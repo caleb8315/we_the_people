@@ -20,7 +20,7 @@ export function NavBarClient({ signedIn }: { signedIn: boolean }) {
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-base-900/80 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center gap-6 px-5 py-3.5">
+      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:gap-6 sm:px-5 sm:py-3.5">
         <Link href="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight">
           <span
             aria-hidden="true"
@@ -32,7 +32,7 @@ export function NavBarClient({ signedIn }: { signedIn: boolean }) {
             OSINT <span className="text-white/50">Platform</span>
           </span>
         </Link>
-        <nav className="flex flex-1 items-center gap-1 text-sm">
+        <nav className="hidden flex-1 items-center gap-1 text-sm md:flex">
           {links.map((l) => {
             const isActive = pathname === l.href || (l.href !== '/' && pathname.startsWith(l.href));
             return (
@@ -55,7 +55,7 @@ export function NavBarClient({ signedIn }: { signedIn: boolean }) {
             );
           })}
         </nav>
-        <div className="flex items-center gap-2 text-sm">
+        <div className="ml-auto hidden items-center gap-2 text-sm md:flex">
           {signedIn ? (
             <>
               <Link
@@ -72,6 +72,23 @@ export function NavBarClient({ signedIn }: { signedIn: boolean }) {
               className="rounded-full bg-white px-4 py-1.5 text-sm font-medium text-black hover:bg-white/90"
             >
               Sign in
+            </Link>
+          )}
+        </div>
+        <div className="ml-auto flex items-center gap-2 md:hidden">
+          {!signedIn ? (
+            <Link
+              href="/login"
+              className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-black hover:bg-white/90"
+            >
+              Sign in
+            </Link>
+          ) : (
+            <Link
+              href="/settings"
+              className="rounded-full border border-white/15 px-2.5 py-1.5 text-xs text-white/80 hover:bg-white/10"
+            >
+              Settings
             </Link>
           )}
         </div>

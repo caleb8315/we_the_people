@@ -118,14 +118,17 @@ export default async function IntelWorkspacePage({
                 <Link
                   key={sv.id}
                   href={href}
-                  className="rounded-full border border-white/15 px-2.5 py-1 text-white/70 hover:border-white/30 hover:text-white"
+                  className="rounded-full border border-white/15 px-2 py-1 text-[11px] text-white/70 hover:border-white/30 hover:text-white sm:px-2.5 sm:text-xs"
                 >
                   {sv.name}
                 </Link>
               );
             })
           )}
-          <SaveIntelViewButton view={view} payload={{ topics: [...focusTopics], min_alert_severity: prefs?.min_alert_severity ?? 70 }} />
+          <SaveIntelViewButton
+            view={view}
+            payload={{ topics: [...focusTopics], min_alert_severity: prefs?.min_alert_severity ?? 70 }}
+          />
         </div>
       </header>
 
@@ -147,7 +150,7 @@ export default async function IntelWorkspacePage({
           <SignalsMap
             points={geoPoints}
             context="intel"
-            mapHeightClass="h-[54vh] min-h-[380px]"
+            mapHeightClass="h-[48vh] min-h-[300px] sm:h-[54vh] sm:min-h-[380px]"
             emptyMessage="Priority signals are present, but none have mappable geospatial metadata."
           />
         ) : (

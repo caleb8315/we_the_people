@@ -26,9 +26,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en">
       <body className="min-h-screen antialiased">
         <NavBar />
-        <main className="mx-auto max-w-6xl px-5 py-8 pb-24 sm:py-10">{children}</main>
+        <main className="mx-auto max-w-6xl px-4 py-5 pb-28 sm:px-5 sm:py-10 sm:pb-24">{children}</main>
         <MobileBottomNav signedIn={signedIn} />
-        <footer className="mx-auto max-w-6xl px-5 py-10 text-xs text-white/50">
+        <footer className="mx-auto hidden max-w-6xl px-4 pb-24 pt-10 text-xs text-white/50 sm:block sm:px-5 sm:pb-10">
           <div className="flex flex-wrap items-center gap-4">
             <span>© {new Date().getFullYear()} OSINT Platform</span>
             <Link href="/privacy" className="hover:text-white">

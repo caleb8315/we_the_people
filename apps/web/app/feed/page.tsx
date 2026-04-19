@@ -142,8 +142,8 @@ export default async function FeedPage({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+      <header className="flex flex-col gap-3 sm:gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Live feed</h1>
             <p className="mt-1 text-sm text-white/60">
@@ -159,7 +159,7 @@ export default async function FeedPage({
           </div>
 
           {userId && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
               <Segmented
                 ariaLabel="Feed mode"
                 active={mode}
@@ -238,7 +238,7 @@ export default async function FeedPage({
           ))}
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-white/55">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/55">
           <span>
             Showing <strong className="text-white/80">{signals.length}</strong> signal
             {signals.length === 1 ? '' : 's'}
@@ -284,7 +284,7 @@ export default async function FeedPage({
           <SignalsMap
             points={geoPoints}
             context="feed"
-            mapHeightClass="h-[52vh] min-h-[360px]"
+            mapHeightClass="h-[42vh] min-h-[260px] sm:h-[52vh] sm:min-h-[360px]"
             emptyMessage="No mappable signals in this filter window yet."
           />
           <div className="rounded-card border border-white/10 bg-white/[0.03] p-3 text-xs text-white/60">
