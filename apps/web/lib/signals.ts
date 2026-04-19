@@ -15,6 +15,7 @@ export interface SignalRowRaw {
   distinct_domains: string[] | null;
   source_id?: string | null;
   first_seen_at: string;
+  raw_data?: Record<string, unknown> | null;
 }
 
 export interface DecoratedSignal extends SignalRowRaw {

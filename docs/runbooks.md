@@ -199,3 +199,56 @@ select
     2
   ) as limit_hit_pct;
 ```
+
+### SQL: map usage and effectiveness (7d)
+
+```sql
+with feed as (
+  select event_props
+  from public.product_events
+  where event_name = 'feed_viewed'
+    and created_at >= now() - interval '7 days'
+)
+select
+  count(*) as feed_views,
+  count(*) filter (where event_props->>'view' = 'map') as map_feed_views,
+  round(
+    100.0 * count(*) filter (where event_props->>'view' = 'map')::numeric
+    / nullif(count(*), 0),
+    2
+  ) as map_feed_share_pct
+from feed;
+
+select
+  count(*) filter (where event_name = 'map_opened') as map_opened,
+  count(*) filter (where event_name = 'signal_opened_from_map') as map_signal_opened,
+  round(
+    100.0 * count(*) filter (where event_name = 'signal_opened_from_map')::numeric
+    / nullif(count(*) filter (where event_name = 'map_opened'), 0),
+    2
+  ) as map_open_to_signal_open_pct
+from public.product_events
+where event_name in ('map_opened', 'signal_opened_from_map')
+  and created_at >= now() - interval '7 days';
+```
+
+### SQL: mobile navigation adoption (7d)
+
+```sql
+select
+  count(*) as mobile_nav_actions
+from public.product_events
+where event_name = 'mobile_nav_used'
+  and created_at >= now() - interval '7 days';
+```
+
+### SQL: saved view adoption (7d)
+
+```sql
+select
+  count(*) as saved_view_events,
+  count(*) filter (where event_props->>'action' = 'created') as presets_created
+from public.product_events
+where event_name = 'saved_view_applied'
+  and created_at >= now() - interval '7 days';
+```

@@ -28,10 +28,10 @@ export function SignalCard({ s }: { s: SignalRow }) {
   return (
     <Link
       href={`/signal/${s.id}`}
-      className="group block rounded-card border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:border-brand-500/50 sm:p-5"
+      className="group block rounded-card border border-white/10 bg-white/[0.03] p-3 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:border-brand-500/50 sm:p-5"
     >
-      <div className="flex gap-4">
-        <div className="flex w-24 shrink-0 flex-col items-start gap-2">
+      <div className="flex gap-3 sm:gap-4">
+        <div className="flex w-20 shrink-0 flex-col items-start gap-2 sm:w-24">
           <SeverityMeter severity={s.severity} />
           <Badge variant={s.verification_status}>{s.verification_status}</Badge>
         </div>
@@ -60,12 +60,12 @@ export function SignalCard({ s }: { s: SignalRow }) {
             )}
           </div>
 
-          <h3 className="mt-2 text-[16px] font-semibold tracking-tight clamp-2 group-hover:text-white">
+          <h3 className="mt-1.5 text-[15px] font-semibold tracking-tight clamp-2 group-hover:text-white sm:mt-2 sm:text-[16px]">
             {s.title}
           </h3>
-          {s.summary && <p className="mt-1 text-sm text-white/70 clamp-2">{s.summary}</p>}
+          {s.summary && <p className="mt-1 text-[13px] text-white/70 clamp-2 sm:text-sm">{s.summary}</p>}
 
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-white/55">
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-white/55 sm:mt-3 sm:gap-x-3 sm:text-[12px]">
             <span>
               Sources <strong className="text-white/80">{s.source_count}</strong>
             </span>

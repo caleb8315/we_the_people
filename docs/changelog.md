@@ -4,6 +4,10 @@ User-facing changes to the beta. Update as new cohorts get features.
 
 ## Unreleased
 
+- Added map/list UX for Feed and Intel workspace, including geospatial signal plotting with exact-vs-approximate location indicators.
+- Added mobile-first navigation and denser mobile signal cards for faster one-hand triage.
+- Added saved view presets (`user_saved_views`) for feed and intel contexts, with server-side API support.
+- Added UX telemetry events and operator validation tiles for map adoption, map-to-signal engagement, mobile usage, and saved-view adoption.
 - Shipped research-driven personalization defaults: My Feed by default with one-tap Global Feed, and dual-mode briefings (`My briefing` + `Global briefing`).
 - Added preference controls for feed mode, briefing frequency, alert intensity, and max alerts/day.
 - Added low-noise alert behavior (`critical_only` defaults, per-user alert cap preference, telemetry for sent/muted alerts).

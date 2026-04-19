@@ -7,7 +7,14 @@ type ProductEventName =
   | 'briefing_opened'
   | 'alert_sent'
   | 'alert_muted'
-  | 'preferences_updated';
+  | 'preferences_updated'
+  | 'feed_view_toggled'
+  | 'map_opened'
+  | 'map_filter_changed'
+  | 'signal_opened_from_map'
+  | 'mobile_nav_used'
+  | 'feed_scrolled_depth'
+  | 'saved_view_applied';
 
 export async function logProductEvent(
   sb: SupabaseClient,

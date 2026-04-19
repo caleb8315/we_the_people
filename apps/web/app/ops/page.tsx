@@ -19,17 +19,53 @@ export default async function OpsPage() {
   const since = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [{ data: runs }, { data: usage }, { count: signalCount }, { count: briefingCount }] = await Promise.all([
+  const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const [
+    { data: runs },
+    { data: usage },
+    { count: signalCount },
+    { count: briefingCount },
+    { data: uxEvents },
+  ] = await Promise.all([
     admin.from('engine_runs').select('*').gte('started_at', since).order('started_at', { ascending: false }).limit(50),
     admin.from('usage_ledger').select('bucket, calls').eq('day', today),
     admin.from('signals').select('id', { count: 'exact', head: true }),
     admin.from('briefings').select('id', { count: 'exact', head: true }),
+    admin
+      .from('product_events')
+      .select('event_name, event_props')
+      .gte('created_at', weekAgo)
+      .in('event_name', [
+        'feed_viewed',
+        'map_opened',
+        'signal_opened_from_map',
+        'mobile_nav_used',
+        'saved_view_applied',
+      ]),
   ]);
 
   const usageByBucket = new Map<string, number>();
   for (const r of usage ?? []) {
     usageByBucket.set(r.bucket, (usageByBucket.get(r.bucket) ?? 0) + r.calls);
   }
+  const events = (uxEvents ?? []) as Array<{ event_name: string; event_props?: Record<string, unknown> | null }>;
+  const feedViews = events.filter((e) => e.event_name === 'feed_viewed');
+  const mapOpenCount = events.filter((e) => e.event_name === 'map_opened').length;
+  const mapSignalOpenCount = events.filter((e) => e.event_name === 'signal_opened_from_map').length;
+  const mobileNavCount = events.filter((e) => e.event_name === 'mobile_nav_used').length;
+  const savedViewCount = events.filter((e) => e.event_name === 'saved_view_applied').length;
+  const mapViewRate =
+    feedViews.length === 0
+      ? 0
+      : Math.round(
+          (100 * feedViews.filter((e) => String(e.event_props?.view ?? '') === 'map').length) / feedViews.length,
+        );
+  const mobileFeedRate =
+    feedViews.length === 0
+      ? 0
+      : Math.round(
+          (100 * feedViews.filter((e) => Boolean(e.event_props?.is_mobile)).length) / feedViews.length,
+        );
 
   return (
     <div className="space-y-8">
@@ -55,6 +91,29 @@ export default async function OpsPage() {
         />
         <StatTile label="Buckets used" value={usageByBucket.size} />
       </section>
+
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <StatTile label="Map feed share (7d)" value={`${mapViewRate}%`} hint="feed_viewed events in map mode" />
+        <StatTile label="Map opened (7d)" value={mapOpenCount} hint="feed + intel map sessions" />
+        <StatTile label="Map signal opens (7d)" value={mapSignalOpenCount} hint="signal_opened_from_map" />
+        <StatTile label="Mobile feed share (7d)" value={`${mobileFeedRate}%`} hint="feed_viewed from mobile UA" />
+        <StatTile label="Saved views (7d)" value={savedViewCount} hint="saved_view_applied events" />
+      </section>
+
+      <Card title="UX validation hints">
+        <ul className="space-y-1 text-sm text-white/70">
+          <li>
+            Map discoverability is healthy if map feed share reaches at least <strong className="text-white">20%</strong> in
+            early cohorts.
+          </li>
+          <li>
+            Map utility improves when <strong className="text-white">signal_opened_from_map / map_opened</strong> trends up.
+          </li>
+          <li>
+            Mobile UX should increase mobile feed share and keep useful-alert ratio above guardrail.
+          </li>
+        </ul>
+      </Card>
 
       <Card title="Usage today">
         {usageByBucket.size === 0 ? (

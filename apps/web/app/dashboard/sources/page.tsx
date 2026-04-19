@@ -11,6 +11,7 @@ interface SourceRow {
   id: string;
   name: string;
   kind: string;
+  country_code: string | null;
   credibility: number;
   metadata: Record<string, unknown> | null;
   enabled: boolean;
@@ -28,6 +29,23 @@ function groupKey(s: SourceRow): string {
   if (type === 'news_regional') return 'regional_news';
   if (type === 'events') return 'events';
   return kind === 'rss' ? 'news_wires' : 'apis';
+}
+
+function hasGeoCoverage(s: SourceRow): boolean {
+  if (s.country_code) return true;
+  const type = String((s.metadata as any)?.type ?? '').toLowerCase();
+  return [
+    'earthquake',
+    'natural_events',
+    'volcano',
+    'hurricane',
+    'satellite',
+    'space_weather',
+    'weather',
+    'weather_alerts',
+    'humanitarian',
+    'events',
+  ].includes(type);
 }
 
 const GROUP_LABELS: Record<string, string> = {
@@ -57,7 +75,7 @@ export default async function SourcesPage() {
   const [{ data: sources }, { data: prefs }] = await Promise.all([
     sb
       .from('sources')
-      .select('id, name, kind, credibility, metadata, enabled')
+      .select('id, name, kind, country_code, credibility, metadata, enabled')
       .eq('enabled', true)
       .order('credibility', { ascending: false }),
     sb.from('preferences').select('muted_sources').eq('user_id', auth.user.id).maybeSingle(),
@@ -76,6 +94,7 @@ export default async function SourcesPage() {
   const mutedCount = rows.filter((s) => muted.has(s.id)).length;
   const activeCount = rows.length - mutedCount;
   const highCredCount = rows.filter((s) => s.credibility >= 80).length;
+  const mapReadyCount = rows.filter((s) => hasGeoCoverage(s)).length;
 
   const order = [
     'news_wires',
@@ -99,10 +118,11 @@ export default async function SourcesPage() {
         </p>
       </header>
 
-      <section className="grid gap-3 sm:grid-cols-3">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="Sources active" value={activeCount} hint={`in your account (of ${rows.length})`} tone="accent" />
         <StatTile label="You have muted" value={mutedCount} tone={mutedCount > 0 ? 'warn' : 'neutral'} />
         <StatTile label="High credibility" value={highCredCount} hint="credibility 80+" />
+        <StatTile label="Map-ready sources" value={mapReadyCount} hint="geo-capable coverage" />
       </section>
 
       {order
