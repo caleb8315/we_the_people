@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation';
 import { getAdminSupabase, getServerSupabase } from '@/lib/supabase-server';
 import { isAdminEmail } from '@/lib/admin';
+import { StatTile } from '@/components/ui/stat-tile';
+import { Card } from '@/components/ui/card';
 
 export const metadata = { title: 'Ops · OSINT Platform' };
 export const dynamic = 'force-dynamic';
@@ -38,40 +40,40 @@ export default async function OpsPage() {
         </div>
         <a
           href="/ops/requests"
-          className="rounded border border-white/15 bg-white/5 px-3 py-1.5 text-sm hover:bg-white/10"
+          className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-sm hover:bg-white/10"
         >
           Access requests →
         </a>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-4">
-        <Stat label="Signals (total)" value={signalCount ?? 0} />
-        <Stat label="Briefings (total)" value={briefingCount ?? 0} />
-        <Stat label="LLM calls today" value={[...usageByBucket.values()].reduce((a, b) => a + b, 0)} />
-        <Stat label="Buckets used" value={usageByBucket.size} />
+        <StatTile label="Signals (total)" value={(signalCount ?? 0).toLocaleString()} />
+        <StatTile label="Briefings (total)" value={(briefingCount ?? 0).toLocaleString()} />
+        <StatTile
+          label="LLM calls today"
+          value={[...usageByBucket.values()].reduce((a, b) => a + b, 0).toLocaleString()}
+        />
+        <StatTile label="Buckets used" value={usageByBucket.size} />
       </section>
 
-      <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-white/70">Usage today</h2>
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm">
-          {usageByBucket.size === 0 ? (
-            <p className="text-white/60">No LLM calls logged today.</p>
-          ) : (
-            <ul className="grid gap-2 sm:grid-cols-3">
-              {[...usageByBucket.entries()].map(([b, c]) => (
-                <li key={b} className="rounded border border-white/10 p-3">
-                  <div className="text-xs uppercase tracking-wide text-white/60">{b}</div>
-                  <div className="text-lg font-semibold">{c}</div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
+      <Card title="Usage today">
+        {usageByBucket.size === 0 ? (
+          <p className="text-sm text-white/55">No LLM calls logged today.</p>
+        ) : (
+          <ul className="grid gap-2 sm:grid-cols-3">
+            {[...usageByBucket.entries()].map(([b, c]) => (
+              <li key={b} className="rounded-md border border-white/10 p-3">
+                <div className="text-xs uppercase tracking-wide text-white/55">{b}</div>
+                <div className="text-lg font-semibold tabular-nums">{c}</div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-white/70">Recent engine runs</h2>
-        <div className="overflow-x-auto rounded-xl border border-white/10">
+        <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/60">Recent engine runs</h2>
+        <div className="overflow-x-auto rounded-card border border-white/10">
           <table className="w-full text-sm">
             <thead className="bg-white/[0.05] text-left text-white/60">
               <tr>
@@ -106,18 +108,9 @@ export default async function OpsPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-      <div className="text-xs uppercase tracking-wide text-white/60">{label}</div>
-      <div className="mt-1 text-2xl font-semibold">{value.toLocaleString()}</div>
-    </div>
-  );
-}
-
 function statusClass(s: string): string {
-  if (s === 'success') return 'bg-emerald-500/15 text-emerald-300';
-  if (s === 'partial') return 'bg-amber-500/15 text-amber-300';
-  if (s === 'failed') return 'bg-red-500/15 text-red-300';
+  if (s === 'success') return 'bg-brand-500/15 text-brand-300';
+  if (s === 'partial') return 'bg-warn-500/15 text-warn-400';
+  if (s === 'failed') return 'bg-danger-500/15 text-danger-400';
   return 'bg-white/10 text-white/60';
 }

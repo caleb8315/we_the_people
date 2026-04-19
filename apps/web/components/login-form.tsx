@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Segmented } from './ui/segmented';
 
 type Mode = 'signin' | 'signup';
 type Result = { ok: boolean; message: string } | null;
@@ -40,7 +41,7 @@ export function LoginForm({ next }: { next: string }) {
         });
         setMode('signin');
       } else {
-        window.location.href = next || '/feed';
+        window.location.href = next || '/dashboard';
       }
     } catch {
       setResult({ ok: false, message: 'Network error. Please try again.' });
@@ -50,79 +51,95 @@ export function LoginForm({ next }: { next: string }) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 rounded-lg border border-white/10 p-1 text-sm">
-        <button
-          type="button"
-          onClick={() => setMode('signin')}
-          className={`rounded py-2 ${mode === 'signin' ? 'bg-white text-black' : 'text-white/70'}`}
-        >
-          Sign in
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('signup')}
-          className={`rounded py-2 ${mode === 'signup' ? 'bg-white text-black' : 'text-white/70'}`}
-        >
-          Sign up
-        </button>
-      </div>
+    <div className="space-y-5">
+      <Segmented
+        ariaLabel="Auth mode"
+        active={mode}
+        onSelect={(v) => setMode(v as Mode)}
+        className="w-full"
+        options={[
+          { label: 'Sign in', value: 'signin' },
+          { label: 'Sign up', value: 'signup' },
+        ]}
+      />
 
       <form onSubmit={onSubmit} className="space-y-3">
         {mode === 'signup' && (
-          <label className="block text-sm text-white/70">
-            Display name (optional)
+          <Field label="Display name (optional)">
             <input
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="mt-1 w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-white outline-none focus:border-white/40"
+              className="input"
               placeholder="Analyst Zero"
             />
-          </label>
+          </Field>
         )}
 
-        <label className="block text-sm text-white/70">
-          Email
+        <Field label="Email">
           <input
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-white outline-none focus:border-white/40"
+            className="input"
             placeholder="you@example.com"
           />
-        </label>
+        </Field>
 
-        <label className="block text-sm text-white/70">
-          Password
+        <Field label="Password">
           <input
             type="password"
             required
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-white outline-none focus:border-white/40"
+            className="input"
             placeholder="At least 8 characters"
           />
-        </label>
+        </Field>
 
         <button
           type="submit"
           disabled={loading || !email || !password}
-          className="w-full rounded bg-white px-4 py-2 font-medium text-black disabled:opacity-60"
+          className="w-full rounded-full bg-white px-4 py-2.5 font-medium text-black hover:bg-white/90 disabled:opacity-60"
         >
           {loading ? 'Working…' : mode === 'signin' ? 'Sign in' : 'Create account'}
         </button>
       </form>
 
       {result && (
-        <p className={`text-sm ${result.ok ? 'text-emerald-300' : 'text-red-300'}`}>{result.message}</p>
+        <p className={`text-sm ${result.ok ? 'text-brand-300' : 'text-danger-400'}`}>{result.message}</p>
       )}
 
       <p className="text-xs text-white/50">
         MVP mode: email/password auth. In Supabase Auth settings, disable “Confirm email” for instant signup login.
       </p>
+
+      <style jsx>{`
+        .input {
+          width: 100%;
+          border-radius: 8px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          background: rgba(255, 255, 255, 0.05);
+          padding: 10px 12px;
+          color: white;
+          outline: none;
+          transition: border-color 120ms ease;
+        }
+        .input:focus {
+          border-color: rgba(16, 185, 129, 0.6);
+        }
+      `}</style>
     </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block text-sm text-white/75">
+      <span className="mb-1 inline-block text-xs font-medium uppercase tracking-wide text-white/55">{label}</span>
+      {children}
+    </label>
   );
 }

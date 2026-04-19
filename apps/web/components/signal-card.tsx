@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { Badge } from './ui/badge';
+import { SeverityMeter } from './ui/severity-meter';
 
 export interface SignalRow {
   id: string;
@@ -14,51 +16,71 @@ export interface SignalRow {
   credible_source_count: number;
   distinct_domains: string[];
   first_seen_at: string;
+  contradictions_count?: number;
+  is_disputed?: boolean;
+  is_new_since?: boolean;
 }
 
-const STATUS_STYLES: Record<SignalRow['verification_status'], string> = {
-  verified: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  developing: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  unverified: 'bg-white/5 text-white/60 border-white/10',
-  quarantined: 'bg-red-500/10 text-red-300 border-red-500/20',
-  blocked: 'bg-red-500/15 text-red-300 border-red-500/30',
-};
-
 export function SignalCard({ s }: { s: SignalRow }) {
-  const label = confidenceLabel(s.confidence);
+  const confLabel = confidenceLabel(s.confidence);
+  const disputed = s.is_disputed ?? (s.contradictions_count ?? 0) > 0;
+
   return (
     <Link
       href={`/signal/${s.id}`}
-      className="block rounded-xl border border-white/10 bg-white/[0.03] p-5 transition hover:bg-white/[0.06]"
+      className="group block rounded-card border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:border-brand-500/50 sm:p-5"
     >
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className={`rounded border px-2 py-0.5 uppercase tracking-wide ${STATUS_STYLES[s.verification_status]}`}>
-          {s.verification_status}
-        </span>
-        {s.topic && (
-          <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 uppercase tracking-wide text-white/70">
-            {s.topic}
-          </span>
-        )}
-        {s.country_code && (
-          <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-white/70">
-            {s.country_code}
-          </span>
-        )}
-        <span className="ml-auto text-white/50">
-          sev {s.severity} · conf {label}
-        </span>
-      </div>
+      <div className="flex gap-4">
+        <div className="flex w-24 shrink-0 flex-col items-start gap-2">
+          <SeverityMeter severity={s.severity} />
+          <Badge variant={s.verification_status}>{s.verification_status}</Badge>
+        </div>
 
-      <h3 className="mt-3 text-base font-semibold">{s.title}</h3>
-      {s.summary && <p className="mt-1 text-sm text-white/70 line-clamp-3">{s.summary}</p>}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {s.topic && (
+              <Badge variant="topic" withIcon={false}>
+                {s.topic}
+              </Badge>
+            )}
+            {s.country_code && (
+              <Badge variant="country" withIcon={false}>
+                {s.country_code}
+              </Badge>
+            )}
+            {disputed && (
+              <Badge variant="disputed" title="Contradictions flagged on this signal">
+                Disputed
+              </Badge>
+            )}
+            {s.is_new_since && (
+              <Badge variant="new" title="New since your last visit">
+                New
+              </Badge>
+            )}
+          </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/50">
-        <span>{s.source_count} source{s.source_count === 1 ? '' : 's'}</span>
-        <span>·</span>
-        <span>{s.credible_source_count} credible</span>
-        <span>·</span>
-        <span>{new Date(s.first_seen_at).toLocaleString()}</span>
+          <h3 className="mt-2 text-[16px] font-semibold tracking-tight clamp-2 group-hover:text-white">
+            {s.title}
+          </h3>
+          {s.summary && <p className="mt-1 text-sm text-white/70 clamp-2">{s.summary}</p>}
+
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-white/55">
+            <span>
+              Sources <strong className="text-white/80">{s.source_count}</strong>
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>
+              Credible <strong className="text-white/80">{s.credible_source_count}</strong>
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>
+              Confidence <strong className="text-white/80">{confLabel}</strong>
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>{relativeTime(s.first_seen_at)}</span>
+          </div>
+        </div>
       </div>
     </Link>
   );
@@ -68,4 +90,18 @@ function confidenceLabel(n: number): string {
   if (n >= 75) return 'high';
   if (n >= 45) return 'medium';
   return 'low';
+}
+
+function relativeTime(iso: string): string {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '';
+  const diff = Date.now() - t;
+  const mins = Math.round(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 14) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
 }

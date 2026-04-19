@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Segmented } from './ui/segmented';
 
 const TOPICS = ['war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'other'] as const;
 type Topic = (typeof TOPICS)[number];
@@ -48,8 +49,12 @@ export function SettingsForm({
   const [alerts, setAlerts] = useState<boolean>(initial?.alerts_enabled ?? true);
   const [minSev, setMinSev] = useState<number>(initial?.min_alert_severity ?? 70);
   const [weatherLabel, setWeatherLabel] = useState<string>(initial?.weather_label ?? '');
-  const [weatherLat, setWeatherLat] = useState<string>(initial?.weather_lat != null ? String(initial.weather_lat) : '');
-  const [weatherLon, setWeatherLon] = useState<string>(initial?.weather_lon != null ? String(initial.weather_lon) : '');
+  const [weatherLat, setWeatherLat] = useState<string>(
+    initial?.weather_lat != null ? String(initial.weather_lat) : '',
+  );
+  const [weatherLon, setWeatherLon] = useState<string>(
+    initial?.weather_lon != null ? String(initial.weather_lon) : '',
+  );
   const [feedMode, setFeedMode] = useState<'personalized' | 'global' | 'hybrid'>(
     initial?.feed_mode_preference ?? 'personalized',
   );
@@ -76,7 +81,6 @@ export function SettingsForm({
     let weatherLonValue = weatherLon.trim();
     let weatherLabelValue = weatherLabel.trim();
 
-    // UX path: user enters "City, State" or ZIP, we auto-resolve coordinates.
     if (weatherLabelValue && (!weatherLatValue || !weatherLonValue)) {
       const geo = await geocodeLocation(weatherLabelValue);
       if (geo) {
@@ -95,8 +99,8 @@ export function SettingsForm({
       muted_topics: mutedTopics,
       countries_of_focus: countries
         .split(',')
-        .map(s => s.trim().toUpperCase())
-        .filter(s => s.length === 2),
+        .map((s) => s.trim().toUpperCase())
+        .filter((s) => s.length === 2),
       email_briefings: email,
       alerts_enabled: alerts,
       min_alert_severity: minSev,
@@ -175,7 +179,7 @@ export function SettingsForm({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-28">
       <Section title="Topics I care about">
         <ChipGroup
           options={[...TOPICS]}
@@ -191,14 +195,17 @@ export function SettingsForm({
           options={[...TOPICS]}
           selected={mutedTopics}
           onToggle={(t) =>
-            setMutedTopics((xs) => (xs.includes(t as Topic) ? xs.filter((x) => x !== t) : [...xs, t as Topic]))
+            setMutedTopics((xs) =>
+              xs.includes(t as Topic) ? xs.filter((x) => x !== t) : [...xs, t as Topic],
+            )
           }
+          tone="danger"
         />
       </Section>
 
       <Section title="Countries of focus (ISO 2-letter, comma-separated)">
         <input
-          className="w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/40"
+          className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-brand-500/50"
           value={countries}
           onChange={(e) => setCountries(e.target.value)}
           placeholder="US, UA, RU, IL"
@@ -218,15 +225,17 @@ export function SettingsForm({
                       xs.includes(s.id) ? xs.filter((x) => x !== s.id) : [...xs, s.id],
                     )
                   }
-                  className={`w-full rounded border px-3 py-2 text-left text-sm ${
+                  className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${
                     isMuted
-                      ? 'border-red-500/40 bg-red-500/10 text-red-200'
-                      : 'border-white/10 bg-white/[0.03] hover:bg-white/10'
+                      ? 'border-danger-500/30 bg-danger-500/10 text-danger-400'
+                      : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{s.name}</span>
-                    <span className="text-xs text-white/50">{isMuted ? 'muted' : `cred ${s.credibility}`}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium clamp-1">{s.name}</span>
+                    <span className="text-[11px] text-white/55">
+                      {isMuted ? 'muted' : `cred ${s.credibility}`}
+                    </span>
                   </div>
                 </button>
               </li>
@@ -235,87 +244,84 @@ export function SettingsForm({
         </ul>
       </Section>
 
-      <Section title="Delivery">
-        <div className="mb-4 space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-          <label className="block text-xs uppercase tracking-wide text-white/60">Feed mode default</label>
-          <select
-            value={feedMode}
-            onChange={(e) => setFeedMode(e.target.value as 'personalized' | 'global' | 'hybrid')}
-            className="w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/40"
-          >
-            <option value="personalized">Personalized first</option>
-            <option value="global">Global first</option>
-            <option value="hybrid">Hybrid (balanced)</option>
-          </select>
-          <p className="text-xs text-white/50">You can still switch instantly between My Feed and Global Feed.</p>
-        </div>
+      <Section title="Delivery defaults">
+        <div className="space-y-4">
+          <Field label="Feed mode default" hint="You can still switch instantly between My Feed and Global Feed.">
+            <Segmented
+              active={feedMode}
+              onSelect={(v) => setFeedMode(v as 'personalized' | 'global' | 'hybrid')}
+              options={[
+                { label: 'Personalized', value: 'personalized' },
+                { label: 'Global', value: 'global' },
+                { label: 'Hybrid', value: 'hybrid' },
+              ]}
+            />
+          </Field>
 
-        <div className="mb-4 space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-          <label className="block text-xs uppercase tracking-wide text-white/60">Briefing frequency</label>
-          <select
-            value={briefingFrequency}
-            onChange={(e) => setBriefingFrequency(e.target.value as 'daily' | 'weekly' | 'both' | 'off')}
-            className="w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/40"
-          >
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="both">Daily + weekly</option>
-            <option value="off">Off</option>
-          </select>
-          <p className="text-xs text-white/50">Default is daily (1/day) to stay useful without spamming.</p>
-        </div>
+          <Field label="Briefing frequency" hint="Daily (1/day) is recommended to stay useful without spam.">
+            <Segmented
+              active={briefingFrequency}
+              onSelect={(v) => setBriefingFrequency(v as 'daily' | 'weekly' | 'both' | 'off')}
+              options={[
+                { label: 'Daily', value: 'daily' },
+                { label: 'Weekly', value: 'weekly' },
+                { label: 'Both', value: 'both' },
+                { label: 'Off', value: 'off' },
+              ]}
+            />
+          </Field>
 
-        <label className="flex items-center gap-3 text-sm">
-          <input type="checkbox" checked={email} onChange={(e) => setEmail(e.target.checked)} />
-          Daily email briefing
-        </label>
-        <label className="mt-2 flex items-center gap-3 text-sm">
-          <input type="checkbox" checked={alerts} onChange={(e) => setAlerts(e.target.checked)} />
-          Priority alerts
-        </label>
-        <div className="mt-3 flex items-center gap-3 text-sm">
-          <label>Minimum severity for alerts: <strong>{minSev}</strong></label>
-          <input
-            type="range"
-            min={40}
-            max={95}
-            value={minSev}
-            onChange={(e) => setMinSev(Number(e.target.value))}
-          />
-        </div>
+          <div className="flex flex-wrap items-center gap-6">
+            <label className="flex items-center gap-2 text-sm text-white/85">
+              <input type="checkbox" checked={email} onChange={(e) => setEmail(e.target.checked)} />
+              Daily email briefing
+            </label>
+            <label className="flex items-center gap-2 text-sm text-white/85">
+              <input type="checkbox" checked={alerts} onChange={(e) => setAlerts(e.target.checked)} />
+              Priority alerts
+            </label>
+          </div>
 
-        <div className="mt-4 space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-          <label className="block text-xs uppercase tracking-wide text-white/60">Alert intensity</label>
-          <select
-            value={alertIntensity}
-            onChange={(e) => setAlertIntensity(e.target.value as 'critical_only' | 'important_and_up' | 'all')}
-            className="w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/40"
-          >
-            <option value="critical_only">Critical only (recommended)</option>
-            <option value="important_and_up">Important and up</option>
-            <option value="all">All priority candidates</option>
-          </select>
-          <label className="block text-sm text-white/70">
-            Max alert emails per day ({maxAlertsPerDay})
+          <Field label={`Minimum alert severity (${minSev})`}>
+            <input
+              type="range"
+              min={40}
+              max={95}
+              value={minSev}
+              onChange={(e) => setMinSev(Number(e.target.value))}
+              className="w-full"
+            />
+          </Field>
+
+          <Field label="Alert intensity">
+            <Segmented
+              active={alertIntensity}
+              onSelect={(v) => setAlertIntensity(v as 'critical_only' | 'important_and_up' | 'all')}
+              options={[
+                { label: 'Critical only', value: 'critical_only' },
+                { label: 'Important+', value: 'important_and_up' },
+                { label: 'All', value: 'all' },
+              ]}
+            />
+          </Field>
+
+          <Field label={`Max alert emails per day (${maxAlertsPerDay})`} hint="Platform cap is 5/day.">
             <input
               type="range"
               min={1}
               max={5}
               value={maxAlertsPerDay}
               onChange={(e) => setMaxAlertsPerDay(Number(e.target.value))}
-              className="mt-2 w-full"
+              className="w-full"
             />
-          </label>
-          <p className="text-xs text-white/50">
-            Platform cap is 5/day in beta; default behavior targets roughly 1-3/day.
-          </p>
+          </Field>
         </div>
       </Section>
 
-      <Section title="Weather location (city/state/ZIP)">
+      <Section title="Weather location">
         <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
           <input
-            className="rounded border border-white/15 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/40"
+            className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-brand-500/50"
             value={weatherLabel}
             onChange={(e) => setWeatherLabel(e.target.value)}
             placeholder="Denver, CO or 80202"
@@ -324,7 +330,7 @@ export function SettingsForm({
             type="button"
             onClick={geocodeNow}
             disabled={geocoding || !weatherLabel.trim()}
-            className="rounded border border-white/20 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-60"
+            className="rounded-full border border-white/15 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-60"
           >
             {geocoding ? 'Resolving…' : 'Auto-resolve'}
           </button>
@@ -335,71 +341,41 @@ export function SettingsForm({
         </p>
       </Section>
 
-      <Section title="Advanced weather coordinates (optional)">
-        <div className="grid gap-2 sm:grid-cols-2">
-          <input
-            className="rounded border border-white/15 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/40"
-            value={weatherLat}
-            onChange={(e) => setWeatherLat(e.target.value)}
-            placeholder="Latitude (optional)"
-          />
-          <input
-            className="rounded border border-white/15 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/40"
-            value={weatherLon}
-            onChange={(e) => setWeatherLon(e.target.value)}
-            placeholder="Longitude (optional)"
-          />
-        </div>
-      </Section>
-
-      <div className="flex items-center gap-3">
-        <button
-          onClick={save}
-          disabled={saving}
-          className="rounded bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-60"
-        >
-          {saving ? 'Saving…' : 'Save settings'}
-        </button>
-        {status && <span className="text-sm text-white/70">{status}</span>}
-      </div>
-
       <Section title="Account">
-        <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+        <div className="space-y-3 rounded-card border border-white/10 bg-white/[0.03] p-4">
           <p className="text-sm text-white/70">
             Email: <span className="font-mono text-white/90">{account.email}</span>
           </p>
-          <label className="block text-sm text-white/70">
-            Display name
+          <Field label="Display name">
             <input
-              className="mt-1 w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/40"
+              className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-brand-500/50"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="Analyst Zero"
             />
-          </label>
-          <label className="block text-sm text-white/70">
-            New password (optional)
+          </Field>
+          <Field label="New password (optional)">
             <input
               type="password"
               minLength={8}
-              className="mt-1 w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/40"
+              className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-brand-500/50"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="Minimum 8 characters"
             />
-          </label>
+          </Field>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={saveAccount}
-              className="rounded border border-white/20 px-3 py-2 text-sm hover:bg-white/10"
+              className="rounded-full border border-white/15 px-3 py-2 text-sm hover:bg-white/10"
             >
               Save account
             </button>
             <button
               type="button"
               onClick={signOut}
-              className="rounded border border-red-500/30 px-3 py-2 text-sm text-red-200 hover:bg-red-500/10"
+              className="rounded-full border border-danger-500/30 px-3 py-2 text-sm text-danger-400 hover:bg-danger-500/10"
             >
               Sign out
             </button>
@@ -409,20 +385,36 @@ export function SettingsForm({
       </Section>
 
       <Section title="Trust & methodology">
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+        <div className="rounded-card border border-white/10 bg-white/[0.03] p-4">
           <p className="text-sm text-white/70">
             Verification states, confidence labels, inconsistency wording, and legal boundaries are documented here.
           </p>
-          <a href="/trust" className="mt-3 inline-block text-sm underline">
+          <a href="/trust" className="mt-3 inline-block text-sm text-brand-300 underline">
             Open trust documentation
           </a>
         </div>
       </Section>
+
+      {/* Sticky save bar */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-base-900/90 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3">
+          <p className="text-xs text-white/60">{status ?? 'Changes are saved to your account only.'}</p>
+          <button
+            onClick={save}
+            disabled={saving}
+            className="rounded-full bg-white px-4 py-2 text-sm font-medium text-black hover:bg-white/90 disabled:opacity-60"
+          >
+            {saving ? 'Saving…' : 'Save settings'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
-async function geocodeLocation(query: string): Promise<{ label: string; lat: number; lon: number } | null> {
+async function geocodeLocation(
+  query: string,
+): Promise<{ label: string; lat: number; lon: number } | null> {
   try {
     const res = await fetch(`/api/location/geocode?query=${encodeURIComponent(query)}`);
     if (!res.ok) return null;
@@ -436,9 +428,19 @@ async function geocodeLocation(query: string): Promise<{ label: string; lat: num
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-white/70">{title}</h2>
+      <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/60">{title}</h2>
       {children}
     </section>
+  );
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <label className="block text-sm text-white/80">
+      <span className="mb-1 inline-block text-xs font-medium uppercase tracking-wide text-white/55">{label}</span>
+      {children}
+      {hint && <p className="mt-1 text-xs text-white/50">{hint}</p>}
+    </label>
   );
 }
 
@@ -446,25 +448,31 @@ function ChipGroup({
   options,
   selected,
   onToggle,
+  tone = 'neutral',
 }: {
   options: string[];
   selected: string[];
   onToggle: (t: string) => void;
+  tone?: 'neutral' | 'danger';
 }) {
   return (
     <div className="flex flex-wrap gap-2">
       {options.map((t) => {
         const on = selected.includes(t);
+        const activeClass =
+          tone === 'danger'
+            ? on
+              ? 'border-danger-500/40 bg-danger-500/15 text-danger-400'
+              : 'border-white/10 text-white/65 hover:border-white/25 hover:text-white'
+            : on
+              ? 'border-brand-500/40 bg-brand-500/15 text-brand-200'
+              : 'border-white/10 text-white/65 hover:border-white/25 hover:text-white';
         return (
           <button
             key={t}
             type="button"
             onClick={() => onToggle(t)}
-            className={`rounded border px-3 py-1 text-sm capitalize ${
-              on
-                ? 'border-white/40 bg-white/10 text-white'
-                : 'border-white/10 text-white/60 hover:border-white/20 hover:text-white'
-            }`}
+            className={`rounded-full border px-3 py-1.5 text-sm capitalize transition ${activeClass}`}
           >
             {t}
           </button>

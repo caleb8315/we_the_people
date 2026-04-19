@@ -67,7 +67,7 @@ export function RequestsTable({ initial }: { initial: AccessRequest[] }) {
         ) : (
           <ul className="space-y-2">
             {pending.map((r) => (
-              <li key={r.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+              <li key={r.id} className="rounded-card border border-white/10 bg-white/[0.03] p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="font-mono text-sm">{r.email}</div>
@@ -80,14 +80,14 @@ export function RequestsTable({ initial }: { initial: AccessRequest[] }) {
                     <button
                       onClick={() => decide(r.email, 'approve')}
                       disabled={busy === r.email}
-                      className="rounded bg-emerald-500/20 px-3 py-1.5 text-sm text-emerald-200 ring-1 ring-emerald-500/30 disabled:opacity-60"
+                      className="rounded-full bg-brand-500/15 px-3 py-1.5 text-sm text-brand-300 ring-1 ring-brand-500/30 disabled:opacity-60"
                     >
                       {busy === r.email ? '…' : 'Approve access'}
                     </button>
                     <button
                       onClick={() => decide(r.email, 'reject')}
                       disabled={busy === r.email}
-                      className="rounded bg-red-500/10 px-3 py-1.5 text-sm text-red-200 ring-1 ring-red-500/30 disabled:opacity-60"
+                      className="rounded-full bg-danger-500/10 px-3 py-1.5 text-sm text-danger-400 ring-1 ring-danger-500/30 disabled:opacity-60"
                     >
                       Reject
                     </button>
@@ -111,10 +111,10 @@ export function RequestsTable({ initial }: { initial: AccessRequest[] }) {
             >
               <span className="font-mono">{r.email}</span>
               <span
-                className={`rounded px-2 py-0.5 text-xs ${
+                className={`rounded-full px-2 py-0.5 text-xs ${
                   r.status === 'approved'
-                    ? 'bg-emerald-500/15 text-emerald-300'
-                    : 'bg-red-500/10 text-red-300'
+                    ? 'bg-brand-500/15 text-brand-300'
+                    : 'bg-danger-500/10 text-danger-400'
                 }`}
               >
                 {r.status}

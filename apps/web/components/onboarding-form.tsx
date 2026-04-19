@@ -1,18 +1,21 @@
 'use client';
 
 import { useState } from 'react';
+import { Segmented } from './ui/segmented';
 
 const TOPICS = ['war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'other'] as const;
 type Topic = (typeof TOPICS)[number];
 
+type FeedMode = 'personalized' | 'global' | 'hybrid';
+type BriefingFreq = 'daily' | 'weekly' | 'both' | 'off';
+type AlertIntensity = 'critical_only' | 'important_and_up' | 'all';
+
 export function OnboardingForm({ defaultName }: { defaultName: string }) {
   const [displayName, setDisplayName] = useState(defaultName);
   const [topics, setTopics] = useState<Topic[]>(['war', 'economy', 'climate']);
-  const [feedMode, setFeedMode] = useState<'personalized' | 'global' | 'hybrid'>('personalized');
-  const [briefingFrequency, setBriefingFrequency] = useState<'daily' | 'weekly' | 'both' | 'off'>('daily');
-  const [alertIntensity, setAlertIntensity] = useState<'critical_only' | 'important_and_up' | 'all'>(
-    'critical_only',
-  );
+  const [feedMode, setFeedMode] = useState<FeedMode>('personalized');
+  const [briefingFrequency, setBriefingFrequency] = useState<BriefingFreq>('daily');
+  const [alertIntensity, setAlertIntensity] = useState<AlertIntensity>('critical_only');
   const [maxAlertsPerDay, setMaxAlertsPerDay] = useState(3);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,9 +46,8 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-5">
-      <label className="block text-sm text-white/70">
-        Display name
+    <form onSubmit={submit} className="space-y-6">
+      <Section title="Your name">
         <input
           type="text"
           required
@@ -53,14 +55,13 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
           maxLength={40}
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
-          className="mt-1 w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-white outline-none focus:border-white/40"
+          className="w-full rounded-md border border-white/15 bg-white/5 px-3 py-2 text-white outline-none focus:border-brand-500/50"
           placeholder="Analyst Zero"
         />
-      </label>
+      </Section>
 
-      <div>
-        <h2 className="text-sm text-white/70">Choose your focus topics</h2>
-        <div className="mt-2 flex flex-wrap gap-2">
+      <Section title="Focus topics" hint="Pick 1 or more. You can change these anytime.">
+        <div className="flex flex-wrap gap-2">
           {TOPICS.map((topic) => {
             const selected = topics.includes(topic);
             return (
@@ -72,10 +73,10 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
                     selected ? prev.filter((t) => t !== topic) : [...prev, topic],
                   )
                 }
-                className={`rounded border px-3 py-1.5 text-sm capitalize ${
+                className={`rounded-full border px-3 py-1.5 text-sm capitalize transition ${
                   selected
-                    ? 'border-white/40 bg-white/10 text-white'
-                    : 'border-white/10 text-white/60 hover:border-white/30'
+                    ? 'border-brand-500/40 bg-brand-500/15 text-brand-200'
+                    : 'border-white/10 text-white/65 hover:border-white/25 hover:text-white'
                 }`}
               >
                 {topic}
@@ -83,72 +84,75 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
             );
           })}
         </div>
-      </div>
+      </Section>
 
-      <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-        <h2 className="text-sm text-white/70">Personalization defaults</h2>
-        <label className="block text-sm text-white/70">
-          Feed mode
-          <select
-            value={feedMode}
-            onChange={(e) => setFeedMode(e.target.value as 'personalized' | 'global' | 'hybrid')}
-            className="mt-1 w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/40"
-          >
-            <option value="personalized">Personalized first</option>
-            <option value="global">Global first</option>
-            <option value="hybrid">Hybrid</option>
-          </select>
-        </label>
-        <label className="block text-sm text-white/70">
-          Briefing frequency
-          <select
-            value={briefingFrequency}
-            onChange={(e) => setBriefingFrequency(e.target.value as 'daily' | 'weekly' | 'both' | 'off')}
-            className="mt-1 w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/40"
-          >
-            <option value="daily">Daily (recommended)</option>
-            <option value="weekly">Weekly</option>
-            <option value="both">Daily + weekly</option>
-            <option value="off">Off</option>
-          </select>
-        </label>
-        <label className="block text-sm text-white/70">
-          Alert intensity
-          <select
-            value={alertIntensity}
-            onChange={(e) => setAlertIntensity(e.target.value as 'critical_only' | 'important_and_up' | 'all')}
-            className="mt-1 w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/40"
-          >
-            <option value="critical_only">Critical only</option>
-            <option value="important_and_up">Important and up</option>
-            <option value="all">All priority candidates</option>
-          </select>
-        </label>
-        <label className="block text-sm text-white/70">
-          Max alert emails/day ({maxAlertsPerDay})
-          <input
-            type="range"
-            min={1}
-            max={5}
-            value={maxAlertsPerDay}
-            onChange={(e) => setMaxAlertsPerDay(Number(e.target.value))}
-            className="mt-1 w-full"
-          />
-        </label>
-        <p className="text-xs text-white/50">
-          Beta defaults are tuned for signal, not noise: personalized feed, daily briefing, critical-first alerts.
-        </p>
-      </div>
+      <Section title="Feed default" hint="Personalized is recommended. You can always switch to global.">
+        <Segmented
+          active={feedMode}
+          onSelect={(v) => setFeedMode(v as FeedMode)}
+          options={[
+            { label: 'Personalized', value: 'personalized' },
+            { label: 'Global', value: 'global' },
+            { label: 'Hybrid', value: 'hybrid' },
+          ]}
+        />
+      </Section>
+
+      <Section title="Briefing frequency" hint="Default is daily (1/day) to stay useful without spam.">
+        <Segmented
+          active={briefingFrequency}
+          onSelect={(v) => setBriefingFrequency(v as BriefingFreq)}
+          options={[
+            { label: 'Daily', value: 'daily' },
+            { label: 'Weekly', value: 'weekly' },
+            { label: 'Both', value: 'both' },
+            { label: 'Off', value: 'off' },
+          ]}
+        />
+      </Section>
+
+      <Section title="Alert intensity" hint="Critical-only keeps noise low. Recommended for beta.">
+        <Segmented
+          active={alertIntensity}
+          onSelect={(v) => setAlertIntensity(v as AlertIntensity)}
+          options={[
+            { label: 'Critical only', value: 'critical_only' },
+            { label: 'Important+', value: 'important_and_up' },
+            { label: 'All', value: 'all' },
+          ]}
+        />
+      </Section>
+
+      <Section title={`Max alerts per day (${maxAlertsPerDay})`} hint="Platform cap is 5/day. Defaults target 1-3/day.">
+        <input
+          type="range"
+          min={1}
+          max={5}
+          value={maxAlertsPerDay}
+          onChange={(e) => setMaxAlertsPerDay(Number(e.target.value))}
+          className="w-full"
+        />
+      </Section>
 
       <button
         type="submit"
         disabled={saving || topics.length === 0 || !displayName.trim()}
-        className="w-full rounded bg-white px-4 py-2 font-medium text-black disabled:opacity-60"
+        className="w-full rounded-full bg-white px-4 py-2.5 font-medium text-black hover:bg-white/90 disabled:opacity-60"
       >
         {saving ? 'Finishing…' : 'Enter dashboard'}
       </button>
 
-      {error && <p className="text-sm text-red-300">{error}</p>}
+      {error && <p className="text-sm text-danger-400">{error}</p>}
     </form>
+  );
+}
+
+function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-white/60">{title}</h2>
+      {hint && <p className="mb-2 mt-1 text-xs text-white/50">{hint}</p>}
+      <div className={hint ? '' : 'mt-2'}>{children}</div>
+    </section>
   );
 }

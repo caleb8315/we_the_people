@@ -12,11 +12,36 @@ body {
   color: #e6e8ee;
   min-height: 100%;
   font-feature-settings: 'ss01', 'cv11';
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 a {
   color: inherit;
 }
 
+/* Consistent focus ring across interactive elements */
+:where(button, a, input, select, textarea, [role='button']):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.6);
+  border-radius: 6px;
+}
+
+/* Line-clamp utilities for scannable cards */
+.clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Hide scrollbar on horizontal chip rows while keeping scroll behavior */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Article typography used on briefing detail + long pages */
 .prose-osint p { line-height: 1.7; }
 .prose-osint h1, .prose-osint h2, .prose-osint h3 { letter-spacing: -0.01em; }
+.prose-osint h2 { font-size: 20px; font-weight: 600; margin-top: 1.25em; }
+.prose-osint h3 { font-size: 16px; font-weight: 600; margin-top: 1em; }
+.prose-osint ul { padding-left: 1.15em; list-style: disc; }
+.prose-osint li { margin-top: 0.25em; }

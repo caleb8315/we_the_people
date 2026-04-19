@@ -28,11 +28,14 @@ export default async function OnboardingPage() {
 
   return (
     <div className="mx-auto max-w-xl space-y-5">
-      <h1 className="text-3xl font-semibold tracking-tight">Welcome to your workspace</h1>
-      <p className="text-sm text-white/70">
-        One-time setup. Pick your identity and focus topics, then your dashboard and AI workspace will be personalized.
-      </p>
-      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+      <header>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-300">Welcome</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Set up your workspace</h1>
+        <p className="mt-2 text-sm text-white/70">
+          One-time setup. Pick your identity, focus topics, and delivery defaults. You can change anything later.
+        </p>
+      </header>
+      <div className="rounded-card border border-white/10 bg-white/[0.03] p-5">
         <OnboardingForm defaultName={defaultName} />
       </div>
     </div>

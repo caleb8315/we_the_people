@@ -1,7 +1,10 @@
-import Link from 'next/link';
 import { getServerSupabase } from '@/lib/supabase-server';
-import { SignalCard, type SignalRow } from '@/components/signal-card';
+import { SignalCard } from '@/components/signal-card';
+import { Segmented } from '@/components/ui/segmented';
+import { ChipRow } from '@/components/ui/chip-row';
+import { EmptyState } from '@/components/ui/empty-state';
 import { logProductEvent } from '@/lib/product-events';
+import { decorateSignals, personalizeSignals, type SignalRowRaw } from '@/lib/signals';
 
 export const metadata = { title: 'Feed · OSINT Platform' };
 export const revalidate = 60;
@@ -26,9 +29,7 @@ export default async function FeedPage({
   const { data: prefs } = userId
     ? await sb
         .from('preferences')
-        .select(
-          'topics, muted_sources, muted_topics, countries_of_focus, feed_mode_preference, min_alert_severity',
-        )
+        .select('topics, muted_sources, muted_topics, countries_of_focus, feed_mode_preference')
         .eq('user_id', userId)
         .maybeSingle()
     : { data: null };
@@ -46,8 +47,9 @@ export default async function FeedPage({
   if (topic !== 'all') q = q.eq('topic', topic);
 
   const { data, error } = await q;
-  const allSignals = (data ?? []) as SignalRow[];
-  const signals = mode === 'personalized' ? personalizeSignals(allSignals, prefs) : allSignals;
+  const allSignals = (data ?? []) as SignalRowRaw[];
+  const filtered = mode === 'personalized' ? personalizeSignals(allSignals, prefs) : allSignals;
+  const signals = await decorateSignals(sb, filtered);
 
   if (userId) {
     void logProductEvent(sb, {
@@ -69,74 +71,82 @@ export default async function FeedPage({
     }
   }
 
+  const qp = (m: string, t: string) => `/feed?mode=${m}&topic=${t}&hours=${hours}`;
+
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Live feed</h1>
-          <p className="text-sm text-white/60">
-            {mode === 'personalized'
-              ? `Your personalized queue for the past ${hours}h.`
-              : `Global queue ranked by severity for the past ${hours}h.`}
-          </p>
-          {!userId && (
-            <p className="mt-1 text-xs text-white/45">
-              Public view: this feed is not connected to any user profile.
+      <header className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Live feed</h1>
+            <p className="mt-1 text-sm text-white/60">
+              {mode === 'personalized'
+                ? `Your personalized queue for the past ${hours}h.`
+                : `Global queue ranked by severity for the past ${hours}h.`}
             </p>
+            {!userId && (
+              <p className="mt-1 text-xs text-white/45">
+                Public view: this feed is not connected to any user profile.
+              </p>
+            )}
+          </div>
+
+          {userId && (
+            <Segmented
+              ariaLabel="Feed mode"
+              active={mode}
+              options={[
+                { label: 'My feed', value: 'personalized', href: qp('personalized', topic) },
+                { label: 'Global feed', value: 'global', href: qp('global', topic) },
+              ]}
+            />
           )}
         </div>
-        {userId && (
-          <div className="flex items-center gap-2 text-sm">
-            <Link
-              href={`/feed?mode=personalized&topic=${topic}&hours=${hours}`}
-              className={`rounded border px-3 py-1 ${
-                mode === 'personalized'
-                  ? 'border-white/40 bg-white/10 text-white'
-                  : 'border-white/10 text-white/60 hover:border-white/20 hover:text-white'
-              }`}
-            >
-              My feed
-            </Link>
-            <Link
-              href={`/feed?mode=global&topic=${topic}&hours=${hours}`}
-              className={`rounded border px-3 py-1 ${
-                mode === 'global'
-                  ? 'border-white/40 bg-white/10 text-white'
-                  : 'border-white/10 text-white/60 hover:border-white/20 hover:text-white'
-              }`}
-            >
-              Global feed
-            </Link>
-          </div>
-        )}
-        <div className="flex flex-wrap gap-2 text-sm">
-          {TOPICS.map(t => (
-            <Link
-              key={t}
-              href={`/feed?mode=${mode}&topic=${t}&hours=${hours}`}
-              className={`rounded border px-3 py-1 capitalize ${
-                t === topic
-                  ? 'border-white/40 bg-white/10 text-white'
-                  : 'border-white/10 text-white/60 hover:border-white/20 hover:text-white'
-              }`}
-            >
-              {t}
-            </Link>
-          ))}
+
+        <ChipRow
+          active={topic}
+          options={TOPICS.map((t) => ({ label: t, value: t, href: qp(mode, t) }))}
+          onClear={undefined}
+        />
+
+        <div className="flex items-center gap-3 text-xs text-white/55">
+          <span>
+            Showing <strong className="text-white/80">{signals.length}</strong> signal
+            {signals.length === 1 ? '' : 's'}
+          </span>
+          <span aria-hidden="true">·</span>
+          <span>past {hours}h</span>
+          {topic !== 'all' && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>topic: {topic}</span>
+            </>
+          )}
         </div>
       </header>
 
-      {error && <p className="text-sm text-red-300">Error: {error.message}</p>}
+      {error && <p className="text-sm text-danger-400">Error: {error.message}</p>}
 
       {signals.length === 0 ? (
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-6 text-sm text-white/60">
-          No signals in this window yet. Ingestion runs hourly.
-        </div>
+        <EmptyState
+          icon="∅"
+          title="No signals in this window."
+          body={
+            mode === 'personalized'
+              ? 'Try widening your filters or switching to Global feed.'
+              : 'Ingestion runs hourly. Check back soon.'
+          }
+          action={
+            mode === 'personalized' && userId
+              ? { label: 'Show global feed', href: qp('global', topic) }
+              : undefined
+          }
+        />
       ) : (
         <ul className="space-y-3">
-          {signals.map(s => (
+          {signals.map((s) => (
             <li key={s.id}>
-              <SignalCard s={s} />
+              <SignalCard s={s as any} />
             </li>
           ))}
         </ul>
@@ -153,29 +163,4 @@ function clamp(n: number, lo: number, hi: number) {
 function parseMode(mode: string | undefined): FeedMode | null {
   if (!mode) return null;
   return MODES.includes(mode as FeedMode) ? (mode as FeedMode) : null;
-}
-
-function personalizeSignals(
-  signals: SignalRow[],
-  prefs:
-    | {
-        topics?: string[] | null;
-        muted_sources?: string[] | null;
-        muted_topics?: string[] | null;
-        countries_of_focus?: string[] | null;
-      }
-    | null,
-) {
-  const focusTopics = new Set((prefs?.topics ?? []).map(String));
-  const mutedTopics = new Set((prefs?.muted_topics ?? []).map(String));
-  const mutedSources = new Set((prefs?.muted_sources ?? []).map(String));
-  const countries = new Set((prefs?.countries_of_focus ?? []).map((c) => String(c).toUpperCase()));
-
-  return signals
-    .filter((s) => !s.source_id || !mutedSources.has(String(s.source_id)))
-    .filter((s) => !mutedTopics.has(String(s.topic ?? 'other')))
-    .filter((s) => (focusTopics.size === 0 ? true : focusTopics.has(String(s.topic ?? 'other'))))
-    .filter((s) =>
-      countries.size === 0 ? true : countries.has(String(s.country_code ?? '').toUpperCase()),
-    );
 }
