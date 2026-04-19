@@ -7,6 +7,8 @@ import { NoaaAlertsAdapter } from './noaa-alerts';
 import { CoinGeckoMarketsAdapter } from './coingecko';
 import { YahooFinanceAdapter } from './yahoo-finance';
 import { GdeltAdapter } from './gdelt';
+import { SwpcAlertsAdapter } from './swpc-alerts';
+import { CisaKevAdapter } from './cisa-kev';
 import { supabase } from '../lib/supabase';
 
 /**
@@ -38,6 +40,8 @@ export async function loadAdapters(): Promise<Adapter[]> {
   if (enabledIds.has('coingecko-markets')) adapters.push(new CoinGeckoMarketsAdapter());
   if (enabledIds.has('yahoo-finance-global')) adapters.push(new YahooFinanceAdapter());
   if (enabledIds.has('gdelt-doc')) adapters.push(new GdeltAdapter());
+  if (enabledIds.has('swpc-alerts')) adapters.push(new SwpcAlertsAdapter());
+  if (enabledIds.has('cisa-kev')) adapters.push(new CisaKevAdapter());
 
   return adapters;
 }

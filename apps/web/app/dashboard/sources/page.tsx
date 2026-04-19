@@ -20,9 +20,12 @@ function groupKey(s: SourceRow): string {
   const kind = String(s.kind ?? '').toLowerCase();
   const type = String((s.metadata as any)?.type ?? '').toLowerCase();
   if (type === 'earthquake' || type === 'natural_events' || type === 'volcano' || type === 'hurricane') return 'science_sensors';
+  if (type === 'satellite' || type === 'space_weather') return 'satellite_space';
   if (type === 'weather' || type === 'weather_alerts') return 'weather';
   if (type === 'markets') return 'markets';
-  if (type === 'cyber') return 'cyber';
+  if (type === 'cyber' || type === 'cyber_intel') return 'cyber';
+  if (type === 'humanitarian' || type === 'official_bulletin') return 'humanitarian_official';
+  if (type === 'news_regional') return 'regional_news';
   if (type === 'events') return 'events';
   return kind === 'rss' ? 'news_wires' : 'apis';
 }
@@ -30,9 +33,12 @@ function groupKey(s: SourceRow): string {
 const GROUP_LABELS: Record<string, string> = {
   news_wires: 'News wires',
   science_sensors: 'Science sensors (satellite, seismic, volcano, hurricane)',
+  satellite_space: 'Satellite and space-weather intelligence',
   weather: 'Weather and alerts',
   markets: 'Markets and macro',
   cyber: 'Cyber advisories',
+  humanitarian_official: 'Humanitarian and official bulletins',
+  regional_news: 'Regional news coverage',
   events: 'Global events (GDELT)',
   apis: 'Other APIs',
 };
@@ -71,7 +77,18 @@ export default async function SourcesPage() {
   const activeCount = rows.length - mutedCount;
   const highCredCount = rows.filter((s) => s.credibility >= 80).length;
 
-  const order = ['news_wires', 'science_sensors', 'weather', 'markets', 'cyber', 'events', 'apis'];
+  const order = [
+    'news_wires',
+    'regional_news',
+    'science_sensors',
+    'satellite_space',
+    'weather',
+    'humanitarian_official',
+    'markets',
+    'cyber',
+    'events',
+    'apis',
+  ];
 
   return (
     <div className="space-y-6">
