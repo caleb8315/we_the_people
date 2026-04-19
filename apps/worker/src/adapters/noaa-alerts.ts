@@ -27,6 +27,8 @@ export class NoaaAlertsAdapter implements Adapter {
         topic: 'disaster',
         severity: mapSeverity(p.severity),
         raw: {
+          lat: feature?.geometry?.coordinates?.[1] ?? null,
+          lon: feature?.geometry?.coordinates?.[0] ?? null,
           areaDesc: p.areaDesc,
           severity: p.severity,
           certainty: p.certainty,

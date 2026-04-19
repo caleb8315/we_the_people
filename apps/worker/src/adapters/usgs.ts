@@ -28,6 +28,7 @@ export class UsgsEarthquakesAdapter implements Adapter {
         country_code: null,
         topic: 'disaster',
         severity,
+        occurred_at: p.time ? new Date(p.time).toISOString() : null,
         raw: { mag, place: p.place, geometry: f.geometry },
       });
     }

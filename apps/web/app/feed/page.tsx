@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { cookies, headers } from 'next/headers';
+import { headers } from 'next/headers';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { SignalCard } from '@/components/signal-card';
 import { Segmented } from '@/components/ui/segmented';
@@ -32,7 +32,6 @@ export default async function FeedPage({
 
   const sb = getServerSupabase();
   const hdrs = headers();
-  const cookieStore = cookies();
   const userAgent = hdrs.get('user-agent') ?? '';
   const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent);
   const { data: auth } = await sb.auth.getUser();
@@ -60,13 +59,14 @@ export default async function FeedPage({
   const defaultMode: FeedMode = prefs?.feed_mode_preference === 'global' ? 'global' : 'personalized';
   const mode: FeedMode = userId ? requestedMode ?? defaultMode : 'global';
   const prefView = String(prefs?.feed_view_preference ?? 'list') as FeedView;
-  const cookieView = parseView(cookieStore.get('feed_view')?.value);
-  const view: FeedView = requestedView ?? (userId ? prefView : cookieView ?? 'list');
+  const view: FeedView = requestedView ?? (userId ? prefView : 'list');
   const since = new Date(Date.now() - hours * 3600 * 1000).toISOString();
 
   let q = sb
     .from('signals')
-    .select('id,title,summary,url,topic,country_code,severity,confidence,verification_status,source_count,credible_source_count,distinct_domains,source_id,first_seen_at,raw_data,expires_at')
+    .select(
+      'id,title,summary,url,topic,country_code,severity,confidence,verification_status,source_count,credible_source_count,distinct_domains,source_id,occurred_at,first_seen_at,raw_data,expires_at',
+    )
     .gte('first_seen_at', since)
     .in('verification_status', ['verified', 'developing', 'unverified'])
     .order('severity', { ascending: false })
@@ -84,10 +84,6 @@ export default async function FeedPage({
   const geoPoints: SignalGeoPoint[] = signals
     .map((s) => signalGeoPoint(s))
     .filter((x): x is SignalGeoPoint => Boolean(x));
-
-  if (requestedView) {
-    cookieStore.set('feed_view', requestedView, { path: '/', maxAge: 60 * 60 * 24 * 90 });
-  }
 
   if (userId) {
     void logProductEvent(sb, {

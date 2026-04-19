@@ -15,6 +15,7 @@ export interface SignalRow {
   source_count: number;
   credible_source_count: number;
   distinct_domains: string[];
+  occurred_at?: string | null;
   first_seen_at: string;
   contradictions_count?: number;
   is_disputed?: boolean;
@@ -73,7 +74,7 @@ export function SignalCard({ s }: { s: SignalRow }) {
           Confidence <strong className="text-white/80">{confLabel}</strong>
         </span>
         <span aria-hidden="true">·</span>
-        <span>{relativeTime(s.first_seen_at)}</span>
+        <span>{relativeTime(s.occurred_at ?? s.first_seen_at)}</span>
       </div>
     </Link>
   );

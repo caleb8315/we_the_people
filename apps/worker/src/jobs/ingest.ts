@@ -117,7 +117,11 @@ export async function runIngest(): Promise<{
         tags: decision.decision_log.includes('non-kinetic') ? ['non_kinetic'] : [],
         occurred_at: primary.published_at ?? null,
         expires_at: computeExpiry(severity, topic, status),
-        raw_data: { decision_log: decision.decision_log, group_size: rawGroup.length },
+        raw_data: {
+          decision_log: decision.decision_log,
+          group_size: rawGroup.length,
+          ...(primary.raw ?? {}),
+        },
       };
 
       const { data: upserted, error: upsertErr } = await sb

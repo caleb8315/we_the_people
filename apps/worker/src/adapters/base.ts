@@ -12,6 +12,7 @@ export interface RawItem {
   summary?: string | null;
   url: string;
   published_at?: string | null;
+  occurred_at?: string | null;       // actual event time (if distinct from publication)
   country_code?: string | null;
   topic?: Topic;
   severity?: number;

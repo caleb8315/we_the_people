@@ -44,7 +44,7 @@ export class OpenMeteoAdapter implements Adapter {
         country_code: city.cc,
         topic: 'climate',
         severity,
-        raw: { city: city.name, tMax, rain, wind },
+        raw: { city: city.name, tMax, rain, wind, lat: city.lat, lon: city.lon },
       });
     }
     return out;

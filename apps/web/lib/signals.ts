@@ -14,6 +14,7 @@ export interface SignalRowRaw {
   credible_source_count: number;
   distinct_domains: string[] | null;
   source_id?: string | null;
+  occurred_at?: string | null;
   first_seen_at: string;
   raw_data?: Record<string, unknown> | null;
 }

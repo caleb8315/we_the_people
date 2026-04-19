@@ -10,6 +10,7 @@ export interface SignalGeoPoint {
   lon: number;
   isApproximate: boolean;
   country_code: string | null;
+  occurred_at: string | null;
 }
 
 const COUNTRY_CENTROIDS: Record<string, { lat: number; lon: number }> = {
@@ -79,6 +80,7 @@ export function signalGeoPoint(
       lon: direct.lon,
       isApproximate: false,
       country_code: signal.country_code ?? null,
+      occurred_at: signal.occurred_at ?? null,
     };
   }
 
@@ -96,5 +98,6 @@ export function signalGeoPoint(
     lon: centroid.lon,
     isApproximate: true,
     country_code: cc || null,
+    occurred_at: signal.occurred_at ?? null,
   };
 }

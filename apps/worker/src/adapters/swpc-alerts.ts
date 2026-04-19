@@ -35,6 +35,7 @@ export class SwpcAlertsAdapter implements Adapter {
         published_at: toIso(row.issue_datetime),
         topic: 'climate',
         severity: mapSpaceWeatherSeverity(scale),
+        occurred_at: toIso(row.issue_datetime),
         raw: {
           product_id: row.product_id ?? null,
           noaa_scale: scale,

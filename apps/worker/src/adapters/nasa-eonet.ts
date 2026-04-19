@@ -23,7 +23,17 @@ export class NasaEonetAdapter implements Adapter {
         published_at: first?.date ?? null,
         topic: cat.toLowerCase().includes('wildfire') ? 'climate' : 'disaster',
         severity: 60,
-        raw: { id: ev.id, category: cat },
+        raw: {
+          id: ev.id,
+          category: cat,
+          geometry: first
+            ? {
+                type: first.type,
+                coordinates: first.coordinates,
+              }
+            : null,
+          event_time: first?.date ?? null,
+        },
       });
     }
     return out;

@@ -33,6 +33,7 @@ export class GdeltAdapter implements Adapter {
         raw: {
           sourceCountry: a.sourcecountry,
           socialimage: a.socialimage,
+          country_code: typeof a.sourcecountry === 'string' ? a.sourcecountry : null,
         },
       });
     }
