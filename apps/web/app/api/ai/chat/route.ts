@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { getClientKey, limit } from '@/lib/rate-limit';
 import { serverEnv } from '@/lib/env';
+import { consumeUserDailyLimit } from '@/lib/daily-limits';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -64,6 +65,20 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
 
+  const chatLimit = await consumeUserDailyLimit(sb, auth.user.id, 'ai_chat');
+  if (!chatLimit.ok) {
+    return NextResponse.json(
+      {
+        error: 'beta_daily_limit',
+        message:
+          'You hit your daily AI chat limit (10) for this beta. This keeps quality high and costs stable while we iterate. Please come back tomorrow.',
+        used: chatLimit.used,
+        limit: chatLimit.limit,
+      },
+      { status: 429 },
+    );
+  }
+
   let sessionId = parsed.data.session_id;
 
   if (!sessionId) {
@@ -102,6 +117,53 @@ export async function POST(req: Request) {
     .eq('user_id', auth.user.id)
     .maybeSingle();
 
+  const [{ data: prefs }, { data: rawSignals }, { data: sourceRows }, { data: recentBriefings }] =
+    await Promise.all([
+      sb
+        .from('preferences')
+        .select('topics, muted_sources, countries_of_focus, weather_label, weather_lat, weather_lon')
+        .eq('user_id', auth.user.id)
+        .maybeSingle(),
+      sb
+        .from('signals_public')
+        .select('id, title, summary, topic, severity, confidence, verification_status, source_id, first_seen_at, url, country_code')
+        .order('first_seen_at', { ascending: false })
+        .limit(60),
+      sb.from('sources').select('id, name, kind, credibility').eq('enabled', true).limit(300),
+      sb
+        .from('briefings')
+        .select('headline, period_start, topics')
+        .order('period_start', { ascending: false })
+        .limit(3),
+    ]);
+
+  const mutedSources = new Set((prefs?.muted_sources ?? []) as string[]);
+  const focusTopics = new Set((prefs?.topics ?? []) as string[]);
+  const filteredSignals = (rawSignals ?? []).filter((s) => !s.source_id || !mutedSources.has(s.source_id));
+  const focusSignals = filteredSignals
+    .filter((s) => focusTopics.size === 0 || focusTopics.has(String(s.topic ?? 'other')))
+    .sort((a, b) => Number(b.severity ?? 0) - Number(a.severity ?? 0))
+    .slice(0, 12);
+
+  const sourcesById = new Map((sourceRows ?? []).map((s) => [s.id, s]));
+  const sourcesInUse = [...new Set(focusSignals.map((s) => s.source_id).filter(Boolean))]
+    .map((id) => sourcesById.get(String(id)))
+    .filter(Boolean)
+    .slice(0, 10);
+
+  const grounding = buildGroundingContext({
+    prefs: {
+      topics: (prefs?.topics ?? []) as string[],
+      countries: (prefs?.countries_of_focus ?? []) as string[],
+      weatherLabel: prefs?.weather_label ?? null,
+      weatherLat: prefs?.weather_lat ?? null,
+      weatherLon: prefs?.weather_lon ?? null,
+    },
+    signals: focusSignals as Array<any>,
+    sources: sourcesInUse as Array<any>,
+    briefings: (recentBriefings ?? []) as Array<any>,
+  });
+
   const { data: contextRows } = await sb
     .from('ai_messages')
     .select('role, content')
@@ -114,11 +176,17 @@ export async function POST(req: Request) {
   const assistantReply = await generateAssistantReply({
     systemPrompt:
       aiProfile?.system_prompt ||
-      'You are an OSINT analyst. Be concise, cite likely evidence types, avoid accusations, and label uncertainty.',
+      'You are an OSINT investigative journalist. Write like a newsroom analyst: concise, factual, source-driven, and transparent about uncertainty. Never make accusations without evidence. Always distinguish verified facts, developing reports, and open questions.',
     model: aiProfile?.model ?? 'gemini-2.0-flash',
     temperature: Number(aiProfile?.temperature ?? 0.4),
     maxOutputTokens: aiProfile?.max_output_tokens ?? 600,
-    context,
+    context: [
+      ...context,
+      {
+        role: 'system',
+        content: grounding,
+      },
+    ],
   });
 
   const { error: asstErr } = await sb.from('ai_messages').insert({
@@ -147,13 +215,15 @@ async function generateAssistantReply(input: {
 }): Promise<string> {
   const env = serverEnv();
 
-  const messages = [
+  const baseMessages = [
     { role: 'system', content: input.systemPrompt },
     ...input.context.map((m) => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
       content: m.content,
     })),
   ];
+
+  const messages = compactForModel(baseMessages, 14_000);
 
   if (env.GEMINI_API_KEY) {
     try {
@@ -208,4 +278,68 @@ async function generateAssistantReply(input: {
   }
 
   return 'AI provider unavailable right now. Your message was saved to your private session; retry in a few minutes.';
+}
+
+function buildGroundingContext(input: {
+  prefs: {
+    topics: string[];
+    countries: string[];
+    weatherLabel: string | null;
+    weatherLat: number | null;
+    weatherLon: number | null;
+  };
+  signals: Array<{
+    id: string;
+    title: string;
+    summary: string | null;
+    topic: string | null;
+    severity: number;
+    confidence: number;
+    verification_status: string;
+    source_id: string | null;
+    first_seen_at: string;
+    url: string | null;
+    country_code: string | null;
+  }>;
+  sources: Array<{ id: string; name: string; kind: string; credibility: number }>;
+  briefings: Array<{ headline: string; period_start: string; topics: string[] }>;
+}) {
+  const signalLines = input.signals.slice(0, 12).map((s, i) => {
+    const ts = s.first_seen_at ? new Date(s.first_seen_at).toISOString() : 'n/a';
+    return `${i + 1}. [${s.topic ?? 'other'}] ${s.title} | sev=${s.severity} conf=${s.confidence} status=${s.verification_status} country=${s.country_code ?? '-'} time=${ts} url=${s.url ?? '-'}`;
+  });
+  const sourceLines = input.sources.map((s) => `${s.name} (${s.kind}, cred ${s.credibility})`);
+  const briefingLines = input.briefings.map((b) => `${new Date(b.period_start).toISOString()} :: ${b.headline}`);
+
+  return [
+    'LIVE PLATFORM CONTEXT (PRIVATE TO CURRENT USER)',
+    `Focus topics: ${input.prefs.topics.join(', ') || 'none set'}`,
+    `Focus countries: ${input.prefs.countries.join(', ') || 'none set'}`,
+    `Weather location: ${input.prefs.weatherLabel ?? 'none set'} (${input.prefs.weatherLat ?? '-'}, ${input.prefs.weatherLon ?? '-'})`,
+    '',
+    'Recent signals from this user feed:',
+    signalLines.join('\n') || 'No signals available.',
+    '',
+    'Recent briefings:',
+    briefingLines.join('\n') || 'No briefings available.',
+    '',
+    'Primary active sources in this context:',
+    sourceLines.join('\n') || 'No source metadata available.',
+    '',
+    'INSTRUCTIONS:',
+    '- Answer as a journalist using this context first.',
+    '- If context is stale or missing, say so clearly and propose next checks.',
+    '- Cite concrete signal/source lines in your response when possible.',
+  ].join('\n');
+}
+
+function compactForModel(
+  messages: Array<{ role: string; content: string }>,
+  maxChars: number,
+) {
+  const out = [...messages];
+  while (out.map((m) => m.content.length).reduce((a, b) => a + b, 0) > maxChars && out.length > 4) {
+    out.splice(1, 1);
+  }
+  return out;
 }

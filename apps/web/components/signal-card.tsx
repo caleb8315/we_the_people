@@ -4,6 +4,7 @@ export interface SignalRow {
   id: string;
   title: string;
   summary: string | null;
+  source_id?: string | null;
   topic: string | null;
   country_code: string | null;
   severity: number;

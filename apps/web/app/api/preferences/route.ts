@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { getClientKey, limit } from '@/lib/rate-limit';
+import { logProductEvent } from '@/lib/product-events';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -16,9 +17,13 @@ const PrefBody = z.object({
   email_briefings: z.boolean().optional(),
   alerts_enabled: z.boolean().optional(),
   min_alert_severity: z.number().int().min(0).max(100).optional(),
-  weather_lat: z.number().min(-90).max(90).optional(),
-  weather_lon: z.number().min(-180).max(180).optional(),
-  weather_label: z.string().max(120).optional(),
+  weather_lat: z.number().min(-90).max(90).nullable().optional(),
+  weather_lon: z.number().min(-180).max(180).nullable().optional(),
+  weather_label: z.string().max(120).nullable().optional(),
+  feed_mode_preference: z.enum(['personalized', 'global', 'hybrid']).optional(),
+  briefing_frequency_preference: z.enum(['daily', 'weekly', 'both', 'off']).optional(),
+  alert_intensity_preference: z.enum(['critical_only', 'important_and_up', 'all']).optional(),
+  max_alerts_per_day_preference: z.number().int().min(1).max(5).optional(),
 });
 
 export async function GET(req: Request) {
@@ -58,9 +63,25 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: 'invalid_body', issues: parsed.error.flatten() }, { status: 400 });
   }
 
-  const row = { user_id: auth.user.id, updated_at: new Date().toISOString(), ...parsed.data };
+  const normalized = { ...parsed.data };
+  if (normalized.briefing_frequency_preference === 'off') {
+    normalized.email_briefings = false;
+  }
+  const row = { user_id: auth.user.id, updated_at: new Date().toISOString(), ...normalized };
   const { error } = await sb.from('preferences').upsert(row, { onConflict: 'user_id' });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await logProductEvent(sb, {
+    userId: auth.user.id,
+    eventName: 'preferences_updated',
+    eventProps: {
+      keys: Object.keys(parsed.data).sort(),
+      alert_intensity_preference: parsed.data.alert_intensity_preference ?? null,
+      max_alerts_per_day_preference: parsed.data.max_alerts_per_day_preference ?? null,
+      briefing_frequency_preference: parsed.data.briefing_frequency_preference ?? null,
+      feed_mode_preference: parsed.data.feed_mode_preference ?? null,
+    },
+  });
 
   return NextResponse.json({ ok: true });
 }

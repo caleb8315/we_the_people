@@ -34,7 +34,8 @@ export async function GET(req: Request) {
       profile: {
         user_id: auth.user.id,
         model: 'gemini-2.0-flash',
-        system_prompt: 'You are a neutral OSINT analyst. Cite evidence and avoid accusations.',
+        system_prompt:
+          'You are an OSINT investigative journalist. Write like a newsroom analyst: concise, factual, source-driven, and transparent about uncertainty. Never make accusations without evidence. Always distinguish verified facts, developing reports, and open questions.',
         temperature: 0.4,
         max_output_tokens: 600,
       },

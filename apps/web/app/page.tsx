@@ -1,8 +1,18 @@
 import Link from 'next/link';
+import { getServerSupabase } from '@/lib/supabase-server';
 
 export const metadata = { title: 'OSINT Platform — Transparent Intelligence' };
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  let signedIn = false;
+  try {
+    const sb = getServerSupabase();
+    const { data } = await sb.auth.getUser();
+    signedIn = !!data.user;
+  } catch {
+    // Anonymous fallback when env/auth isn't available.
+  }
+
   return (
     <div className="space-y-20">
       <section className="space-y-7 rounded-2xl border border-white/10 bg-gradient-to-br from-white/10 to-white/[0.02] p-8 sm:p-10">
@@ -15,7 +25,9 @@ export default function LandingPage() {
           into a transparent intelligence graph. Every claim is traceable. Every signal has confidence and source evidence.
         </p>
         <div className="flex flex-wrap gap-3">
-          <Link href="/login" className="rounded bg-white text-black px-4 py-2 font-medium">Get your dashboard</Link>
+          <Link href={signedIn ? '/dashboard' : '/login'} className="rounded bg-white text-black px-4 py-2 font-medium">
+            {signedIn ? 'Dashboard' : 'Get your dashboard'}
+          </Link>
           <Link href="/feed" className="rounded border border-white/20 px-4 py-2">Explore live feed</Link>
           <Link href="/trust" className="rounded border border-white/20 px-4 py-2">Trust & methodology</Link>
         </div>

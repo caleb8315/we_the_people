@@ -108,4 +108,8 @@ export interface Preferences {
   email_briefings: boolean;
   alerts_enabled: boolean;
   min_alert_severity: number;
+  feed_mode_preference: 'personalized' | 'global' | 'hybrid';
+  briefing_frequency_preference: 'daily' | 'weekly' | 'both' | 'off';
+  alert_intensity_preference: 'critical_only' | 'important_and_up' | 'all';
+  max_alerts_per_day_preference: number;
 }

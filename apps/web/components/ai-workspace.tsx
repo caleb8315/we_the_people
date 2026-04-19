@@ -11,6 +11,7 @@ export function AiWorkspace() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
 
   async function load(sessionId?: string | null) {
     const qp = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
@@ -30,6 +31,7 @@ export function AiWorkspace() {
   async function send() {
     if (!input.trim()) return;
     setLoading(true);
+    setStatus(null);
     const userText = input.trim();
     setInput('');
 
@@ -47,7 +49,11 @@ export function AiWorkspace() {
       body: JSON.stringify({ session_id: activeSessionId ?? undefined, message: userText }),
     });
     setLoading(false);
-    if (!res.ok) return;
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setStatus(body?.message ?? 'Could not send message right now.');
+      return;
+    }
     const body = await res.json();
     if (!activeSessionId && body.session_id) setActiveSessionId(body.session_id);
     await load(body.session_id ?? activeSessionId);
@@ -83,6 +89,9 @@ export function AiWorkspace() {
 
       <section className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
         <h2 className="text-sm font-semibold">{activeTitle}</h2>
+        <p className="mt-1 text-xs text-white/50">
+          Beta limit: up to 10 AI chat messages/day per user. Limits reset daily.
+        </p>
         <div className="mt-3 max-h-[460px] space-y-2 overflow-auto pr-1">
           {messages.map((m) => (
             <div
@@ -114,6 +123,7 @@ export function AiWorkspace() {
             {loading ? 'Sending…' : 'Send'}
           </button>
         </div>
+        {status && <p className="mt-2 text-sm text-amber-200">{status}</p>}
       </section>
     </div>
   );

@@ -1,5 +1,6 @@
 import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
 import { env } from '../lib/env';
+import { consumeUserDailyLimit } from '../lib/daily-limits';
 
 /**
  * Sends user-specific daily briefing emails.
@@ -35,7 +36,9 @@ export async function runEmailBriefings(): Promise<{ sent: number; failed: numbe
   const [{ data: prefsRows }, usersRes] = await Promise.all([
     sb
       .from('preferences')
-      .select('user_id, topics, email_briefings, weather_lat, weather_lon, weather_label')
+      .select(
+        'user_id, topics, email_briefings, weather_lat, weather_lon, weather_label, briefing_frequency_preference',
+      )
       .eq('email_briefings', true),
     sb.auth.admin.listUsers({ page: 1, perPage: 1000 }),
   ]);
@@ -50,6 +53,8 @@ export async function runEmailBriefings(): Promise<{ sent: number; failed: numbe
   const errors: string[] = [];
 
   for (const pref of prefsRows ?? []) {
+    const freq = String(pref.briefing_frequency_preference ?? 'daily');
+    if (!(freq === 'daily' || freq === 'both')) continue;
     const email = usersById.get(pref.user_id);
     if (!email) continue;
 
@@ -60,6 +65,18 @@ export async function runEmailBriefings(): Promise<{ sent: number; failed: numbe
       .eq('user_id', pref.user_id)
       .maybeSingle();
     if (existing) continue;
+
+    const dailyCap = await consumeUserDailyLimit(sb, pref.user_id, 'daily_briefing');
+    if (!dailyCap.ok) {
+      await sb.from('briefing_deliveries').insert({
+        briefing_id: latest.id,
+        user_id: pref.user_id,
+        email,
+        status: 'skipped',
+        error: `daily briefing cap reached (${dailyCap.limit})`,
+      });
+      continue;
+    }
 
     const { data: signals } = await sb
       .from('signals')

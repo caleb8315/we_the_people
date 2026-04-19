@@ -60,3 +60,142 @@ delete from auth.users where id = '<id>';
 ```
 
 Confirm by rerunning the select and ensuring zero rows.
+
+## 8. User preference research (14-day readout)
+
+Use this runbook after shipping personalization defaults.
+
+### Baseline defaults
+
+- Feed default: `personalized` with one-tap global toggle.
+- Briefing default: `daily` (email enabled unless user sets `off`).
+- Alerts default: `critical_only`, `max_alerts_per_day_preference = 3`, hard cap `5`.
+- AI chat beta limit: `10/day`.
+
+### Decision metrics and guardrails
+
+- **Personalization adoption**: `% of `feed_viewed` events in `personalized` mode`.
+  - Keep personalized default if `>= 60%`.
+- **Global escape-rate**: `% of users switching to global from personalized`.
+  - If `> 35%`, evaluate `hybrid` default for new users.
+- **Alert fatigue**: `% of users with `alert_muted` within 48h of first `alert_sent``.
+  - If `> 20%`, tighten defaults (raise severity threshold and/or lower default cap).
+- **Briefing engagement**: `% of users generating/opening briefings at least 2 times/week`.
+  - If `< 30%`, simplify briefing UX and consider weekly-first onboarding option.
+- **Limit pressure**: `% of active users hitting AI daily chat limit`.
+  - If `> 25%`, improve reset messaging and evaluate cap vs prompt quality tradeoff.
+
+### SQL: mode adoption (feed)
+
+```sql
+select
+  coalesce(event_props->>'mode', 'unknown') as mode,
+  count(*) as events,
+  round(100.0 * count(*) / nullif(sum(count(*)) over (), 0), 2) as pct
+from public.product_events
+where event_name = 'feed_viewed'
+  and created_at >= now() - interval '14 days'
+group by 1
+order by events desc;
+```
+
+### SQL: global escape-rate (users)
+
+```sql
+with switches as (
+  select distinct user_id
+  from public.product_events
+  where event_name = 'feed_mode_switched'
+    and created_at >= now() - interval '14 days'
+    and event_props->>'to' = 'global'
+),
+active as (
+  select distinct user_id
+  from public.product_events
+  where event_name = 'feed_viewed'
+    and created_at >= now() - interval '14 days'
+)
+select
+  (select count(*) from switches) as switched_users,
+  (select count(*) from active) as active_users,
+  round(
+    100.0 * (select count(*) from switches)::numeric
+    / nullif((select count(*) from active), 0),
+    2
+  ) as switched_pct;
+```
+
+### SQL: alert fatigue (muted within 48h)
+
+```sql
+with first_sent as (
+  select user_id, min(created_at) as first_sent_at
+  from public.product_events
+  where event_name = 'alert_sent'
+    and created_at >= now() - interval '14 days'
+  group by user_id
+),
+muted_48h as (
+  select distinct fs.user_id
+  from first_sent fs
+  join public.product_events pe
+    on pe.user_id = fs.user_id
+   and pe.event_name = 'alert_muted'
+   and pe.created_at between fs.first_sent_at and fs.first_sent_at + interval '48 hours'
+)
+select
+  (select count(*) from first_sent) as alerted_users,
+  (select count(*) from muted_48h) as muted_in_48h_users,
+  round(
+    100.0 * (select count(*) from muted_48h)::numeric
+    / nullif((select count(*) from first_sent), 0),
+    2
+  ) as muted_in_48h_pct;
+```
+
+### SQL: briefing engagement
+
+```sql
+select
+  count(distinct user_id) filter (where events >= 4) as engaged_users,
+  count(distinct user_id) as users_opening_or_generating,
+  round(
+    100.0 * count(distinct user_id) filter (where events >= 4)::numeric
+    / nullif(count(distinct user_id), 0),
+    2
+  ) as engaged_pct
+from (
+  select user_id, count(*) as events
+  from public.product_events
+  where event_name in ('briefing_opened', 'briefing_generated')
+    and created_at >= now() - interval '14 days'
+  group by user_id
+) x;
+```
+
+### SQL: AI daily limit pressure
+
+```sql
+with active_users as (
+  select distinct user_id
+  from public.user_daily_usage
+  where day >= current_date - 14
+    and bucket = 'ai_chat'
+),
+maxed as (
+  select user_id
+  from public.user_daily_usage
+  where day >= current_date - 14
+    and bucket = 'ai_chat'
+  group by user_id, day
+  having sum(calls) >= 10
+)
+select
+  (select count(distinct user_id) from active_users) as active_chat_users,
+  (select count(distinct user_id) from maxed) as users_hitting_limit,
+  round(
+    100.0 * (select count(distinct user_id) from maxed)::numeric
+    / nullif((select count(distinct user_id) from active_users), 0),
+    2
+  ) as limit_hit_pct;
+```

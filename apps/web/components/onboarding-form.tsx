@@ -8,6 +8,12 @@ type Topic = (typeof TOPICS)[number];
 export function OnboardingForm({ defaultName }: { defaultName: string }) {
   const [displayName, setDisplayName] = useState(defaultName);
   const [topics, setTopics] = useState<Topic[]>(['war', 'economy', 'climate']);
+  const [feedMode, setFeedMode] = useState<'personalized' | 'global' | 'hybrid'>('personalized');
+  const [briefingFrequency, setBriefingFrequency] = useState<'daily' | 'weekly' | 'both' | 'off'>('daily');
+  const [alertIntensity, setAlertIntensity] = useState<'critical_only' | 'important_and_up' | 'all'>(
+    'critical_only',
+  );
+  const [maxAlertsPerDay, setMaxAlertsPerDay] = useState(3);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,6 +27,10 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
       body: JSON.stringify({
         display_name: displayName.trim(),
         topics,
+        feed_mode_preference: feedMode,
+        briefing_frequency_preference: briefingFrequency,
+        alert_intensity_preference: alertIntensity,
+        max_alerts_per_day_preference: Math.max(1, Math.min(5, maxAlertsPerDay)),
       }),
     });
     setSaving(false);
@@ -73,6 +83,61 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
             );
           })}
         </div>
+      </div>
+
+      <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+        <h2 className="text-sm text-white/70">Personalization defaults</h2>
+        <label className="block text-sm text-white/70">
+          Feed mode
+          <select
+            value={feedMode}
+            onChange={(e) => setFeedMode(e.target.value as 'personalized' | 'global' | 'hybrid')}
+            className="mt-1 w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/40"
+          >
+            <option value="personalized">Personalized first</option>
+            <option value="global">Global first</option>
+            <option value="hybrid">Hybrid</option>
+          </select>
+        </label>
+        <label className="block text-sm text-white/70">
+          Briefing frequency
+          <select
+            value={briefingFrequency}
+            onChange={(e) => setBriefingFrequency(e.target.value as 'daily' | 'weekly' | 'both' | 'off')}
+            className="mt-1 w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/40"
+          >
+            <option value="daily">Daily (recommended)</option>
+            <option value="weekly">Weekly</option>
+            <option value="both">Daily + weekly</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label className="block text-sm text-white/70">
+          Alert intensity
+          <select
+            value={alertIntensity}
+            onChange={(e) => setAlertIntensity(e.target.value as 'critical_only' | 'important_and_up' | 'all')}
+            className="mt-1 w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/40"
+          >
+            <option value="critical_only">Critical only</option>
+            <option value="important_and_up">Important and up</option>
+            <option value="all">All priority candidates</option>
+          </select>
+        </label>
+        <label className="block text-sm text-white/70">
+          Max alert emails/day ({maxAlertsPerDay})
+          <input
+            type="range"
+            min={1}
+            max={5}
+            value={maxAlertsPerDay}
+            onChange={(e) => setMaxAlertsPerDay(Number(e.target.value))}
+            className="mt-1 w-full"
+          />
+        </label>
+        <p className="text-xs text-white/50">
+          Beta defaults are tuned for signal, not noise: personalized feed, daily briefing, critical-first alerts.
+        </p>
       </div>
 
       <button

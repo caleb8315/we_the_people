@@ -1,12 +1,22 @@
 import { notFound } from 'next/navigation';
-import { getAdminSupabase } from '@/lib/supabase-server';
+import { getServerSupabase } from '@/lib/supabase-server';
+import { logProductEvent } from '@/lib/product-events';
 
 export const revalidate = 120;
 
 export default async function BriefingPage({ params }: { params: { id: string } }) {
-  const sb = getAdminSupabase();
+  const sb = getServerSupabase();
+  const { data: auth } = await sb.auth.getUser();
   const { data } = await sb.from('briefings').select('*').eq('id', params.id).maybeSingle();
   if (!data) notFound();
+
+  if (auth.user) {
+    void logProductEvent(sb, {
+      userId: auth.user.id,
+      eventName: 'briefing_opened',
+      eventProps: { mode: 'global_detail', briefing_id: data.id, kind: data.kind },
+    });
+  }
 
   return (
     <article className="prose-osint space-y-6">

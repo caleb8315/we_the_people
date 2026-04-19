@@ -9,6 +9,10 @@ export const runtime = 'nodejs';
 const Body = z.object({
   display_name: z.string().min(2).max(40),
   topics: z.array(z.enum(['war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'other'])).min(1).max(6),
+  feed_mode_preference: z.enum(['personalized', 'global', 'hybrid']).optional(),
+  briefing_frequency_preference: z.enum(['daily', 'weekly', 'both', 'off']).optional(),
+  alert_intensity_preference: z.enum(['critical_only', 'important_and_up', 'all']).optional(),
+  max_alerts_per_day_preference: z.number().int().min(1).max(5).optional(),
 });
 
 /**
@@ -27,7 +31,14 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
 
   const now = new Date().toISOString();
-  const { display_name, topics } = parsed.data;
+  const {
+    display_name,
+    topics,
+    feed_mode_preference,
+    briefing_frequency_preference,
+    alert_intensity_preference,
+    max_alerts_per_day_preference,
+  } = parsed.data;
 
   const [{ error: profileErr }, { error: prefsErr }, { error: aiErr }] = await Promise.all([
     sb.from('profiles').upsert(
@@ -42,6 +53,12 @@ export async function POST(req: Request) {
       {
         user_id: auth.user.id,
         topics,
+        feed_mode_preference: feed_mode_preference ?? 'personalized',
+        briefing_frequency_preference: briefing_frequency_preference ?? 'daily',
+        email_briefings: (briefing_frequency_preference ?? 'daily') !== 'off',
+        alert_intensity_preference: alert_intensity_preference ?? 'critical_only',
+        max_alerts_per_day_preference: max_alerts_per_day_preference ?? 3,
+        min_alert_severity: 85,
         updated_at: now,
       },
       { onConflict: 'user_id' },
@@ -49,6 +66,8 @@ export async function POST(req: Request) {
     sb.from('ai_profiles').upsert(
       {
         user_id: auth.user.id,
+        system_prompt:
+          'You are an OSINT investigative journalist. Write like a newsroom analyst: concise, factual, source-driven, and transparent about uncertainty. Never make accusations without evidence. Always distinguish verified facts, developing reports, and open questions.',
         updated_at: now,
       },
       { onConflict: 'user_id' },

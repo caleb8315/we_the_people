@@ -19,11 +19,18 @@ export async function NavBar() {
           OSINT <span className="text-white/50">Platform</span>
         </Link>
         <nav className="flex flex-1 items-center gap-4 text-sm text-white/70">
-          {signedIn && <Link href="/dashboard" className="hover:text-white">Dashboard</Link>}
-          <Link href="/feed" className="hover:text-white">Feed</Link>
-          <Link href="/briefings" className="hover:text-white">Briefings</Link>
-          <Link href="/trust" className="hover:text-white">Trust</Link>
-          <Link href="/about" className="hover:text-white">About</Link>
+          {signedIn ? (
+            <>
+              <Link href="/dashboard" className="hover:text-white">Dashboard</Link>
+              <Link href="/feed" className="hover:text-white">Feed</Link>
+              <Link href="/briefings" className="hover:text-white">Briefings</Link>
+            </>
+          ) : (
+            <>
+              <Link href="/feed" className="hover:text-white">Feed</Link>
+              <Link href="/briefings" className="hover:text-white">Briefings</Link>
+            </>
+          )}
         </nav>
         <div className="flex items-center gap-3 text-sm">
           {signedIn ? (
