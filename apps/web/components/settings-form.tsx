@@ -29,6 +29,48 @@ export interface SourceOpt {
   name: string;
   kind: string;
   credibility: number;
+  metadata?: { type?: string | null } | null;
+}
+
+const SOURCE_GROUP_ORDER = [
+  'news_wires',
+  'regional_news',
+  'science_sensors',
+  'satellite_space',
+  'weather',
+  'humanitarian_official',
+  'markets',
+  'cyber',
+  'events',
+  'apis',
+] as const;
+
+const SOURCE_GROUP_LABELS: Record<(typeof SOURCE_GROUP_ORDER)[number], string> = {
+  news_wires: 'News wires',
+  regional_news: 'Regional news coverage',
+  science_sensors: 'Science sensors',
+  satellite_space: 'Satellite and space-weather intelligence',
+  weather: 'Weather and alerts',
+  humanitarian_official: 'Humanitarian and official bulletins',
+  markets: 'Markets and macro',
+  cyber: 'Cyber intelligence',
+  events: 'Global events',
+  apis: 'Other APIs',
+};
+
+function sourceGroupKey(source: SourceOpt): (typeof SOURCE_GROUP_ORDER)[number] {
+  const kind = String(source.kind ?? '').toLowerCase();
+  const type = String(source.metadata?.type ?? '').toLowerCase();
+  if (type === 'earthquake' || type === 'natural_events' || type === 'volcano' || type === 'hurricane')
+    return 'science_sensors';
+  if (type === 'satellite' || type === 'space_weather') return 'satellite_space';
+  if (type === 'weather' || type === 'weather_alerts') return 'weather';
+  if (type === 'markets') return 'markets';
+  if (type === 'cyber' || type === 'cyber_intel') return 'cyber';
+  if (type === 'humanitarian' || type === 'official_bulletin') return 'humanitarian_official';
+  if (type === 'news_regional') return 'regional_news';
+  if (type === 'events') return 'events';
+  return kind === 'rss' ? 'news_wires' : 'apis';
 }
 
 export function SettingsForm({
@@ -73,6 +115,12 @@ export function SettingsForm({
   const [displayName, setDisplayName] = useState(account.display_name ?? '');
   const [newPassword, setNewPassword] = useState('');
   const [accountStatus, setAccountStatus] = useState<string | null>(null);
+  const groupedSources = new Map<(typeof SOURCE_GROUP_ORDER)[number], SourceOpt[]>();
+  for (const source of sources) {
+    const key = sourceGroupKey(source);
+    if (!groupedSources.has(key)) groupedSources.set(key, []);
+    groupedSources.get(key)!.push(source);
+  }
 
   async function save() {
     setSaving(true);
@@ -213,35 +261,44 @@ export function SettingsForm({
       </Section>
 
       <Section title="Muted sources">
-        <ul className="grid gap-2 sm:grid-cols-2">
-          {sources.map((s) => {
-            const isMuted = mutedSources.includes(s.id);
-            return (
-              <li key={s.id}>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setMutedSources((xs) =>
-                      xs.includes(s.id) ? xs.filter((x) => x !== s.id) : [...xs, s.id],
-                    )
-                  }
-                  className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${
-                    isMuted
-                      ? 'border-danger-500/30 bg-danger-500/10 text-danger-400'
-                      : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium clamp-1">{s.name}</span>
-                    <span className="text-[11px] text-white/55">
-                      {isMuted ? 'muted' : `cred ${s.credibility}`}
-                    </span>
-                  </div>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="space-y-4">
+          {SOURCE_GROUP_ORDER.filter((k) => groupedSources.has(k)).map((group) => (
+            <div key={group}>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/55">
+                {SOURCE_GROUP_LABELS[group]}
+              </p>
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {groupedSources.get(group)!.map((s) => {
+                  const isMuted = mutedSources.includes(s.id);
+                  return (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMutedSources((xs) =>
+                            xs.includes(s.id) ? xs.filter((x) => x !== s.id) : [...xs, s.id],
+                          )
+                        }
+                        className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${
+                          isMuted
+                            ? 'border-danger-500/30 bg-danger-500/10 text-danger-400'
+                            : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium clamp-1">{s.name}</span>
+                          <span className="text-[11px] text-white/55">
+                            {isMuted ? 'muted' : `cred ${s.credibility}`}
+                          </span>
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
       </Section>
 
       <Section title="Delivery defaults">

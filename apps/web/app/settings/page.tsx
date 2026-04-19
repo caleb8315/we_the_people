@@ -11,7 +11,11 @@ export default async function SettingsPage() {
 
   const [{ data: prefs }, { data: sources }, { data: profile }] = await Promise.all([
     sb.from('preferences').select('*').eq('user_id', auth.user.id).maybeSingle(),
-    sb.from('sources').select('id, name, kind, credibility').eq('enabled', true).order('credibility', { ascending: false }),
+    sb
+      .from('sources')
+      .select('id, name, kind, credibility, metadata')
+      .eq('enabled', true)
+      .order('credibility', { ascending: false }),
     sb.from('profiles').select('display_name').eq('user_id', auth.user.id).maybeSingle(),
   ]);
 
