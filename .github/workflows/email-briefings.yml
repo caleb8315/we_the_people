@@ -1,0 +1,28 @@
+name: Email Briefings
+
+on:
+  schedule:
+    - cron: '35 7 * * *'   # 35 minutes after daily briefing
+  workflow_dispatch:
+
+concurrency:
+  group: email-briefings
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      BRIEFING_FROM_EMAIL: ${{ secrets.BRIEFING_FROM_EMAIL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run email

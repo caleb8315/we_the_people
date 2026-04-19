@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "cd ../.. && npm install && npm run build --workspace apps/web",
+  "installCommand": "cd ../.. && npm install",
+  "regions": ["iad1"],
+  "functions": {
+    "app/api/**/*": { "maxDuration": 30 }
+  }
+}

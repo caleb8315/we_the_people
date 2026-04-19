@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "paths": {
+      "@osint/core": ["../../packages/core/src/index.ts"],
+      "@osint/core/*": ["../../packages/core/src/*"]
+    }
+  },
+  "include": ["src/**/*", "../../packages/core/src/**/*"]
+}

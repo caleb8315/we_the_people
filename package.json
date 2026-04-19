@@ -1,0 +1,27 @@
+{
+  "name": "osint-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Transparent, privacy-first OSINT platform (monorepo)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "dev": "npm run dev --workspace apps/web",
+    "ingest": "npm run ingest --workspace apps/worker",
+    "brief": "npm run brief --workspace apps/worker",
+    "email": "npm run email --workspace apps/worker"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "@types/node": "^20.17.12"
+  }
+}

@@ -1,0 +1,34 @@
+name: Ingest
+
+on:
+  schedule:
+    - cron: '17 * * * *'   # hourly, offset from briefing
+  workflow_dispatch:
+
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      MAX_DAILY_LLM_CALLS: ${{ vars.MAX_DAILY_LLM_CALLS || '200' }}
+      MAX_DAILY_LLM_CALLS_SIGNALS: ${{ vars.MAX_DAILY_LLM_CALLS_SIGNALS || '150' }}
+      MAX_DAILY_LLM_CALLS_BRIEFING: ${{ vars.MAX_DAILY_LLM_CALLS_BRIEFING || '20' }}
+      MAX_DAILY_LLM_CALLS_CONTRADICTION: ${{ vars.MAX_DAILY_LLM_CALLS_CONTRADICTION || '30' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run ingest

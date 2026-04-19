@@ -1,0 +1,42 @@
+name: Briefing
+
+on:
+  schedule:
+    - cron: '0 7 * * *'    # 07:00 UTC daily
+    - cron: '0 14 * * 0'   # 14:00 UTC Sunday (weekly)
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: 'daily or weekly'
+        required: true
+        default: 'daily'
+
+concurrency:
+  group: briefing-${{ github.event.schedule || 'manual' }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      MAX_DAILY_LLM_CALLS: ${{ vars.MAX_DAILY_LLM_CALLS || '200' }}
+      MAX_DAILY_LLM_CALLS_BRIEFING: ${{ vars.MAX_DAILY_LLM_CALLS_BRIEFING || '20' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run briefing
+        run: |
+          kind="${{ github.event.inputs.kind }}"
+          if [ -z "$kind" ]; then
+            if [ "${{ github.event.schedule }}" = "0 14 * * 0" ]; then kind=weekly; else kind=daily; fi
+          fi
+          npm run brief -- "$kind"
