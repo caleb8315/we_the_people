@@ -11,11 +11,14 @@ import {
   heuristicConfidence,
   heuristicSeverity,
   isCredibleDomain,
-  makeDedupeKey,
   MAX_CLAIMS_PER_SIGNAL,
   MAX_SOURCES_PER_SIGNAL,
   reliabilityPublicLabel,
 } from '@osint/core';
+// makeDedupeKey uses `node:crypto` and therefore lives OUTSIDE the
+// browser-safe barrel above. Import it from the subpath so no client
+// bundle ever pulls it in.
+import { makeDedupeKey } from '@osint/core/dedupe';
 import type { EvidenceItem, Topic, VerificationStatus } from '@osint/core/types';
 
 import { loadAdapters } from '../adapters/index';
