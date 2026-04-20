@@ -41,7 +41,7 @@ export const STATUS_DESCRIPTION: Record<VerificationStatus, string> = {
   verified:
     'Two or more credible, independent sources are reporting this event consistently. We still present the underlying sources; we do not assert factual truth.',
   developing:
-    'Multiple sources reference this event, or at least one credible source does, but corroboration is still partial. Read the evidence before acting on it.',
+    'Reported by at least one credible source, but not yet independently corroborated by two or more credible outlets. Treat with caution and read the evidence directly.',
   unverified:
     'Reported by a single source so far. Awaiting corroboration from additional independent outlets.',
   quarantined:

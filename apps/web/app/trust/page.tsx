@@ -27,8 +27,8 @@ export default function TrustPage() {
             sources report the event consistently.
           </li>
           <li>
-            <Badge variant="developing">Developing</Badge> Multiple sources reference the
-            event, or at least one credible source does, but corroboration is still partial.
+            <Badge variant="developing">Developing</Badge> Reported by at least one credible
+            source, but not yet independently corroborated by two or more credible outlets. Treat with caution.
           </li>
           <li>
             <Badge variant="unverified">Single-source</Badge> Reported by one source so far.
