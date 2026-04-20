@@ -6,3 +6,5 @@ export * from './domains';
 export * from './topics';
 export * from './dedupe';
 export * from './budget';
+export * from './normalize';
+export * from './evidence';

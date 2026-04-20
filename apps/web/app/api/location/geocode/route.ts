@@ -100,7 +100,7 @@ async function geocodeNominatim(query: string): Promise<{ label: string; lat: nu
   const url =
     `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`;
   const res = await fetch(url, {
-    headers: { 'user-agent': 'OSINT-Platform-Geocoder/1.0' },
+    headers: { 'user-agent': 'Crosscheck-Geocoder/1.0' },
   });
   if (!res.ok) return null;
   const rows = (await res.json()) as Array<{ display_name?: string; lat?: string; lon?: string }>;

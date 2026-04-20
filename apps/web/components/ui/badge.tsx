@@ -27,10 +27,13 @@ const VARIANT_STYLES: Record<BadgeVariant, string> = {
   neutral: 'bg-white/5 text-white/70 border-white/10',
 };
 
+// Badge variant keys mirror the internal reliability enum for styling, but
+// the labels shown to users come from `statusLabel()` in `@osint/core`.
+// Keep icons neutral: a check here means "corroborated", not "true".
 const VARIANT_ICON: Partial<Record<BadgeVariant, string>> = {
   verified: '✓',
   developing: '◐',
-  unverified: '?',
+  unverified: '·',
   quarantined: '⚑',
   blocked: '■',
   disputed: '!',

@@ -4,7 +4,7 @@ import { isAdminEmail } from '@/lib/admin';
 import { StatTile } from '@/components/ui/stat-tile';
 import { Card } from '@/components/ui/card';
 
-export const metadata = { title: 'Ops · OSINT Platform' };
+export const metadata = { title: 'Ops · Crosscheck' };
 export const dynamic = 'force-dynamic';
 
 export default async function OpsPage() {

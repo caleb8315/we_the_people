@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { statusShortLabel } from '@osint/core';
+import type { VerificationStatus } from '@osint/core/types';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { getClientKey, limit } from '@/lib/rate-limit';
 import { consumeUserDailyLimit } from '@/lib/daily-limits';
@@ -61,17 +63,23 @@ export async function POST(req: Request) {
     .slice(0, 12);
 
   const prompt = [
-    'You are an OSINT investigative journalist.',
-    'Write a concise personalized intelligence briefing with:',
-    '- Top 5 developments',
-    '- What changed in the last 24 hours',
+    'You are the Crosscheck analyst writing a concise personal briefing that describes how public reporting and sensor evidence agree, conflict, and where evidence is missing.',
+    'Hard rules:',
+    '- Never tell the reader what is correct or what happened. Describe how credible public sources are reporting it.',
+    '- Prefer the words agreement, conflict, corroboration, confidence, evidence, and limitation.',
+    '- When sources disagree, surface both sides rather than picking one.',
+    '- Never accuse any person, group, or state of anything.',
+    '- When sensor networks have not detected supporting evidence, say so plainly — never phrase absence as a denial of the event.',
+    'Structure:',
+    '- Top 5 developments (one sentence each, with 1–2 citation-style references)',
+    '- What changed in the last 24 hours (agreement shifts, new disagreements, new sensor confirmations)',
     '- What to watch next',
-    'Use neutral wording and highlight verification status and confidence.',
+    'Each item should note how well the reporting is corroborated (corroborated / developing / single-source) and the confidence band.',
     '',
     'Signals:',
     ...filtered.map(
       (s, i) =>
-        `${i + 1}. [${s.topic}] ${s.title} | sev=${s.severity} conf=${s.confidence} status=${s.verification_status} | ${s.url ?? '-'}`,
+        `${i + 1}. [${s.topic}] ${s.title} | sev=${s.severity} conf=${s.confidence} reliability=${statusShortLabel(s.verification_status as VerificationStatus)} | ${s.url ?? '-'}`,
     ),
   ].join('\n');
 

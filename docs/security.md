@@ -1,6 +1,6 @@
 # Security & Privacy Baseline
 
-This document describes the security posture of the OSINT Platform beta. It is the source of truth for reviewers, grant applications, and the launch checklist.
+This document describes the security posture of the OSINT Platform beta. It is the authoritative reference for reviewers, grant applications, and the launch checklist.
 
 ## Threat model (beta scope)
 
@@ -52,8 +52,8 @@ Explicitly out of scope for v1 (but tracked):
 
 ### Data retention
 
-- Signals auto-expire by verification status and severity (see `computeExpiry`).
-- Quarantined rows expire in ≤ 24h unless promoted.
+- Signals auto-expire based on their reliability label and severity (see `computeExpiry`).
+- Quarantined / flagged rows expire in ≤ 24h unless promoted.
 - Users can delete their account from Settings (`/api/account/delete`), which cascades to profile, preferences, and feedback.
 - `usage_ledger` rows older than 60 days should be pruned by a scheduled maintenance job.
 
@@ -65,6 +65,7 @@ Explicitly out of scope for v1 (but tracked):
 
 ## Legal / positioning
 
-- Platform outputs are described as "evidence-backed inconsistency signals," not accusations.
+- Platform outputs are described as "evidence-backed source-disagreement signals," not verdicts, not accusations, and not findings of fact.
+- We never claim to verify truth or to fact-check individual statements. Reliability labels (Corroborated / Developing / Single-source / Flagged) describe how well a signal is corroborated across independent credible sources. Confidence bands describe how much evidence we have seen. Neither is a claim about what is factually true.
 - We only use public data or explicitly licensed feeds.
-- Every signal shows source citations and a confidence label.
+- Every signal shows source citations, a reliability label, and a confidence band.

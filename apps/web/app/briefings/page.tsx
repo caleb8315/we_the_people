@@ -9,7 +9,7 @@ import { SignalCard } from '@/components/signal-card';
 import { decorateSignals, personalizeSignals, type SignalRowRaw } from '@/lib/signals';
 import { logProductEvent } from '@/lib/product-events';
 
-export const metadata = { title: 'Briefings · OSINT Platform' };
+export const metadata = { title: 'Briefings · Crosscheck' };
 export const revalidate = 120;
 
 const MODES = ['my', 'global'] as const;
@@ -98,7 +98,7 @@ export default async function BriefingsPage({ searchParams }: { searchParams: { 
             }
           >
             <p className="-mt-2 mb-3 text-xs text-white/55">
-              Preview reflects your topics and mute settings so you can verify personalization at a glance.
+              Preview reflects your topics and mute settings so you can confirm personalization at a glance.
             </p>
             {personalized.length === 0 ? (
               <EmptyState

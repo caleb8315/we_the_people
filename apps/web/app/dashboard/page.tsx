@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { decorateSignals, personalizeSignals, type SignalRowRaw } from '@/lib/signals';
 
-export const metadata = { title: 'Dashboard · OSINT Platform' };
+export const metadata = { title: 'Dashboard · Crosscheck' };
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
@@ -55,7 +55,7 @@ export default async function DashboardPage() {
   const decoratedPersonal = await decorateSignals(sb, personal.slice(0, 12), { newSince: lastVisit });
 
   const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const newVerifiedCount = (rawSignals ?? []).filter(
+  const newCorroboratedCount = (rawSignals ?? []).filter(
     (s) => s.verification_status === 'verified' && s.first_seen_at >= dayAgo,
   ).length;
   const disputedCount = decoratedPersonal.reduce((n, s) => n + ((s.contradictions_count ?? 0) > 0 ? 1 : 0), 0);
@@ -84,8 +84,8 @@ export default async function DashboardPage() {
         <p className="text-[11px] font-medium uppercase tracking-widest text-white/55">Workspace</p>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight">Welcome back, {name}</h1>
         <p className="mt-2 max-w-2xl text-sm text-white/70">
-          Your personal intelligence workspace. Scan the at-a-glance strip, review your priority signals, and jump to
-          briefings or the AI analyst.
+          Your personal consistency-check workspace. Scan the at-a-glance strip, review your priority signals, and
+          jump to briefings or the AI analyst.
         </p>
       </header>
 
@@ -98,16 +98,16 @@ export default async function DashboardPage() {
           href={topPriority ? `/signal/${topPriority.id}` : undefined}
         />
         <StatTile
-          label="New verified (24h)"
-          value={newVerifiedCount}
+          label="Newly corroborated (24h)"
+          value={newCorroboratedCount}
           hint="Corroborated across 2+ credible sources"
           tone="accent"
           href="/feed?mode=global"
         />
         <StatTile
-          label="Disputed in your feed"
+          label="Source disagreements in your feed"
           value={disputedCount}
-          hint="Claim vs observation mismatches"
+          hint="Sources disagree on a material detail"
           tone={disputedCount > 0 ? 'warn' : 'neutral'}
         />
         <StatTile
@@ -152,7 +152,7 @@ export default async function DashboardPage() {
       <section className="grid gap-3 sm:grid-cols-3">
         <WorkspaceLink
           href="/dashboard/intel"
-          title="Intel workspace"
+          title="Priority workspace"
           body="Prioritized, high-severity signals filtered to your focus."
         />
         <WorkspaceLink

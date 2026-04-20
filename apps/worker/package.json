@@ -9,6 +9,7 @@
     "brief": "tsx src/index.ts brief",
     "alert": "tsx src/index.ts alert",
     "email": "tsx src/index.ts email",
+    "backfill": "tsx src/index.ts backfill",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

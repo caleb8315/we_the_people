@@ -2,7 +2,7 @@ import { LoginForm } from '@/components/login-form';
 import { redirect } from 'next/navigation';
 import { getServerSupabase } from '@/lib/supabase-server';
 
-export const metadata = { title: 'Sign in · OSINT Platform' };
+export const metadata = { title: 'Sign in · Crosscheck' };
 
 export default async function LoginPage({ searchParams }: { searchParams: { next?: string; error?: string } }) {
   const sb = getServerSupabase();

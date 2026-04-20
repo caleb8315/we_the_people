@@ -4,7 +4,7 @@ import { getServerSupabase } from '@/lib/supabase-server';
 import { Badge } from '@/components/ui/badge';
 import { StatTile } from '@/components/ui/stat-tile';
 
-export const metadata = { title: 'Sources · OSINT Platform' };
+export const metadata = { title: 'Sources · Crosscheck' };
 export const dynamic = 'force-dynamic';
 
 interface SourceRow {

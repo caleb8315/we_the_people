@@ -1,3 +1,5 @@
+import { statusLabel } from '@osint/core';
+import type { VerificationStatus } from '@osint/core/types';
 import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
 import { env } from '../lib/env';
 import { consumeUserDailyLimit } from '../lib/daily-limits';
@@ -105,7 +107,7 @@ export async function runEmailBriefings(): Promise<{ sent: number; failed: numbe
       body: JSON.stringify({
         from: e.BRIEFING_FROM_EMAIL,
         to: [email],
-        subject: `Daily OSINT Briefing · ${latest.headline}`,
+        subject: `Crosscheck Daily · ${latest.headline}`,
         html,
       }),
     });
@@ -156,7 +158,7 @@ function buildUserBriefingHtml(input: {
     .map(
       (s) =>
         `<li><strong>[${escapeHtml(String(s.topic ?? 'other'))}]</strong> ${escapeHtml(s.title)} ` +
-        `(sev ${s.severity}, ${escapeHtml(s.verification_status)})` +
+        `(sev ${s.severity}, reliability: ${escapeHtml(statusLabel(s.verification_status as VerificationStatus))})` +
         (s.url ? ` — <a href="${escapeHtml(String(s.url))}">source</a>` : '') +
         `</li>`,
     )
@@ -170,7 +172,10 @@ function buildUserBriefingHtml(input: {
       <p>${escapeHtml(input.body).slice(0, 2200).replace(/\n/g, '<br/>')}</p>
       <h3>Top signals for your profile</h3>
       <ul>${cards || '<li>No high-priority signals matched your current topics today.</li>'}</ul>
-      <p style="color:#666;font-size:12px">This briefing is generated per account; your preferences and AI state are isolated.</p>
+      <p style="color:#666;font-size:12px">
+        Reliability labels reflect how many independent credible sources are reporting each signal. They are not
+        claims of factual truth. This briefing is generated per account; your preferences and AI state are isolated.
+      </p>
     </div>
   `;
 }

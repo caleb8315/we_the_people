@@ -45,7 +45,7 @@ export async function tryConsume(
     .eq('day', today);
 
   if (error) {
-    // Fail closed: if we cannot verify budget, skip LLM work.
+    // Fail closed: if we cannot confirm the budget, skip LLM work.
     return { ok: false, reason: `ledger error: ${error.message}`, used: 0 };
   }
 

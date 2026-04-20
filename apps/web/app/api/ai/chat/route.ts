@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { statusShortLabel } from '@osint/core';
+import type { VerificationStatus } from '@osint/core/types';
 import { getServerSupabase } from '@/lib/supabase-server';
+import { DEFAULT_AI_SYSTEM_PROMPT } from '@/lib/ai-defaults';
 import { getClientKey, limit } from '@/lib/rate-limit';
 import { serverEnv } from '@/lib/env';
 import { consumeUserDailyLimit } from '@/lib/daily-limits';
@@ -174,9 +177,7 @@ export async function POST(req: Request) {
 
   const context = [...(contextRows ?? [])].reverse();
   const assistantReply = await generateAssistantReply({
-    systemPrompt:
-      aiProfile?.system_prompt ||
-      'You are an OSINT investigative journalist. Write like a newsroom analyst: concise, factual, source-driven, and transparent about uncertainty. Never make accusations without evidence. Always distinguish verified facts, developing reports, and open questions.',
+    systemPrompt: aiProfile?.system_prompt || DEFAULT_AI_SYSTEM_PROMPT,
     model: aiProfile?.model ?? 'gemini-2.0-flash',
     temperature: Number(aiProfile?.temperature ?? 0.4),
     maxOutputTokens: aiProfile?.max_output_tokens ?? 600,
@@ -306,7 +307,8 @@ function buildGroundingContext(input: {
 }) {
   const signalLines = input.signals.slice(0, 12).map((s, i) => {
     const ts = s.first_seen_at ? new Date(s.first_seen_at).toISOString() : 'n/a';
-    return `${i + 1}. [${s.topic ?? 'other'}] ${s.title} | sev=${s.severity} conf=${s.confidence} status=${s.verification_status} country=${s.country_code ?? '-'} time=${ts} url=${s.url ?? '-'}`;
+    const reliability = statusShortLabel(s.verification_status as VerificationStatus);
+    return `${i + 1}. [${s.topic ?? 'other'}] ${s.title} | sev=${s.severity} conf=${s.confidence} reliability=${reliability} country=${s.country_code ?? '-'} time=${ts} url=${s.url ?? '-'}`;
   });
   const sourceLines = input.sources.map((s) => `${s.name} (${s.kind}, cred ${s.credibility})`);
   const briefingLines = input.briefings.map((b) => `${new Date(b.period_start).toISOString()} :: ${b.headline}`);

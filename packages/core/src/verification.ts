@@ -1,10 +1,66 @@
 import type { EvidenceItem, Signal, VerificationStatus } from './types';
 import { extractDomain, isCredibleDomain } from './domains';
 
-const VERIFIED_MIN_SOURCES = 2;
-const VERIFIED_MIN_CREDIBLE = 2;
+/**
+ * Reliability / corroboration scoring.
+ *
+ * We never assert "truth" or "fact". We describe how many independent public
+ * sources are reporting a given signal and how credible those sources are.
+ * The enum values below are internal identifiers (they map to DB rows and
+ * RLS policies) — user-facing copy must always go through `statusLabel()`
+ * / `statusDescription()` so the product never publicly claims that anything
+ * has been "verified" or "fact-checked".
+ */
+
+const CORROBORATED_MIN_SOURCES = 2;
+const CORROBORATED_MIN_CREDIBLE = 2;
 const DEVELOPING_MIN_SOURCES = 2;
 const QUARANTINE_EXPIRY_HOURS = 48;
+
+// ── Public labels ──────────────────────────────────────────────────────────
+// These are the ONLY strings users should ever see for a signal's reliability.
+// Do not render `verification_status` directly in the UI.
+
+export const STATUS_LABEL: Record<VerificationStatus, string> = {
+  verified: 'Corroborated',
+  developing: 'Developing',
+  unverified: 'Single-source',
+  quarantined: 'Flagged',
+  blocked: 'Suppressed',
+};
+
+export const STATUS_SHORT_LABEL: Record<VerificationStatus, string> = {
+  verified: 'corroborated',
+  developing: 'developing',
+  unverified: 'single-source',
+  quarantined: 'flagged',
+  blocked: 'suppressed',
+};
+
+export const STATUS_DESCRIPTION: Record<VerificationStatus, string> = {
+  verified:
+    'Two or more credible, independent sources are reporting this event consistently. We still present the underlying sources; we do not assert factual truth.',
+  developing:
+    'Multiple sources reference this event, or at least one credible source does, but corroboration is still partial. Read the evidence before acting on it.',
+  unverified:
+    'Reported by a single source so far. Awaiting corroboration from additional independent outlets.',
+  quarantined:
+    'Flagged for review (for example, policy or legal language without observed on-the-ground evidence). Held back from alerts until corroboration improves.',
+  blocked:
+    'Suppressed from the public feed (administrative action). Evidence is retained for audit.',
+};
+
+export function statusLabel(s: VerificationStatus): string {
+  return STATUS_LABEL[s] ?? STATUS_LABEL.unverified;
+}
+
+export function statusShortLabel(s: VerificationStatus): string {
+  return STATUS_SHORT_LABEL[s] ?? STATUS_SHORT_LABEL.unverified;
+}
+
+export function statusDescription(s: VerificationStatus): string {
+  return STATUS_DESCRIPTION[s] ?? STATUS_DESCRIPTION.unverified;
+}
 
 const NON_KINETIC_PATTERNS: RegExp[] = [
   /\blgbt/i, /\bcivil\s*rights/i, /\babortion/i, /\bgender/i,
@@ -28,8 +84,14 @@ export interface VerificationDecision {
   decision_log: string[];
 }
 
+// Alias so call sites can use the neutral name.
+export type ReliabilityDecision = VerificationDecision;
+
 export function computeStatus(sourceCount: number, credibleCount: number): VerificationStatus {
-  if (credibleCount >= VERIFIED_MIN_CREDIBLE && sourceCount >= VERIFIED_MIN_SOURCES) {
+  if (
+    credibleCount >= CORROBORATED_MIN_CREDIBLE &&
+    sourceCount >= CORROBORATED_MIN_SOURCES
+  ) {
     return 'verified';
   }
   if (sourceCount >= DEVELOPING_MIN_SOURCES) return 'developing';
@@ -44,6 +106,11 @@ export function isNonKineticContext(text: string): boolean {
   return !hasKinetic;
 }
 
+/**
+ * Compute a reliability decision (internal name kept as `decideVerification`
+ * for backwards compatibility; the exported alias `decideReliability` is the
+ * preferred name for new code).
+ */
 export function decideVerification(
   title: string,
   summary: string | null,
@@ -108,6 +175,9 @@ export function canAlert(status: VerificationStatus, tier: 'priority' | 'daily')
 }
 
 export { QUARANTINE_EXPIRY_HOURS };
+
+// Neutral alias for new call sites.
+export { decideVerification as decideReliability };
 
 // Re-export for convenience in callers that only need a single function
 export { extractDomain };

@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { SettingsForm } from '@/components/settings-form';
 
-export const metadata = { title: 'Settings · OSINT Platform' };
+export const metadata = { title: 'Settings · Crosscheck' };
 
 export default async function SettingsPage() {
   const sb = getServerSupabase();

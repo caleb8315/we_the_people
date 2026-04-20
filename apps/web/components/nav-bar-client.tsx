@@ -26,10 +26,10 @@ export function NavBarClient({ signedIn }: { signedIn: boolean }) {
             aria-hidden="true"
             className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-[11px] font-bold text-black"
           >
-            W
+            ✓
           </span>
           <span>
-            OSINT <span className="text-white/50">Platform</span>
+            Crosscheck
           </span>
         </Link>
         <nav className="hidden flex-1 items-center gap-1 text-sm md:flex">

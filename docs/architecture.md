@@ -12,13 +12,13 @@
  ┌────────────────────────────────────────────────────────┐
  │                   @osint/worker                         │
  │                                                         │
- │   adapters/  ──▶  dedupe + classify  ──▶  verify        │
+ │   adapters/  ──▶  dedupe + classify  ──▶ corroborate    │
  │   (RSS, USGS,                             (core)        │
  │    NASA EONET)                                          │
  │        │                                       │        │
  │        ▼                                       ▼        │
- │   signals upsert                        contradictions  │
- │   evidence replace                      (inconsistencies)│
+ │   signals upsert                        source-disagree │
+ │   evidence replace                      (contradictions) │
  └─────────────────────────┬──────────────────────────────┘
                            ▼
                     ┌────────────┐
@@ -44,11 +44,11 @@
 
 1. A source adapter fetches raw items from a public feed.
 2. Items are grouped by `dedupe_key` (normalized title + country + day + topic).
-3. For each group, heuristic severity + verification decision are computed.
+3. For each group, heuristic severity + a reliability (corroboration) decision are computed.
 4. Signal is upserted. Evidence is replaced.
-5. Contradiction detector (deterministic) runs per signal; hits stored.
-6. Alerts job picks signals with `severity ≥ 80` and verified/developing status.
-7. Briefing job assembles top signals once per day into a single `briefings` row.
+5. Source-disagreement detector (deterministic) runs per signal; hits are stored in the `contradictions` table.
+6. Alerts job picks signals with `severity ≥ 80` that are at least developing in reliability (corroborated or developing).
+7. Briefing job assembles top signals once per day into a single `briefings` row, with neutral wording and no findings of fact.
 
 ## Budget guarantees
 

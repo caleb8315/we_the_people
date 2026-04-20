@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getServerSupabase } from '@/lib/supabase-server';
+import { DEFAULT_AI_SYSTEM_PROMPT } from '@/lib/ai-defaults';
 import { getClientKey, limit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
@@ -34,8 +35,7 @@ export async function GET(req: Request) {
       profile: {
         user_id: auth.user.id,
         model: 'gemini-2.0-flash',
-        system_prompt:
-          'You are an OSINT investigative journalist. Write like a newsroom analyst: concise, factual, source-driven, and transparent about uncertainty. Never make accusations without evidence. Always distinguish verified facts, developing reports, and open questions.',
+        system_prompt: DEFAULT_AI_SYSTEM_PROMPT,
         temperature: 0.4,
         max_output_tokens: 600,
       },

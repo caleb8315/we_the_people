@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { OnboardingForm } from '@/components/onboarding-form';
 
-export const metadata = { title: 'Onboarding · OSINT Platform' };
+export const metadata = { title: 'Onboarding · Crosscheck' };
 export const dynamic = 'force-dynamic';
 
 export default async function OnboardingPage() {

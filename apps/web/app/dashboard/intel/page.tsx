@@ -10,7 +10,7 @@ import { decorateSignals, type SignalRowRaw } from '@/lib/signals';
 import { signalGeoPoint, type SignalGeoPoint } from '@/lib/signal-geo';
 import { logProductEvent } from '@/lib/product-events';
 
-export const metadata = { title: 'Intel Workspace · OSINT Platform' };
+export const metadata = { title: 'Priority Workspace · Crosscheck' };
 export const dynamic = 'force-dynamic';
 const VIEWS = ['list', 'map'] as const;
 type IntelView = (typeof VIEWS)[number];
@@ -90,9 +90,9 @@ export default async function IntelWorkspacePage({
       <header>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Intel workspace</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Priority workspace</h1>
             <p className="mt-1 text-sm text-white/60">
-              Prioritized by your focus topics and verification quality. Alert intensity:{' '}
+              Prioritized by your focus topics and how well each signal is corroborated. Alert intensity:{' '}
               {prefs?.alert_intensity_preference ?? 'critical_only'}. Threshold: {prefs?.min_alert_severity ?? 70}.
             </p>
           </div>
@@ -135,7 +135,7 @@ export default async function IntelWorkspacePage({
       <section className="grid gap-3 sm:grid-cols-3">
         <StatTile label="Priority signals" value={prioritized.length} hint="Matched your focus topics" />
         <StatTile label="Critical (sev 85+)" value={criticalCount} tone={criticalCount > 0 ? 'danger' : 'neutral'} />
-        <StatTile label="Disputed" value={disputedCount} tone={disputedCount > 0 ? 'warn' : 'neutral'} />
+        <StatTile label="Source disagreements" value={disputedCount} tone={disputedCount > 0 ? 'warn' : 'neutral'} />
       </section>
 
       <section>

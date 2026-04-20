@@ -5,9 +5,9 @@ public preview URL you can use for testing.
 
 ## Prereqs
 
-- Verified GitHub account (your push to main currently requires email verification).
+- A GitHub account linked to you (GitHub may require email confirmation before it lets you push to `main`). This is GitHub's own account check, unrelated to how the OSINT Platform scores reliability.
 - Supabase project with the production URL and keys (Project settings -> API).
-- Optional: Gemini + Groq API keys, Resend API key + verified sender (or use `onboarding@resend.dev` for testing).
+- Optional: Gemini + Groq API keys, Resend API key + a confirmed sender domain (or use `onboarding@resend.dev` for testing).
 
 ## Step 1: Import the repo
 
@@ -74,6 +74,17 @@ Make sure these migrations from `supabase/migrations/` have been applied in orde
 - `008_user_daily_limits.sql`
 - `009_research_preferences_and_events.sql`
 - `010_dashboard_last_visit.sql`
+- `011_expand_source_catalog.sql`
+- `012_ux_map_mobile_research.sql`
+- `013_reframe_ai_defaults.sql`
+- `014_contradictions_contract.sql`
+- `015_reliability_dimensions.sql`
+- `016_reliability_labels.sql`
+
+For the reliability / contradictions / evidence rollout — including the
+backfill procedure that populates the new columns on recently-ingested
+signals without recomputing full history — see
+[docs/migration-plan.md](migration-plan.md).
 
 ## Step 6: Configure GitHub Actions workers
 

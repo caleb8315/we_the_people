@@ -10,7 +10,7 @@ import { logProductEvent } from '@/lib/product-events';
 import { decorateSignals, personalizeSignals, type SignalRowRaw } from '@/lib/signals';
 import { signalGeoPoint, type SignalGeoPoint } from '@/lib/signal-geo';
 
-export const metadata = { title: 'Feed · OSINT Platform' };
+export const metadata = { title: 'Feed · Crosscheck' };
 export const revalidate = 60;
 
 const TOPICS = ['all', 'war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster'] as const;

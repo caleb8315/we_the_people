@@ -114,7 +114,7 @@ export function AiWorkspace() {
             className="flex-1 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-brand-500/50"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask for an intelligence synthesis…"
+            placeholder="Ask about agreement, conflicts, or evidence gaps across sources…"
           />
           <button
             type="button"

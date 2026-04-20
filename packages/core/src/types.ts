@@ -24,12 +24,27 @@ export const TOPICS: Topic[] = [
   'other',
 ];
 
+/**
+ * Internal reliability enum. These values persist in the database and in RLS
+ * policies, so they cannot be renamed without a migration. They are NEVER
+ * rendered directly in the UI — use `statusLabel()` from `./verification`.
+ *
+ * Mapping to user-facing labels:
+ *   verified    → "Corroborated"
+ *   developing  → "Developing"
+ *   unverified  → "Single-source"
+ *   quarantined → "Flagged"
+ *   blocked     → "Suppressed"
+ */
 export type VerificationStatus =
   | 'unverified'
   | 'developing'
   | 'verified'
   | 'quarantined'
   | 'blocked';
+
+// Neutral alias for new code.
+export type ReliabilityStatus = VerificationStatus;
 
 export type ConfidenceLabel = 'low' | 'medium' | 'high';
 
@@ -81,11 +96,18 @@ export interface Signal {
 
 export interface Contradiction {
   signal_id: string;
-  claim: string;
-  observation: string;
-  explanation: string | null;
-  confidence: number;
+  // Required by the DB contract (migration 014):
+  type: 'cause_conflict' | 'numeric_conflict' | 'presence_conflict';
+  severity: 'low' | 'medium' | 'high';
+  summary: string;
+  metadata: Record<string, unknown>;
   evidence_ids: string[];
+  // Legacy columns kept for backwards compatibility with older UI reads.
+  // New rows populate both the new contract and these fields.
+  claim?: string;
+  observation?: string;
+  explanation?: string | null;
+  confidence?: number;
 }
 
 export interface Briefing {

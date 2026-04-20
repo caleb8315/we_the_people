@@ -3,7 +3,7 @@ import { getServerSupabase } from '@/lib/supabase-server';
 import { AiWorkspace } from '@/components/ai-workspace';
 import { StatTile } from '@/components/ui/stat-tile';
 
-export const metadata = { title: 'AI Workspace · OSINT Platform' };
+export const metadata = { title: 'AI Workspace · Crosscheck' };
 export const dynamic = 'force-dynamic';
 
 export default async function AiPage() {

@@ -1,4 +1,4 @@
-export const metadata = { title: 'Privacy · OSINT Platform' };
+export const metadata = { title: 'Privacy · Crosscheck' };
 
 export default function PrivacyPage() {
   return (

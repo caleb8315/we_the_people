@@ -15,7 +15,8 @@
     "dev": "npm run dev --workspace apps/web",
     "ingest": "npm run ingest --workspace apps/worker",
     "brief": "npm run brief --workspace apps/worker",
-    "email": "npm run email --workspace apps/worker"
+    "email": "npm run email --workspace apps/worker",
+    "backfill": "npm run backfill --workspace apps/worker"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -1,3 +1,5 @@
+import { statusLabel, statusShortLabel } from '@osint/core';
+import type { VerificationStatus } from '@osint/core/types';
 import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
 import { callLlm } from '../lib/llm';
 
@@ -77,18 +79,28 @@ export async function runBriefing(kind: 'daily' | 'weekly'): Promise<{ briefing_
 function buildPrompt(kind: 'daily' | 'weekly', items: any[]): string {
   const list = items
     .slice(0, 12)
-    .map((s, i) => `${i + 1}. [${s.topic}/${s.verification_status}] ${s.title} (sev=${s.severity})`)
+    .map(
+      (s, i) =>
+        `${i + 1}. [${s.topic}/${statusShortLabel(s.verification_status as VerificationStatus)}] ${s.title} (sev=${s.severity})`,
+    )
     .join('\n');
 
   return `
-You are writing a ${kind} intelligence briefing for a transparency-focused OSINT platform.
-Rules:
-- Neutral, analytical tone. No speculation presented as fact.
-- Never accuse; use language like "reports indicate", "sources disagree", "observed data suggests".
+You are the Crosscheck analyst writing a ${kind} briefing. Crosscheck describes how public
+reporting and open sensor evidence agree, where they conflict, and where evidence is missing.
+It is not an OSINT investigation tool and not a news app.
+
+Hard rules:
+- Never tell the reader what happened or what is correct. Describe how credible public sources
+  are reporting it, and cite them.
+- Prefer the words agreement, conflict, corroboration, confidence, evidence, and limitation.
+- Neutral tone. Never accuse. Prefer language like "reports indicate", "sources disagree",
+  "observed data suggests", "corroboration is developing", "no sensor confirmation detected".
+- When sources disagree, surface the disagreement (both sides + citations) rather than picking one.
 - Group by topic. 3–5 short paragraphs. Under 350 words.
 - End with a one-line "what to watch next 48h".
 
-Signals:
+Signals (format: topic/reliability):
 ${list}
 `.trim();
 }
@@ -96,7 +108,8 @@ ${list}
 function renderDeterministic(kind: 'daily' | 'weekly', items: any[]): string {
   const lines = items.slice(0, 12).map(s => {
     const url = s.url ? ` — ${s.url}` : '';
-    return `- **[${s.topic}]** ${s.title} _(severity ${s.severity}, ${s.verification_status})_${url}`;
+    const label = statusLabel(s.verification_status as VerificationStatus);
+    return `- **[${s.topic}]** ${s.title} _(severity ${s.severity}, reliability: ${label})_${url}`;
   });
   return `### ${kind === 'weekly' ? 'Weekly' : 'Daily'} — key signals\n\n${lines.join('\n')}`;
 }

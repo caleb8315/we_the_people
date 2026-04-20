@@ -1,0 +1,61 @@
+name: Backfill (manual)
+
+# Phase-8 rollout helper. NOT on a schedule. Operators trigger this
+# manually from the Actions tab when migrations 014 / 015 / 016 have been
+# applied and we want newly-added reliability / contradiction / evidence
+# fields populated on signals ingested in the last 24–48h.
+#
+# Hard caps (enforced in code, not in YAML):
+#   - window capped at 168h (7 days)
+#   - row limit capped at 2000 per invocation
+#   - dry-run mode available from the input form
+#
+# The workflow never runs automatically. Do NOT add a `schedule:` trigger
+# here; history-wide recompute is explicitly out of scope for phase 8.
+
+on:
+  workflow_dispatch:
+    inputs:
+      hours:
+        description: 'Window in hours (default 48, max 168)'
+        required: false
+        default: '48'
+      dry_run:
+        description: 'Dry run — compute scores and log them without writing to the DB'
+        required: false
+        type: boolean
+        default: true
+      limit:
+        description: 'Max signals to touch this run (default 500, max 2000)'
+        required: false
+        default: '500'
+
+concurrency:
+  group: backfill
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run backfill
+        run: |
+          set -euo pipefail
+          HOURS="${{ github.event.inputs.hours }}"
+          LIMIT="${{ github.event.inputs.limit }}"
+          DRY="${{ github.event.inputs.dry_run }}"
+          EXTRA=""
+          if [ "${DRY}" = "true" ]; then EXTRA="--dry-run"; fi
+          npm run backfill -- "${HOURS}" --limit="${LIMIT}" ${EXTRA}

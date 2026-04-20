@@ -444,7 +444,8 @@ export function SettingsForm({
       <Section title="Trust & methodology">
         <div className="rounded-card border border-white/10 bg-white/[0.03] p-4">
           <p className="text-sm text-white/70">
-            Verification states, confidence labels, inconsistency wording, and legal boundaries are documented here.
+            Reliability labels, confidence bands, source-disagreement wording, and the legal boundaries we work
+            within are documented here.
           </p>
           <a href="/trust" className="mt-3 inline-block text-sm text-brand-300 underline">
             Open trust documentation

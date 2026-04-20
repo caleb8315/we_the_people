@@ -2,8 +2,10 @@
  * Domain utilities + credibility list.
  *
  * Neutral stance: these are widely-cited international wire/reporting outlets
- * used to bootstrap the verification engine. Users can mute any source, and
- * credibility updates as more signals are corroborated.
+ * used to bootstrap the reliability/corroboration engine. Users can mute any
+ * source, and credibility is re-weighted as more signals are corroborated.
+ * We never claim these outlets report "the truth" — we only note that many
+ * independent readers treat them as reliable enough to cross-check.
  */
 
 export const CREDIBLE_DOMAINS: ReadonlySet<string> = new Set([

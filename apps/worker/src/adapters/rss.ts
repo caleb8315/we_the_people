@@ -28,7 +28,7 @@ export class RssAdapter implements Adapter {
 async function fetchRss(url: string): Promise<string> {
   const res = await fetch(url, {
     headers: {
-      'user-agent': 'OSINT-Platform-Bot/1.0 (+https://osint-platform.local)',
+      'user-agent': 'Crosscheck-Bot/1.0 (+https://crosscheck.local)',
       accept: 'application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
     },
   });

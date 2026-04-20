@@ -6,9 +6,9 @@ import { MobileBottomNav } from '@/components/mobile-bottom-nav';
 import { getServerSupabase } from '@/lib/supabase-server';
 
 export const metadata: Metadata = {
-  title: 'OSINT Platform · Transparent Intelligence',
+  title: 'Crosscheck — see where reporting agrees, conflicts, and lacks evidence',
   description:
-    'Privacy-first, transparency-first open-source intelligence. Aggregates public data, verifies events against multiple sources, and surfaces inconsistencies with neutral wording.',
+    'Crosscheck clusters public reporting and open sensor data by event, then shows how sources agree, where they conflict, and which pieces of evidence are missing. Not an OSINT investigation tool. Not a news app. A system for source consistency.',
   robots: { index: true, follow: true },
 };
 
@@ -30,20 +30,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <MobileBottomNav signedIn={signedIn} />
         <footer className="mx-auto hidden max-w-6xl px-4 pb-24 pt-10 text-xs text-white/50 sm:block sm:px-5 sm:pb-10">
           <div className="flex flex-wrap items-center gap-4">
-            <span>© {new Date().getFullYear()} OSINT Platform</span>
+            <span>© {new Date().getFullYear()} Crosscheck</span>
             <Link href="/privacy" className="hover:text-white">
               Privacy
             </Link>
             {!signedIn && (
               <Link href="/trust" className="hover:text-white">
-                Trust & methodology
+                Methodology
               </Link>
             )}
           </div>
           <p className="mt-3 max-w-2xl">
-            This platform surfaces evidence-backed inconsistencies between public reports and public data. It does not
-            make accusations, does not use classified sources, and presents confidence levels and citations for every
-            signal.
+            Crosscheck describes how public reporting agrees, conflicts, and where evidence is
+            missing across sources and sensor networks. Every signal links to the underlying
+            reports; every disagreement shows both sides. It is not an investigation tool and not
+            a news app.
           </p>
         </footer>
       </body>

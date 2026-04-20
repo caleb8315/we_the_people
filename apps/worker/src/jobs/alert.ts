@@ -1,4 +1,5 @@
-import { canAlert } from '@osint/core/verification';
+import { canAlert, statusLabel } from '@osint/core/verification';
+import type { VerificationStatus } from '@osint/core/types';
 import { env } from '../lib/env';
 import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
 import { consumeUserDailyLimit } from '../lib/daily-limits';
@@ -8,10 +9,10 @@ import { logProductEvent } from '../lib/product-events';
  * Alert job — runs every N minutes.
  *
  * MVP policy: the worker sends operator/admin notifications when a
- * "priority" signal appears (severity >= 80, verified or developing).
- * Per-user push alerts are opt-in and delivered via email (Resend)
- * using user preferences. This file implements the operator channel;
- * per-user push is wired up with email delivery in a later phase.
+ * "priority" signal appears (severity >= 80, corroborated or developing).
+ * Per-user push alerts are opt-in and delivered via email (Resend) using
+ * user preferences. This file implements the operator channel; per-user
+ * push is wired up with email delivery in a later phase.
  */
 export async function runAlerts(): Promise<{ sent: number }> {
   const runId = await startEngineRun('alert');
@@ -140,11 +141,12 @@ export async function runAlerts(): Promise<{ sent: number }> {
   }
 
   for (const s of candidates) {
+    const reliability = statusLabel(s.verification_status as VerificationStatus);
     const ok = await sendOperatorTelegram(
       [
         `🟡 PRIORITY · ${s.topic?.toUpperCase() ?? 'EVENT'}`,
         `${s.title}`,
-        `severity=${s.severity} · ${s.verification_status} · ${s.country_code ?? '—'}`,
+        `severity=${s.severity} · reliability: ${reliability} · ${s.country_code ?? '—'}`,
         s.url ?? '',
       ].join('\n'),
     );
@@ -199,16 +201,20 @@ async function sendUserAlertEmail(input: {
   if (!input.from || !input.apiKey) {
     return { ok: false, error: 'email config missing (BRIEFING_FROM_EMAIL/RESEND_API_KEY)' };
   }
+  const reliability = statusLabel(input.signal.verification_status as VerificationStatus);
   const html = `
     <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.5;color:#111">
       <h2>Priority alert: ${escapeHtml(input.signal.title)}</h2>
       <p><strong>Topic:</strong> ${escapeHtml(String(input.signal.topic ?? 'other'))}</p>
       <p><strong>Severity:</strong> ${input.signal.severity} / 100</p>
-      <p><strong>Status:</strong> ${escapeHtml(input.signal.verification_status)}</p>
+      <p><strong>Reliability:</strong> ${escapeHtml(reliability)}</p>
       <p><strong>Country:</strong> ${escapeHtml(input.signal.country_code ?? '-')}</p>
       <p>${escapeHtml(input.signal.summary ?? 'No summary provided.')}</p>
       ${input.signal.url ? `<p><a href="${escapeHtml(input.signal.url)}">Open source link</a></p>` : ''}
-      <p style="font-size:12px;color:#666">Beta limit: up to 5 priority alerts/day per user.</p>
+      <p style="font-size:12px;color:#666">
+        Reliability reflects how many independent credible sources are reporting this signal. It is not a claim
+        of factual truth. Beta limit: up to 5 priority alerts/day per user.
+      </p>
     </div>
   `;
   try {

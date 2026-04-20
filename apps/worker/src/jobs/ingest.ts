@@ -1,19 +1,26 @@
 import {
+  assessPhysicalEvidence,
+  buildReliabilitySummary,
   classifyTopic,
   computeExpiry,
+  computeReliabilityScores,
   decideVerification,
-  detectInconsistencies,
+  detectInconsistenciesWithLimits,
+  extractClaimsFromEvidence,
   extractDomain,
   heuristicConfidence,
   heuristicSeverity,
   isCredibleDomain,
   makeDedupeKey,
-  toContradictions,
+  MAX_CLAIMS_PER_SIGNAL,
+  MAX_SOURCES_PER_SIGNAL,
+  reliabilityPublicLabel,
 } from '@osint/core';
 import type { EvidenceItem, Topic, VerificationStatus } from '@osint/core/types';
 
 import { loadAdapters } from '../adapters/index';
 import type { RawItem } from '../adapters/base';
+import { upsertContradictions } from '../lib/contradictions';
 import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
 
 /**
@@ -21,8 +28,9 @@ import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
  *   1. Fetch from every enabled source in parallel (adapter-per-source).
  *   2. Group items by dedupe key (so 5 outlets on same story collapse).
  *   3. Score severity + confidence heuristically (no LLM).
- *   4. Decide verification status (credible count + non-kinetic quarantine).
+ *   4. Decide reliability / corroboration status (credible count + non-kinetic quarantine).
  *   5. Upsert signals + evidence atomically.
+ *   6. Detect source disagreements and write them to `contradictions`.
  */
 export async function runIngest(): Promise<{
   fetched: number;
@@ -104,6 +112,60 @@ export async function runIngest(): Promise<{
       );
       const status: VerificationStatus = decision.status;
 
+      // Phase 2 / 7: detect contradictions + reliability BEFORE the signal
+      // upsert so the reliability scores land on the initial row write. We
+      // tag evidence with a temporary index id here and re-map to DB ids
+      // after the evidence insert below. The existing severity / confidence
+      // / verification_status trio is left untouched — reliability augments.
+      //
+      // Phase 7 safety rails: contradiction detection is capped at
+      // MAX_SOURCES_PER_SIGNAL / MAX_CLAIMS_PER_SIGNAL. When either limit
+      // is hit the detector is skipped (no partial output, no LLM
+      // fallback), and we tag the signal with `complex_signal` so the UI
+      // can show "detection skipped — too many sources" instead of
+      // misleading readers with a zero-contradictions feed for a truly
+      // divisive story.
+      const indexedEvidence = evidence.map((e, i) => ({ ...e, id: `idx:${i}` }));
+      const claims = extractClaimsFromEvidence(indexedEvidence);
+      const detection = detectInconsistenciesWithLimits(claims, {
+        sources_count: evidence.length,
+      });
+      const contradictions = detection.contradictions;
+      if (detection.skipped) {
+        console.log(
+          `[ingest] skipped contradictions for dedupe_key=${dedupe_key}: ${detection.reason} (sources=${detection.source_count}, claims=${detection.claim_count}, limits=${MAX_SOURCES_PER_SIGNAL}/${MAX_CLAIMS_PER_SIGNAL})`,
+        );
+      }
+      const reliability = computeReliabilityScores({
+        evidence,
+        claims,
+        contradictions,
+      });
+      // Phase 3 — user-facing label + deterministic one-sentence summary.
+      const reliabilityLabelPublic = reliabilityPublicLabel(reliability.reliability_score);
+      const reliabilitySummary = buildReliabilitySummary({
+        contradictions_count: contradictions.length,
+        evidence_strength_score: reliability.evidence_strength_score,
+        agreement_score: reliability.agreement_score,
+      });
+      // Phase 5 — structured physical-evidence assessment. Atomic with the
+      // signal write (same per-group try block); stashed in raw_data so no
+      // schema migration is required for this phase.
+      const physicalEvidence = assessPhysicalEvidence({
+        evidence,
+        topic,
+        title: primary.title,
+        summary: primary.summary,
+      });
+
+      // Compose signal tags. Each tag is a compact, machine-readable flag
+      // that the UI and ops tooling can filter on. `complex_signal` is the
+      // Phase-7 marker: contradiction detection was deliberately skipped
+      // for this signal because it blew past the source / claim caps.
+      const tags: string[] = [];
+      if (decision.decision_log.includes('non-kinetic')) tags.push('non_kinetic');
+      if (detection.skipped) tags.push('complex_signal');
+
       const signalRow = {
         dedupe_key,
         title: primary.title.slice(0, 500),
@@ -118,12 +180,31 @@ export async function runIngest(): Promise<{
         source_count: decision.source_count,
         credible_source_count: decision.credible_source_count,
         distinct_domains: decision.distinct_domains,
-        tags: decision.decision_log.includes('non-kinetic') ? ['non_kinetic'] : [],
+        tags,
         occurred_at: primary.published_at ?? null,
         expires_at: computeExpiry(severity, topic, status),
+        // Phase-2 reliability columns (migration 015).
+        reliability_score: reliability.reliability_score,
+        agreement_score: reliability.agreement_score,
+        source_independence_score: reliability.source_independence_score,
+        narrative_divergence_score: reliability.narrative_divergence_score,
+        evidence_strength_score: reliability.evidence_strength_score,
+        // Phase-3 user-facing contract (migration 016).
+        reliability_label: reliabilityLabelPublic,
+        reliability_summary: reliabilitySummary,
         raw_data: {
           decision_log: decision.decision_log,
           group_size: rawGroup.length,
+          reliability: reliability.details,
+          physical_evidence: physicalEvidence,
+          contradiction_detection: {
+            skipped: detection.skipped,
+            reason: detection.reason,
+            source_count: detection.source_count,
+            claim_count: detection.claim_count,
+            source_limit: MAX_SOURCES_PER_SIGNAL,
+            claim_limit: MAX_CLAIMS_PER_SIGNAL,
+          },
           ...(primary.raw ?? {}),
         },
       };
@@ -157,19 +238,22 @@ export async function runIngest(): Promise<{
         }
       }
 
-      // Contradictions: detect inconsistencies across this signal's evidence,
-      // then replace any prior contradiction rows for the signal.
-      const hints = detectInconsistencies(
-        { title: primary.title, summary: primary.summary ?? null },
-        evidence,
-      );
-      await sb.from('contradictions').delete().eq('signal_id', upserted.id);
-      if (hints.length > 0) {
-        const rows = toContradictions(upserted.id, hints, insertedEvidenceIds);
-        const { error: cErr } = await sb.from('contradictions').insert(rows);
-        if (cErr) errors.push(`contradiction insert: ${cErr.message}`);
-        else contradictionInserts += rows.length;
-      }
+      // Contradictions — atomic with the signal write. Enforces the
+      // required contract: extract → detect → upsert, idempotent and
+      // scoped per signal_id (delete-then-insert, no duplicates).
+      // Re-map the temporary `idx:N` evidence references to the real DB ids
+      // returned from the evidence insert above; drop any that didn't land.
+      const indexToDbId = new Map<string, string>();
+      insertedEvidenceIds.forEach((dbId, i) => indexToDbId.set(`idx:${i}`, dbId));
+      const contradictionsForWrite = contradictions.map((c) => ({
+        ...c,
+        evidence_ids: c.evidence_ids
+          .map((ref) => indexToDbId.get(ref) ?? null)
+          .filter((id): id is string => typeof id === 'string'),
+      }));
+      const contraRes = await upsertContradictions(sb, upserted.id, contradictionsForWrite);
+      if (contraRes.error) errors.push(`contradiction: ${contraRes.error}`);
+      contradictionInserts += contraRes.inserted;
     } catch (err) {
       errors.push(`group: ${(err as Error).message}`);
     }

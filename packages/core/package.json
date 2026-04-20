@@ -14,7 +14,9 @@
     "./domains": "./src/domains.ts",
     "./topics": "./src/topics.ts",
     "./dedupe": "./src/dedupe.ts",
-    "./budget": "./src/budget.ts"
+    "./budget": "./src/budget.ts",
+    "./normalize": "./src/normalize.ts",
+    "./evidence": "./src/evidence.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
