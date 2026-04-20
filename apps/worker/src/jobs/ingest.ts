@@ -2,11 +2,13 @@ import {
   classifyTopic,
   computeExpiry,
   decideVerification,
+  detectInconsistencies,
   extractDomain,
   heuristicConfidence,
   heuristicSeverity,
   isCredibleDomain,
   makeDedupeKey,
+  toContradictions,
 } from '@osint/core';
 import type { EvidenceItem, Topic, VerificationStatus } from '@osint/core/types';
 
@@ -26,6 +28,7 @@ export async function runIngest(): Promise<{
   fetched: number;
   signals: number;
   evidence: number;
+  contradictions: number;
 }> {
   const runId = await startEngineRun('ingest');
   const errors: string[] = [];
@@ -71,6 +74,7 @@ export async function runIngest(): Promise<{
   const sb = supabase();
   let signalInserts = 0;
   let evidenceInserts = 0;
+  let contradictionInserts = 0;
 
   for (const [dedupe_key, rawGroup] of groups) {
     try {
@@ -139,10 +143,32 @@ export async function runIngest(): Promise<{
       // Replace-evidence strategy: delete + re-insert for this signal.
       await sb.from('evidence').delete().eq('signal_id', upserted.id);
       const evidenceRows = evidence.map(e => ({ signal_id: upserted.id, ...e }));
+      let insertedEvidenceIds: string[] = [];
       if (evidenceRows.length > 0) {
-        const { error: evErr } = await sb.from('evidence').insert(evidenceRows);
-        if (evErr) errors.push(`evidence insert: ${evErr.message}`);
-        else evidenceInserts += evidenceRows.length;
+        const { data: evData, error: evErr } = await sb
+          .from('evidence')
+          .insert(evidenceRows)
+          .select('id');
+        if (evErr) {
+          errors.push(`evidence insert: ${evErr.message}`);
+        } else {
+          evidenceInserts += evidenceRows.length;
+          insertedEvidenceIds = (evData ?? []).map((r: { id: string }) => r.id);
+        }
+      }
+
+      // Contradictions: detect inconsistencies across this signal's evidence,
+      // then replace any prior contradiction rows for the signal.
+      const hints = detectInconsistencies(
+        { title: primary.title, summary: primary.summary ?? null },
+        evidence,
+      );
+      await sb.from('contradictions').delete().eq('signal_id', upserted.id);
+      if (hints.length > 0) {
+        const rows = toContradictions(upserted.id, hints, insertedEvidenceIds);
+        const { error: cErr } = await sb.from('contradictions').insert(rows);
+        if (cErr) errors.push(`contradiction insert: ${cErr.message}`);
+        else contradictionInserts += rows.length;
       }
     } catch (err) {
       errors.push(`group: ${(err as Error).message}`);
@@ -154,9 +180,20 @@ export async function runIngest(): Promise<{
     records_in: fetched,
     records_out: signalInserts,
     errors,
-    meta: { groups: groups.size, evidence: evidenceInserts },
+    meta: {
+      groups: groups.size,
+      evidence: evidenceInserts,
+      contradictions: contradictionInserts,
+    },
   });
 
-  console.log(`[ingest] done: ${signalInserts} signals, ${evidenceInserts} evidence, ${errors.length} errors`);
-  return { fetched, signals: signalInserts, evidence: evidenceInserts };
+  console.log(
+    `[ingest] done: ${signalInserts} signals, ${evidenceInserts} evidence, ${contradictionInserts} contradictions, ${errors.length} errors`,
+  );
+  return {
+    fetched,
+    signals: signalInserts,
+    evidence: evidenceInserts,
+    contradictions: contradictionInserts,
+  };
 }
