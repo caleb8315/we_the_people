@@ -16,7 +16,8 @@
     "./dedupe": "./src/dedupe.ts",
     "./budget": "./src/budget.ts",
     "./normalize": "./src/normalize.ts",
-    "./evidence": "./src/evidence.ts"
+    "./evidence": "./src/evidence.ts",
+    "./cluster": "./src/cluster.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

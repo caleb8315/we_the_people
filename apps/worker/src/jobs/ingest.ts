@@ -2,6 +2,7 @@ import {
   assessPhysicalEvidence,
   buildReliabilitySummary,
   classifyTopic,
+  clusterItems,
   computeExpiry,
   computeReliabilityScores,
   decideVerification,
@@ -64,22 +65,61 @@ export async function runIngest(): Promise<{
     }
   });
 
-  // Group by dedupe key across sources.
-  const groups = new Map<string, RawItem[]>();
-  for (const raw of items) {
-    const topic = raw.topic ?? classifyTopic(raw.title, raw.summary);
-    const key = makeDedupeKey({
-      title: raw.title,
-      country_code: raw.country_code ?? null,
-      occurred_at: raw.published_at ?? null,
-      topic,
-    });
-    const bucket = groups.get(key) ?? [];
-    bucket.push(raw);
-    groups.set(key, bucket);
+  // ── Classify topics up-front (needed for both clustering and dedupe) ──
+  const itemTopics: string[] = items.map(
+    raw => raw.topic ?? classifyTopic(raw.title, raw.summary),
+  );
+
+  // ── Cluster articles about the same real-world event ──────────────────
+  // Two-pass strategy:
+  //   Pass 1 — keyword-similarity clustering (Jaccard on key terms within
+  //            each topic+day bucket).  This merges "Iran strikes kill
+  //            dozens in Gaza" and "Casualties reported after Iranian
+  //            attack on Gaza" into one group even though the headlines
+  //            differ.  O(n·k) where k = articles per topic per day.
+  //   Pass 2 — derive a stable dedupe_key per cluster (SHA-1 of the
+  //            representative/primary title) for the DB upsert.
+  const clusterables = items.map((raw, i) => ({
+    title: raw.title,
+    topic: itemTopics[i]!,
+    published_day: raw.published_at ? raw.published_at.slice(0, 10) : '',
+  }));
+  const clusterIds = clusterItems(clusterables);
+
+  // Build groups keyed by cluster id, then assign a stable dedupe key per
+  // cluster using the first-seen (representative) article's title.
+  const clusterBuckets = new Map<number, RawItem[]>();
+  for (let i = 0; i < items.length; i++) {
+    const cid = clusterIds[i]!;
+    let bucket = clusterBuckets.get(cid);
+    if (!bucket) {
+      bucket = [];
+      clusterBuckets.set(cid, bucket);
+    }
+    bucket.push(items[i]!);
   }
 
-  console.log(`[ingest] ${fetched} items → ${groups.size} unique signals`);
+  const groups = new Map<string, RawItem[]>();
+  for (const [, bucket] of clusterBuckets) {
+    const rep = bucket[0]!;
+    const topic = rep.topic ?? classifyTopic(rep.title, rep.summary);
+    const key = makeDedupeKey({
+      title: rep.title,
+      country_code: rep.country_code ?? null,
+      occurred_at: rep.published_at ?? null,
+      topic,
+    });
+    // If an exact-hash collision occurs across clusters (extremely rare),
+    // merge into the existing bucket rather than silently dropping.
+    const existing = groups.get(key);
+    if (existing) {
+      existing.push(...bucket);
+    } else {
+      groups.set(key, bucket);
+    }
+  }
+
+  console.log(`[ingest] ${fetched} items → ${clusterBuckets.size} clusters → ${groups.size} unique signals`);
 
   // Build signal rows + evidence rows.
   const sb = supabase();

@@ -26,6 +26,19 @@ export const CREDIBLE_DOMAINS: ReadonlySet<string> = new Set([
   'si.edu',
   'un.org',
   'who.int',
+  'nytimes.com',
+  'washingtonpost.com',
+  'cbsnews.com',
+  'nbcnews.com',
+  'abcnews.go.com',
+  'cbc.ca',
+  'skynews.com',
+  'independent.co.uk',
+  'euronews.com',
+  'thehindu.com',
+  'gdacs.org',
+  'esa.int',
+  'nist.gov',
 ]);
 
 export function extractDomain(url: string | null | undefined): string {

@@ -17,3 +17,4 @@ export * from './domains';
 export * from './topics';
 export * from './normalize';
 export * from './evidence';
+export * from './cluster';

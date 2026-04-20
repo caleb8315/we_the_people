@@ -8,10 +8,12 @@ export class GdeltAdapter implements Adapter {
   label = 'GDELT Global Events';
 
   async fetch(): Promise<RawItem[]> {
-    const query = encodeURIComponent('(conflict OR earthquake OR flood OR sanctions OR cyberattack)');
+    const query = encodeURIComponent(
+      '(conflict OR earthquake OR flood OR sanctions OR cyberattack OR airstrike OR bombing OR missile OR explosion OR troops)',
+    );
     const url =
       `https://api.gdeltproject.org/api/v2/doc/doc?query=${query}` +
-      '&mode=ArtList&format=json&maxrecords=25&sort=datedesc';
+      '&mode=ArtList&format=json&maxrecords=100&sort=datedesc';
     const res = await fetch(url);
     if (!res.ok) throw new Error(`gdelt ${res.status}`);
     const j = (await res.json()) as any;
@@ -25,15 +27,16 @@ export class GdeltAdapter implements Adapter {
       out.push({
         source_id: this.id,
         title,
-        summary: a.seendate ? `Seen ${a.seendate}` : null,
+        summary: (a.excerpt as string | undefined) ?? null,
         url: link,
         published_at: a.seendate ? new Date(a.seendate).toISOString() : new Date().toISOString(),
+        country_code: typeof a.sourcecountry === 'string' ? a.sourcecountry : null,
         topic: undefined,
         severity: 45,
         raw: {
           sourceCountry: a.sourcecountry,
           socialimage: a.socialimage,
-          country_code: typeof a.sourcecountry === 'string' ? a.sourcecountry : null,
+          domain: a.domain,
         },
       });
     }
