@@ -1,4 +1,10 @@
 import './globals.css';
+// Leaflet's default stylesheet is loaded at the root so the map tiles
+// render with correct dimensions wherever <SignalsMap /> is used. The
+// stylesheet must be imported from the root layout (a Server Component) —
+// Next.js App Router refuses global CSS from node_modules inside
+// `'use client'` files and will fail the production build silently.
+import 'leaflet/dist/leaflet.css';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { NavBar } from '@/components/nav-bar';

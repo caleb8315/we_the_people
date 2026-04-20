@@ -1,12 +1,10 @@
 'use client';
 
-// Leaflet's default CSS. Must be imported as a side effect or tiles render
-// without dimensions and the map container stays blank. Next.js hoists CSS
-// side-effect imports into the bundle graph automatically; because this
-// file is reached only via `next/dynamic({ ssr: false })`, the CSS is
-// deferred to the client exactly alongside Leaflet itself.
-import 'leaflet/dist/leaflet.css';
-
+// NOTE: Leaflet's default CSS (`leaflet/dist/leaflet.css`) is imported once
+// from `apps/web/app/layout.tsx` — the App Router only allows global CSS
+// from `node_modules` to be imported from Server Components / the root
+// layout, never from a `'use client'` file. Importing it here would
+// silently break the production build.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type * as Leaflet from 'leaflet';
 import { statusLabel } from '@osint/core';
