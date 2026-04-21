@@ -17,7 +17,11 @@
     "./budget": "./src/budget.ts",
     "./normalize": "./src/normalize.ts",
     "./evidence": "./src/evidence.ts",
-    "./cluster": "./src/cluster.ts"
+    "./cluster": "./src/cluster.ts",
+    "./stemmer": "./src/stemmer.ts",
+    "./entities": "./src/entities.ts",
+    "./synonyms": "./src/synonyms.ts",
+    "./signal-matcher": "./src/signal-matcher.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

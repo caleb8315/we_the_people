@@ -18,3 +18,6 @@ export * from './topics';
 export * from './normalize';
 export * from './evidence';
 export * from './cluster';
+export * from './stemmer';
+export * from './entities';
+export * from './synonyms';

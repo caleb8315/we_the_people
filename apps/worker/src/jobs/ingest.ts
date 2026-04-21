@@ -17,9 +17,7 @@ import {
   registerDynamicCredibleDomains,
   reliabilityPublicLabel,
 } from '@osint/core';
-// makeDedupeKey uses `node:crypto` and therefore lives OUTSIDE the
-// browser-safe barrel above. Import it from the subpath so no client
-// bundle ever pulls it in.
+import { prepareExistingSignals, matchClustersToExisting } from '@osint/core/signal-matcher';
 import { makeDedupeKey } from '@osint/core/dedupe';
 import type { EvidenceItem, Topic, VerificationStatus } from '@osint/core/types';
 
@@ -28,20 +26,24 @@ import type { RawItem } from '../adapters/base';
 import { upsertContradictions } from '../lib/contradictions';
 import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
 
+const RECENT_SIGNAL_HOURS = 72;
+
 /**
  * Ingest job — runs on GH Actions cron (hourly):
  *   1. Fetch from every enabled source in parallel (adapter-per-source).
  *   2. Group items by dedupe key (so 5 outlets on same story collapse).
- *   3. Score severity + confidence heuristically (no LLM).
- *   4. Decide reliability / corroboration status (credible count + non-kinetic quarantine).
- *   5. Upsert signals + evidence atomically.
- *   6. Detect source disagreements and write them to `contradictions`.
+ *   3. Cross-run match: compare new clusters against recent DB signals.
+ *   4. Score severity + confidence heuristically (no LLM).
+ *   5. Decide reliability / corroboration status (credible count + non-kinetic quarantine).
+ *   6. Upsert signals + evidence atomically.
+ *   7. Detect source disagreements and write them to `contradictions`.
  */
 export async function runIngest(): Promise<{
   fetched: number;
   signals: number;
   evidence: number;
   contradictions: number;
+  crossRunMatches: number;
 }> {
   const runId = await startEngineRun('ingest');
   const errors: string[] = [];
@@ -49,8 +51,6 @@ export async function runIngest(): Promise<{
   const adapters = await loadAdapters();
   console.log(`[ingest] starting — ${adapters.length} adapters enabled`);
 
-  // Load DB-driven credible domains so sources with credibility >= 60
-  // count toward corroboration even if they're not in the hardcoded list.
   const { data: sourceRows } = await supabase()
     .from('sources')
     .select('credibility, metadata')
@@ -60,6 +60,34 @@ export async function runIngest(): Promise<{
     console.log(`[ingest] registered ${sourceRows.length} DB sources for dynamic credibility`);
   }
 
+  // ── Phase 1: Load recent signals for cross-run matching ───────────────
+  const recentCutoff = new Date(Date.now() - RECENT_SIGNAL_HOURS * 3600 * 1000).toISOString();
+  const { data: recentSignals } = await supabase()
+    .from('signals')
+    .select('dedupe_key, title, topic, occurred_at')
+    .gte('occurred_at', recentCutoff)
+    .order('occurred_at', { ascending: false })
+    .limit(500);
+
+  const preparedSignals = prepareExistingSignals(recentSignals ?? []);
+  console.log(`[ingest] loaded ${preparedSignals.length} recent signals for cross-run matching`);
+
+  // ── Fetch URL dedup: skip articles we've already seen ─────────────────
+  const existingUrls = new Set<string>();
+  if (recentSignals && recentSignals.length > 0) {
+    const { data: existingEvidence } = await supabase()
+      .from('evidence')
+      .select('url')
+      .gte('published_at', recentCutoff)
+      .limit(5000);
+    if (existingEvidence) {
+      for (const row of existingEvidence) {
+        if (row.url) existingUrls.add(row.url);
+      }
+    }
+  }
+  console.log(`[ingest] loaded ${existingUrls.size} existing evidence URLs for dedup`);
+
   // Parallel fetch.
   const results = await Promise.allSettled(adapters.map(a => a.fetch()));
   const items: RawItem[] = [];
@@ -67,9 +95,16 @@ export async function runIngest(): Promise<{
   results.forEach((r, i) => {
     const a = adapters[i]!;
     if (r.status === 'fulfilled') {
-      items.push(...r.value);
       fetched += r.value.length;
-      console.log(`[ingest] ${a.id}: ${r.value.length}`);
+      let skipped = 0;
+      for (const item of r.value) {
+        if (existingUrls.has(item.url)) {
+          skipped++;
+          continue;
+        }
+        items.push(item);
+      }
+      console.log(`[ingest] ${a.id}: ${r.value.length}${skipped > 0 ? ` (${skipped} skipped as seen)` : ''}`);
     } else {
       const msg = `${a.id}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`;
       console.warn('[ingest] fetch failed — ' + msg);
@@ -77,20 +112,12 @@ export async function runIngest(): Promise<{
     }
   });
 
-  // ── Classify topics up-front (needed for both clustering and dedupe) ──
+  // ── Classify topics up-front ──────────────────────────────────────────
   const itemTopics: string[] = items.map(
     raw => raw.topic ?? classifyTopic(raw.title, raw.summary),
   );
 
   // ── Cluster articles about the same real-world event ──────────────────
-  // Two-pass strategy:
-  //   Pass 1 — keyword-similarity clustering (Jaccard on key terms within
-  //            each topic+day bucket).  This merges "Iran strikes kill
-  //            dozens in Gaza" and "Casualties reported after Iranian
-  //            attack on Gaza" into one group even though the headlines
-  //            differ.  O(n·k) where k = articles per topic per day.
-  //   Pass 2 — derive a stable dedupe_key per cluster (SHA-1 of the
-  //            representative/primary title) for the DB upsert.
   const clusterables = items.map((raw, i) => ({
     title: raw.title,
     topic: itemTopics[i]!,
@@ -98,8 +125,6 @@ export async function runIngest(): Promise<{
   }));
   const clusterIds = clusterItems(clusterables);
 
-  // Build groups keyed by cluster id, then assign a stable dedupe key per
-  // cluster using the first-seen (representative) article's title.
   const clusterBuckets = new Map<number, RawItem[]>();
   for (let i = 0; i < items.length; i++) {
     const cid = clusterIds[i]!;
@@ -111,7 +136,15 @@ export async function runIngest(): Promise<{
     bucket.push(items[i]!);
   }
 
+  // Build initial groups with generated dedupe keys
   const groups = new Map<string, RawItem[]>();
+  const clusterMeta: Array<{
+    dedupe_key: string;
+    title: string;
+    topic: string;
+    published_day: string;
+  }> = [];
+
   for (const [, bucket] of clusterBuckets) {
     const rep = bucket[0]!;
     const topic = rep.topic ?? classifyTopic(rep.title, rep.summary);
@@ -121,17 +154,51 @@ export async function runIngest(): Promise<{
       occurred_at: rep.published_at ?? null,
       topic,
     });
-    // If an exact-hash collision occurs across clusters (extremely rare),
-    // merge into the existing bucket rather than silently dropping.
     const existing = groups.get(key);
     if (existing) {
       existing.push(...bucket);
     } else {
       groups.set(key, bucket);
+      clusterMeta.push({
+        dedupe_key: key,
+        title: rep.title,
+        topic,
+        published_day: rep.published_at ? rep.published_at.slice(0, 10) : '',
+      });
     }
   }
 
-  console.log(`[ingest] ${fetched} items → ${clusterBuckets.size} clusters → ${groups.size} unique signals`);
+  // ── Phase 1: Cross-run matching ───────────────────────────────────────
+  // Compare each new cluster against recent existing signals. If a match
+  // is found, remap the dedupe_key so the upsert merges evidence into
+  // the existing signal instead of creating a duplicate.
+  const remapping = matchClustersToExisting(clusterMeta, preparedSignals);
+  let crossRunMatches = 0;
+
+  if (remapping.size > 0) {
+    const remappedGroups = new Map<string, RawItem[]>();
+    for (const [originalKey, bucket] of groups) {
+      const newKey = remapping.get(originalKey) ?? originalKey;
+      if (newKey !== originalKey) {
+        crossRunMatches++;
+        console.log(
+          `[ingest] cross-run match: "${bucket[0]?.title?.slice(0, 60)}" → existing signal`,
+        );
+      }
+      const existing = remappedGroups.get(newKey);
+      if (existing) {
+        existing.push(...bucket);
+      } else {
+        remappedGroups.set(newKey, bucket);
+      }
+    }
+    groups.clear();
+    for (const [k, v] of remappedGroups) groups.set(k, v);
+  }
+
+  console.log(
+    `[ingest] ${fetched} items → ${items.length} after URL dedup → ${clusterBuckets.size} clusters → ${groups.size} unique signals (${crossRunMatches} cross-run matches)`,
+  );
 
   // Build signal rows + evidence rows.
   const sb = supabase();
@@ -156,7 +223,32 @@ export async function runIngest(): Promise<{
         };
       });
 
-      const decision = decideVerification(primary.title, primary.summary ?? '', evidence);
+      // For cross-run matched signals, fetch existing evidence to get the
+      // full picture for verification / reliability scoring.
+      let combinedEvidence = evidence;
+      if (remapping.has(dedupe_key) || crossRunMatches > 0) {
+        const { data: existingRows } = await sb
+          .from('signals')
+          .select('id')
+          .eq('dedupe_key', dedupe_key)
+          .single();
+        if (existingRows?.id) {
+          const { data: oldEvidence } = await sb
+            .from('evidence')
+            .select('source_id, url, domain, title, published_at, is_credible, excerpt')
+            .eq('signal_id', existingRows.id);
+          if (oldEvidence && oldEvidence.length > 0) {
+            // Merge: add existing evidence rows that aren't duplicated by URL
+            const newUrls = new Set(evidence.map(e => e.url));
+            const additionalEvidence = oldEvidence.filter(
+              (e: any) => !newUrls.has(e.url),
+            ) as EvidenceItem[];
+            combinedEvidence = [...evidence, ...additionalEvidence];
+          }
+        }
+      }
+
+      const decision = decideVerification(primary.title, primary.summary ?? '', combinedEvidence);
       const severity = Math.max(
         primary.severity ?? 0,
         heuristicSeverity(primary.title, primary.summary),
@@ -167,23 +259,10 @@ export async function runIngest(): Promise<{
       );
       const status: VerificationStatus = decision.status;
 
-      // Phase 2 / 7: detect contradictions + reliability BEFORE the signal
-      // upsert so the reliability scores land on the initial row write. We
-      // tag evidence with a temporary index id here and re-map to DB ids
-      // after the evidence insert below. The existing severity / confidence
-      // / verification_status trio is left untouched — reliability augments.
-      //
-      // Phase 7 safety rails: contradiction detection is capped at
-      // MAX_SOURCES_PER_SIGNAL / MAX_CLAIMS_PER_SIGNAL. When either limit
-      // is hit the detector is skipped (no partial output, no LLM
-      // fallback), and we tag the signal with `complex_signal` so the UI
-      // can show "detection skipped — too many sources" instead of
-      // misleading readers with a zero-contradictions feed for a truly
-      // divisive story.
-      const indexedEvidence = evidence.map((e, i) => ({ ...e, id: `idx:${i}` }));
+      const indexedEvidence = combinedEvidence.map((e, i) => ({ ...e, id: `idx:${i}` }));
       const claims = extractClaimsFromEvidence(indexedEvidence);
       const detection = detectInconsistenciesWithLimits(claims, {
-        sources_count: evidence.length,
+        sources_count: combinedEvidence.length,
       });
       const contradictions = detection.contradictions;
       if (detection.skipped) {
@@ -192,31 +271,23 @@ export async function runIngest(): Promise<{
         );
       }
       const reliability = computeReliabilityScores({
-        evidence,
+        evidence: combinedEvidence,
         claims,
         contradictions,
       });
-      // Phase 3 — user-facing label + deterministic one-sentence summary.
       const reliabilityLabelPublic = reliabilityPublicLabel(reliability.reliability_score);
       const reliabilitySummary = buildReliabilitySummary({
         contradictions_count: contradictions.length,
         evidence_strength_score: reliability.evidence_strength_score,
         agreement_score: reliability.agreement_score,
       });
-      // Phase 5 — structured physical-evidence assessment. Atomic with the
-      // signal write (same per-group try block); stashed in raw_data so no
-      // schema migration is required for this phase.
       const physicalEvidence = assessPhysicalEvidence({
-        evidence,
+        evidence: combinedEvidence,
         topic,
         title: primary.title,
         summary: primary.summary,
       });
 
-      // Compose signal tags. Each tag is a compact, machine-readable flag
-      // that the UI and ops tooling can filter on. `complex_signal` is the
-      // Phase-7 marker: contradiction detection was deliberately skipped
-      // for this signal because it blew past the source / claim caps.
       const tags: string[] = [];
       if (decision.decision_log.includes('non-kinetic')) tags.push('non_kinetic');
       if (detection.skipped) tags.push('complex_signal');
@@ -238,13 +309,11 @@ export async function runIngest(): Promise<{
         tags,
         occurred_at: primary.published_at ?? null,
         expires_at: computeExpiry(severity, topic, status),
-        // Phase-2 reliability columns (migration 015).
         reliability_score: reliability.reliability_score,
         agreement_score: reliability.agreement_score,
         source_independence_score: reliability.source_independence_score,
         narrative_divergence_score: reliability.narrative_divergence_score,
         evidence_strength_score: reliability.evidence_strength_score,
-        // Phase-3 user-facing contract (migration 016).
         reliability_label: reliabilityLabelPublic,
         reliability_summary: reliabilitySummary,
         raw_data: {
@@ -276,28 +345,51 @@ export async function runIngest(): Promise<{
       }
       signalInserts++;
 
-      // Replace-evidence strategy: delete + re-insert for this signal.
-      await sb.from('evidence').delete().eq('signal_id', upserted.id);
-      const evidenceRows = evidence.map(e => ({ signal_id: upserted.id, ...e }));
+      // For cross-run matches, we ADD new evidence rather than replacing
+      // all evidence. For fresh signals, replace-all is still correct.
+      const isRemap = remapping.has(dedupe_key);
+      if (!isRemap) {
+        await sb.from('evidence').delete().eq('signal_id', upserted.id);
+      }
+
+      // Only insert evidence rows that are genuinely new (by URL)
+      const newEvidenceRows = evidence.map(e => ({ signal_id: upserted.id, ...e }));
       let insertedEvidenceIds: string[] = [];
-      if (evidenceRows.length > 0) {
-        const { data: evData, error: evErr } = await sb
-          .from('evidence')
-          .insert(evidenceRows)
-          .select('id');
-        if (evErr) {
-          errors.push(`evidence insert: ${evErr.message}`);
+      if (newEvidenceRows.length > 0) {
+        // For cross-run matches, check which URLs already exist
+        if (isRemap) {
+          const { data: existingEvUrls } = await sb
+            .from('evidence')
+            .select('url')
+            .eq('signal_id', upserted.id);
+          const existingSet = new Set((existingEvUrls ?? []).map((r: any) => r.url));
+          const trulyNew = newEvidenceRows.filter(r => !existingSet.has(r.url));
+          if (trulyNew.length > 0) {
+            const { data: evData, error: evErr } = await sb
+              .from('evidence')
+              .insert(trulyNew)
+              .select('id');
+            if (evErr) {
+              errors.push(`evidence insert: ${evErr.message}`);
+            } else {
+              evidenceInserts += trulyNew.length;
+              insertedEvidenceIds = (evData ?? []).map((r: { id: string }) => r.id);
+            }
+          }
         } else {
-          evidenceInserts += evidenceRows.length;
-          insertedEvidenceIds = (evData ?? []).map((r: { id: string }) => r.id);
+          const { data: evData, error: evErr } = await sb
+            .from('evidence')
+            .insert(newEvidenceRows)
+            .select('id');
+          if (evErr) {
+            errors.push(`evidence insert: ${evErr.message}`);
+          } else {
+            evidenceInserts += newEvidenceRows.length;
+            insertedEvidenceIds = (evData ?? []).map((r: { id: string }) => r.id);
+          }
         }
       }
 
-      // Contradictions — atomic with the signal write. Enforces the
-      // required contract: extract → detect → upsert, idempotent and
-      // scoped per signal_id (delete-then-insert, no duplicates).
-      // Re-map the temporary `idx:N` evidence references to the real DB ids
-      // returned from the evidence insert above; drop any that didn't land.
       const indexToDbId = new Map<string, string>();
       insertedEvidenceIds.forEach((dbId, i) => indexToDbId.set(`idx:${i}`, dbId));
       const contradictionsForWrite = contradictions.map((c) => ({
@@ -323,16 +415,19 @@ export async function runIngest(): Promise<{
       groups: groups.size,
       evidence: evidenceInserts,
       contradictions: contradictionInserts,
+      crossRunMatches,
+      urlDedupSkipped: fetched - items.length,
     },
   });
 
   console.log(
-    `[ingest] done: ${signalInserts} signals, ${evidenceInserts} evidence, ${contradictionInserts} contradictions, ${errors.length} errors`,
+    `[ingest] done: ${signalInserts} signals, ${evidenceInserts} evidence, ${contradictionInserts} contradictions, ${crossRunMatches} cross-run matches, ${errors.length} errors`,
   );
   return {
     fetched,
     signals: signalInserts,
     evidence: evidenceInserts,
     contradictions: contradictionInserts,
+    crossRunMatches,
   };
 }
