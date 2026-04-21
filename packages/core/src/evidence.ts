@@ -42,6 +42,7 @@ const USGS_DOMAINS = ['usgs.gov', 'earthquake.usgs.gov', 'volcanoes.usgs.gov'];
 const EONET_DOMAINS = ['eonet.gsfc.nasa.gov', 'eonet.sci.gsfc.nasa.gov'];
 const NASA_DOMAINS = ['nasa.gov'];
 const NOAA_DOMAINS = ['noaa.gov', 'weather.gov'];
+const FIRMS_DOMAINS = ['firms.modaps.eosdis.nasa.gov'];
 
 function normalizeDomain(domain: string): string {
   return (domain ?? '').toLowerCase().replace(/^www\./, '');
@@ -75,6 +76,7 @@ export function assessPhysicalEvidence(input: PhysicalEvidenceInputs): PhysicalE
   let eonetMatch = false;
   let nasaMatch = false;
   let noaaMatch = false;
+  let firmsMatch = false;
   const credibleDomains = new Set<string>();
 
   for (const e of evidence) {
@@ -83,19 +85,21 @@ export function assessPhysicalEvidence(input: PhysicalEvidenceInputs): PhysicalE
     if (matchesAny(d, EONET_DOMAINS) || e.source_id === 'nasa-eonet') eonetMatch = true;
     if (matchesAny(d, NASA_DOMAINS)) nasaMatch = true;
     if (matchesAny(d, NOAA_DOMAINS)) noaaMatch = true;
+    if (matchesAny(d, FIRMS_DOMAINS) || e.source_id === 'nasa-firms') firmsMatch = true;
     if (e.is_credible && d) credibleDomains.add(d);
   }
   const credibleCount = credibleDomains.size;
 
-  const satelliteMatch = eonetMatch || nasaMatch;
+  const satelliteMatch = eonetMatch || nasaMatch || firmsMatch;
   const sensorMatches =
-    (usgsMatch ? 1 : 0) + (satelliteMatch ? 1 : 0) + (noaaMatch ? 1 : 0);
+    (usgsMatch ? 1 : 0) + (satelliteMatch ? 1 : 0) + (noaaMatch ? 1 : 0) + (firmsMatch ? 1 : 0);
   const hasCredibleBase = credibleCount >= 2;
 
   const sources: string[] = [];
   if (usgsMatch) sources.push('USGS seismic network');
+  if (firmsMatch) sources.push('NASA FIRMS thermal detection');
   if (eonetMatch) sources.push('NASA EONET');
-  else if (nasaMatch) sources.push('NASA');
+  else if (nasaMatch && !firmsMatch) sources.push('NASA');
   if (noaaMatch) sources.push('NOAA weather service');
   if (credibleCount > 0) {
     sources.push(`${credibleCount} credible outlet${credibleCount === 1 ? '' : 's'}`);

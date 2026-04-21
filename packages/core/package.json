@@ -21,7 +21,11 @@
     "./stemmer": "./src/stemmer.ts",
     "./entities": "./src/entities.ts",
     "./synonyms": "./src/synonyms.ts",
-    "./signal-matcher": "./src/signal-matcher.ts"
+    "./signal-matcher": "./src/signal-matcher.ts",
+    "./wire-provenance": "./src/wire-provenance.ts",
+    "./dynamic-credibility": "./src/dynamic-credibility.ts",
+    "./lsh-dedup": "./src/lsh-dedup.ts",
+    "./embedding-similarity": "./src/embedding-similarity.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

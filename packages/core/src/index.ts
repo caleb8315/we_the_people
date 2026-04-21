@@ -21,3 +21,5 @@ export * from './cluster';
 export * from './stemmer';
 export * from './entities';
 export * from './synonyms';
+export * from './wire-provenance';
+export * from './lsh-dedup';

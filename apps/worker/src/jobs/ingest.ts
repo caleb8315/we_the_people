@@ -16,7 +16,10 @@ import {
   MAX_SOURCES_PER_SIGNAL,
   registerDynamicCredibleDomains,
   reliabilityPublicLabel,
+  tagWireProvenance,
+  countIndependentSources,
 } from '@osint/core';
+import { computeCredibilityUpdates, type SignalOutcome } from '@osint/core/dynamic-credibility';
 import { prepareExistingSignals, matchClustersToExisting } from '@osint/core/signal-matcher';
 import { makeDedupeKey } from '@osint/core/dedupe';
 import type { EvidenceItem, Topic, VerificationStatus } from '@osint/core/types';
@@ -205,6 +208,7 @@ export async function runIngest(): Promise<{
   let signalInserts = 0;
   let evidenceInserts = 0;
   let contradictionInserts = 0;
+  const signalOutcomes: SignalOutcome[] = [];
 
   for (const [dedupe_key, rawGroup] of groups) {
     try {
@@ -248,7 +252,22 @@ export async function runIngest(): Promise<{
         }
       }
 
+      // ── Wire provenance: detect syndicated wire copy ──────────────────
+      const taggedEvidence = tagWireProvenance(combinedEvidence);
+      const independence = countIndependentSources(taggedEvidence);
+
       const decision = decideVerification(primary.title, primary.summary ?? '', combinedEvidence);
+
+      // Override source counts with wire-aware independent counts when
+      // wire detection found syndicated content. This prevents 5 outlets
+      // all running the same AP story from counting as 5 independent sources.
+      if (independence.independent < decision.source_count && Object.keys(independence.wire_groups).length > 0) {
+        decision.source_count = Math.max(independence.independent, 1);
+        decision.decision_log.push(
+          `wire_provenance: ${independence.total} total domains, ${independence.independent} independent (wire: ${JSON.stringify(independence.wire_groups)})`,
+        );
+      }
+
       const severity = Math.max(
         primary.severity ?? 0,
         heuristicSeverity(primary.title, primary.summary),
@@ -345,6 +364,15 @@ export async function runIngest(): Promise<{
       }
       signalInserts++;
 
+      // Track outcomes for dynamic credibility updates
+      signalOutcomes.push({
+        signal_id: upserted.id,
+        verification_status: status,
+        source_ids: [...new Set(combinedEvidence.map(e => e.source_id).filter((s): s is string => !!s))],
+        has_contradictions: contradictions.length > 0,
+        credible_source_count: decision.credible_source_count,
+      });
+
       // For cross-run matches, we ADD new evidence rather than replacing
       // all evidence. For fresh signals, replace-all is still correct.
       const isRemap = remapping.has(dedupe_key);
@@ -406,6 +434,37 @@ export async function runIngest(): Promise<{
     }
   }
 
+  // ── Dynamic credibility: update source scores via EMA ─────────────────
+  let credibilityUpdates = 0;
+  if (signalOutcomes.length > 0) {
+    try {
+      const { data: allSources } = await sb
+        .from('sources')
+        .select('id, credibility')
+        .eq('enabled', true);
+      if (allSources) {
+        const currentScores = new Map<string, number>();
+        for (const s of allSources) currentScores.set(s.id, s.credibility);
+
+        const updates = computeCredibilityUpdates(signalOutcomes, currentScores);
+        for (const u of updates) {
+          const { error: updErr } = await sb
+            .from('sources')
+            .update({ credibility: u.new_score })
+            .eq('id', u.source_id);
+          if (!updErr) {
+            credibilityUpdates++;
+          }
+        }
+        if (credibilityUpdates > 0) {
+          console.log(`[ingest] updated credibility for ${credibilityUpdates} sources`);
+        }
+      }
+    } catch (err) {
+      errors.push(`credibility update: ${(err as Error).message}`);
+    }
+  }
+
   await finishEngineRun(runId, {
     status: errors.length === 0 ? 'success' : errors.length > groups.size / 2 ? 'failed' : 'partial',
     records_in: fetched,
@@ -417,6 +476,7 @@ export async function runIngest(): Promise<{
       contradictions: contradictionInserts,
       crossRunMatches,
       urlDedupSkipped: fetched - items.length,
+      credibilityUpdates,
     },
   });
 

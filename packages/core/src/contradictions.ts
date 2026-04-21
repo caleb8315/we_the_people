@@ -297,6 +297,70 @@ export function detectInconsistencies(claims: Claim[]): DetectedContradiction[] 
     }
   }
 
+  // 4) numeric_conflict — find ALL materially different number pairs, not
+  //    just the first one. Different claims may cite different statistics
+  //    (e.g. one cites deaths, another cites injuries with different numbers).
+  if (withNums.length >= 3) {
+    const seen = new Set<string>();
+    if (out.length > 0 && out[0]?.type === 'numeric_conflict') {
+      const m = out[0].metadata as any;
+      if (m?.a?.source && m?.b?.source) {
+        seen.add(`${m.a.source}|${m.b.source}`);
+        seen.add(`${m.b.source}|${m.a.source}`);
+      }
+    }
+    for (let i = 0; i < withNums.length && out.length < 5; i++) {
+      for (let j = i + 1; j < withNums.length && out.length < 5; j++) {
+        const ci = withNums[i]!;
+        const cj = withNums[j]!;
+        const pairKey = `${ci.source}|${cj.source}`;
+        if (seen.has(pairKey)) continue;
+        const ni = ci.numbers[0]!;
+        const nj = cj.numbers[0]!;
+        const ratio = materialRatio(ni, nj);
+        if (ratio >= 2.0) {
+          seen.add(pairKey);
+          seen.add(`${cj.source}|${ci.source}`);
+          out.push({
+            type: 'numeric_conflict',
+            severity: numericSeverity(ratio),
+            summary: `${ci.source} reports ~${ni}; ${cj.source} reports ~${nj}.`,
+            metadata: {
+              a: { source: ci.source, url: ci.url, value: ni },
+              b: { source: cj.source, url: cj.url, value: nj },
+              ratio: Number.isFinite(ratio) ? Number(ratio.toFixed(2)) : null,
+            },
+            evidence_ids: pickEvidenceIds(ci, cj),
+          });
+        }
+      }
+    }
+  }
+
+  // 5) presence_conflict — accident vs deliberate framing.
+  const accidentClaim = claims.find((c) => c.accident && !c.attack);
+  const attackClaim = claims.find((c) => c.attack && !c.accident);
+  if (accidentClaim && attackClaim) {
+    out.push({
+      type: 'presence_conflict',
+      severity: 'high',
+      summary: `${accidentClaim.source} describes an accident; ${attackClaim.source} describes a deliberate attack.`,
+      metadata: {
+        assertion: {
+          source: accidentClaim.source,
+          url: accidentClaim.url,
+          kind: 'accident',
+        },
+        observation: {
+          source: attackClaim.source,
+          url: attackClaim.url,
+          kind: 'deliberate_attack',
+        },
+      },
+      evidence_ids: pickEvidenceIds(accidentClaim, attackClaim),
+    });
+  }
+
   return out;
 }
 

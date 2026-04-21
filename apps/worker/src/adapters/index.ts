@@ -9,6 +9,7 @@ import { YahooFinanceAdapter } from './yahoo-finance';
 import { GdeltAdapter } from './gdelt';
 import { SwpcAlertsAdapter } from './swpc-alerts';
 import { CisaKevAdapter } from './cisa-kev';
+import { NasaFirmsAdapter } from './nasa-firms';
 import { supabase } from '../lib/supabase';
 
 /**
@@ -42,6 +43,9 @@ export async function loadAdapters(): Promise<Adapter[]> {
   if (enabledIds.has('gdelt-doc')) adapters.push(new GdeltAdapter());
   if (enabledIds.has('swpc-alerts')) adapters.push(new SwpcAlertsAdapter());
   if (enabledIds.has('cisa-kev')) adapters.push(new CisaKevAdapter());
+  if (enabledIds.has('nasa-firms') || process.env.FIRMS_MAP_KEY) {
+    adapters.push(new NasaFirmsAdapter());
+  }
 
   return adapters;
 }

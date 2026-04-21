@@ -127,6 +127,7 @@ export interface ReliabilityBreakdown {
 const USGS_DOMAINS = ['usgs.gov', 'earthquake.usgs.gov', 'volcanoes.usgs.gov'];
 const EONET_DOMAINS = ['eonet.gsfc.nasa.gov', 'eonet.sci.gsfc.nasa.gov'];
 const NASA_DOMAINS = ['nasa.gov'];
+const FIRMS_DOMAINS = ['firms.modaps.eosdis.nasa.gov'];
 
 function normalizeDomain(domain: string): string {
   return (domain ?? '').toLowerCase().replace(/^www\./, '');
@@ -213,7 +214,9 @@ export function computeReliabilityScores(input: ReliabilityInputs): ReliabilityB
     if (
       matchesAny(d, EONET_DOMAINS) ||
       e.source_id === 'nasa-eonet' ||
-      matchesAny(d, NASA_DOMAINS)
+      matchesAny(d, NASA_DOMAINS) ||
+      matchesAny(d, FIRMS_DOMAINS) ||
+      e.source_id === 'nasa-firms'
     ) {
       eonet_match = true;
     }
