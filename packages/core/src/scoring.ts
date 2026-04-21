@@ -187,7 +187,7 @@ function dominantClaimCount(claims: Claim[]): number {
  *   narrative_divergence_score = min(100, contradictions.length * 25)
  *   evidence_strength_score    = (usgs_match ? 40 : 0)
  *                              + (eonet_match ? 30 : 0)
- *                              + (credible_sources > 3 ? 30 : 0)
+ *                              + (credible_sources > 1 ? 30 : 0)
  *
  *   reliability_score = clamp(
  *       agreement_score            * 0.35
@@ -204,10 +204,11 @@ export function computeReliabilityScores(input: ReliabilityInputs): ReliabilityB
   let usgs_match = false;
   let eonet_match = false;
 
+  const credibleDomainSet = new Set<string>();
   for (const e of input.evidence) {
     const d = normalizeDomain(e.domain);
     if (d) domains.add(d);
-    if (e.is_credible) credible_sources += 1;
+    if (e.is_credible && d) credibleDomainSet.add(d);
     if (matchesAny(d, USGS_DOMAINS) || e.source_id === 'usgs') usgs_match = true;
     if (
       matchesAny(d, EONET_DOMAINS) ||
@@ -217,6 +218,7 @@ export function computeReliabilityScores(input: ReliabilityInputs): ReliabilityB
       eonet_match = true;
     }
   }
+  credible_sources = credibleDomainSet.size;
 
   const distinct_domains = domains.size;
   // When no claims are supplied, fall back to "every source agrees" so we
@@ -231,7 +233,7 @@ export function computeReliabilityScores(input: ReliabilityInputs): ReliabilityB
   const source_independence_score = clamp((distinct_domains / total_sources) * 100, 0, 100);
   const narrative_divergence_score = clamp(input.contradictions.length * 25, 0, 100);
   const evidence_strength_score = clamp(
-    (usgs_match ? 40 : 0) + (eonet_match ? 30 : 0) + (credible_sources > 3 ? 30 : 0),
+    (usgs_match ? 40 : 0) + (eonet_match ? 30 : 0) + (credible_sources > 1 ? 30 : 0),
     0,
     100,
   );

@@ -9,37 +9,102 @@
  */
 
 export const CREDIBLE_DOMAINS: ReadonlySet<string> = new Set([
+  // Wire services
   'reuters.com',
   'apnews.com',
-  'bbc.com',
-  'bbc.co.uk',
-  'theguardian.com',
-  'aljazeera.com',
-  'france24.com',
-  'dw.com',
-  'npr.org',
-  'reliefweb.int',
-  'usgs.gov',
-  'nasa.gov',
-  'noaa.gov',
-  'cisa.gov',
-  'si.edu',
-  'un.org',
-  'who.int',
+  'afp.com',
+  // US broadcast / major print
+  'cnn.com',
   'nytimes.com',
   'washingtonpost.com',
   'cbsnews.com',
   'nbcnews.com',
   'abcnews.go.com',
-  'cbc.ca',
-  'skynews.com',
+  'npr.org',
+  'foxnews.com',
+  'usatoday.com',
+  'politico.com',
+  'thehill.com',
+  // UK / Europe
+  'bbc.com',
+  'bbc.co.uk',
+  'theguardian.com',
   'independent.co.uk',
+  'telegraph.co.uk',
+  'skynews.com',
   'euronews.com',
+  'france24.com',
+  'dw.com',
+  'rte.ie',
+  'irishtimes.com',
+  'spiegel.de',
+  'lemonde.fr',
+  // Middle East / Africa
+  'aljazeera.com',
+  'middleeasteye.net',
+  'arabnews.com',
+  'haaretz.com',
+  'timesofisrael.com',
+  'trtworld.com',
+  'allafrica.com',
+  // Asia-Pacific
+  'scmp.com',
+  'japantimes.co.jp',
+  'straitstimes.com',
+  'abc.net.au',
   'thehindu.com',
+  'hindustantimes.com',
+  'nikkei.com',
+  'channelnewsasia.com',
+  // Americas (non-US)
+  'cbc.ca',
+  'globalnews.ca',
+  // Government / institutional / scientific
+  'reliefweb.int',
+  'usgs.gov',
+  'nasa.gov',
+  'noaa.gov',
+  'weather.gov',
+  'cisa.gov',
+  'si.edu',
+  'un.org',
+  'who.int',
   'gdacs.org',
   'esa.int',
   'nist.gov',
+  'state.gov',
+  'defense.gov',
+  // Defense / security niche
+  'defenseone.com',
+  'warontherocks.com',
+  'janes.com',
+  // Cyber / tech
+  'krebsonsecurity.com',
+  'arstechnica.com',
+  'therecord.media',
+  'bleepingcomputer.com',
 ]);
+
+/**
+ * Runtime-loaded credible domains from the DB `sources` table.
+ * Populated by `loadCredibleDomainsFromDB()` during ingest so that any
+ * source with credibility >= DYNAMIC_CREDIBILITY_THRESHOLD is treated as
+ * credible without needing a code change.
+ */
+const dynamicCredibleDomains = new Set<string>();
+const DYNAMIC_CREDIBILITY_THRESHOLD = 60;
+
+export function registerDynamicCredibleDomains(
+  sources: Array<{ credibility: number; metadata: Record<string, unknown> }>,
+): void {
+  dynamicCredibleDomains.clear();
+  for (const s of sources) {
+    if (s.credibility >= DYNAMIC_CREDIBILITY_THRESHOLD) {
+      const domain = s.metadata?.domain as string | undefined;
+      if (domain) dynamicCredibleDomains.add(domain.toLowerCase().replace(/^www\./, ''));
+    }
+  }
+}
 
 export function extractDomain(url: string | null | undefined): string {
   if (!url) return '';
@@ -59,6 +124,8 @@ export function isDomainMatch(candidate: string, trusted: string): boolean {
 
 export function isCredibleDomain(domain: string): boolean {
   if (!domain) return false;
+  const normalized = domain.toLowerCase().replace(/^www\./, '');
+  if (dynamicCredibleDomains.has(normalized)) return true;
   for (const trusted of CREDIBLE_DOMAINS) {
     if (isDomainMatch(domain, trusted)) return true;
   }

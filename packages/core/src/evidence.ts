@@ -59,9 +59,9 @@ function matchesAny(domain: string, needles: string[]): boolean {
  * Build a `PhysicalEvidence` record from a signal's evidence rows.
  *
  * Status logic:
- *   - `confirmed`       — ≥ 2 sensor networks match AND ≥ 3 credible outlets, OR
- *                         ≥ 1 sensor network match AND ≥ 3 credible outlets.
- *   - `partial`         — exactly one sensor match, or ≥ 3 credible outlets
+ *   - `confirmed`       — ≥ 2 sensor networks match AND ≥ 2 credible domains, OR
+ *                         ≥ 1 sensor network match AND ≥ 2 credible domains.
+ *   - `partial`         — exactly one sensor match, or ≥ 2 credible domains
  *                         without sensors.
  *   - `none_detected`   — no sensor matches. Never interpreted as "did not
  *                         happen" — see the wording rule above.
@@ -75,7 +75,7 @@ export function assessPhysicalEvidence(input: PhysicalEvidenceInputs): PhysicalE
   let eonetMatch = false;
   let nasaMatch = false;
   let noaaMatch = false;
-  let credibleCount = 0;
+  const credibleDomains = new Set<string>();
 
   for (const e of evidence) {
     const d = normalizeDomain(e.domain ?? '');
@@ -83,13 +83,14 @@ export function assessPhysicalEvidence(input: PhysicalEvidenceInputs): PhysicalE
     if (matchesAny(d, EONET_DOMAINS) || e.source_id === 'nasa-eonet') eonetMatch = true;
     if (matchesAny(d, NASA_DOMAINS)) nasaMatch = true;
     if (matchesAny(d, NOAA_DOMAINS)) noaaMatch = true;
-    if (e.is_credible) credibleCount += 1;
+    if (e.is_credible && d) credibleDomains.add(d);
   }
+  const credibleCount = credibleDomains.size;
 
   const satelliteMatch = eonetMatch || nasaMatch;
   const sensorMatches =
     (usgsMatch ? 1 : 0) + (satelliteMatch ? 1 : 0) + (noaaMatch ? 1 : 0);
-  const hasCredibleBase = credibleCount >= 3;
+  const hasCredibleBase = credibleCount >= 2;
 
   const sources: string[] = [];
   if (usgsMatch) sources.push('USGS seismic network');

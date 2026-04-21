@@ -14,6 +14,7 @@ import {
   isCredibleDomain,
   MAX_CLAIMS_PER_SIGNAL,
   MAX_SOURCES_PER_SIGNAL,
+  registerDynamicCredibleDomains,
   reliabilityPublicLabel,
 } from '@osint/core';
 // makeDedupeKey uses `node:crypto` and therefore lives OUTSIDE the
@@ -47,6 +48,17 @@ export async function runIngest(): Promise<{
 
   const adapters = await loadAdapters();
   console.log(`[ingest] starting — ${adapters.length} adapters enabled`);
+
+  // Load DB-driven credible domains so sources with credibility >= 60
+  // count toward corroboration even if they're not in the hardcoded list.
+  const { data: sourceRows } = await supabase()
+    .from('sources')
+    .select('credibility, metadata')
+    .eq('enabled', true);
+  if (sourceRows) {
+    registerDynamicCredibleDomains(sourceRows as Array<{ credibility: number; metadata: Record<string, unknown> }>);
+    console.log(`[ingest] registered ${sourceRows.length} DB sources for dynamic credibility`);
+  }
 
   // Parallel fetch.
   const results = await Promise.allSettled(adapters.map(a => a.fetch()));

@@ -117,18 +117,22 @@ export function decideVerification(
   evidence: EvidenceItem[],
 ): VerificationDecision {
   const distinctDomains = new Set<string>();
-  let credible = 0;
+  const credibleDomains = new Set<string>();
   for (const e of evidence) {
     if (!e.domain) continue;
     distinctDomains.add(e.domain);
-    if (isCredibleDomain(e.domain)) credible++;
+    if (isCredibleDomain(e.domain)) credibleDomains.add(e.domain);
   }
 
+  const credible = credibleDomains.size;
   const text = `${title}\n${summary ?? ''}`;
   const log: string[] = [];
 
   let status = computeStatus(distinctDomains.size, credible);
-  log.push(`initial=${status} sources=${distinctDomains.size} credible=${credible}`);
+  log.push(
+    `initial=${status} sources=${distinctDomains.size} credible_domains=${credible} ` +
+    `credible_list=[${[...credibleDomains].join(',')}]`,
+  );
 
   if (isNonKineticContext(text) && status !== 'quarantined') {
     log.push('override: non-kinetic context (policy/legal language without kinetic evidence)');

@@ -4,7 +4,9 @@
  * (typically < 50).
  *
  * Strategy:
- *   1. Partition articles by (topic, publication day) — cheap O(n) pass.
+ *   1. Partition articles by (topic, day-window) — cheap O(n) pass.
+ *      Adjacent calendar days share a bucket so evening/morning coverage
+ *      of the same event merges correctly.
  *   2. Within each partition, extract "key terms" from each title (nouns,
  *      numbers, place-name fragments) by stripping stop words.
  *   3. Merge any pair whose Jaccard similarity on key-terms exceeds
@@ -32,7 +34,7 @@ const STOP_WORDS = new Set([
   'latest', 'update', 'news', 'breaking',
 ]);
 
-const MERGE_THRESHOLD = 0.30;
+const MERGE_THRESHOLD = 0.22;
 
 // ── Public API ──────────────────────────────────────────────────────────
 
@@ -43,23 +45,47 @@ export interface Clusterable {
 }
 
 /**
+ * Expand a single day into a pair of adjacent-day windows so that articles
+ * published on the boundary (e.g. 11 PM Tuesday → 1 AM Wednesday) end up
+ * in overlapping buckets and can still merge.
+ */
+function dayWindows(day: string): string[] {
+  if (!day) return [''];
+  try {
+    const d = new Date(day + 'T12:00:00Z');
+    const prev = new Date(d.getTime() - 86_400_000);
+    const cur = day;
+    const prevStr = prev.toISOString().slice(0, 10);
+    const pairKey = prevStr < cur ? `${prevStr}~${cur}` : `${cur}~${prevStr}`;
+    return [cur, pairKey];
+  } catch {
+    return [day];
+  }
+}
+
+/**
  * Given an array of items, return a cluster-id for each item (same index).
  * Items that belong to the same event get the same cluster id.
  */
 export function clusterItems<T extends Clusterable>(items: T[]): number[] {
   if (items.length === 0) return [];
 
-  // 1. Partition by (topic, day)
+  // 1. Partition by (topic, day-window). Each item goes into its own day
+  //    bucket AND the adjacent-day overlap bucket, so cross-midnight events
+  //    get a chance to merge.
   const bucketMap = new Map<string, number[]>();
   for (let i = 0; i < items.length; i++) {
     const item = items[i]!;
-    const key = `${item.topic}|${item.published_day}`;
-    let arr = bucketMap.get(key);
-    if (!arr) {
-      arr = [];
-      bucketMap.set(key, arr);
+    const windows = dayWindows(item.published_day);
+    for (const w of windows) {
+      const key = `${item.topic}|${w}`;
+      let arr = bucketMap.get(key);
+      if (!arr) {
+        arr = [];
+        bucketMap.set(key, arr);
+      }
+      arr.push(i);
     }
-    arr.push(i);
   }
 
   // 2. Extract key terms for every item
@@ -81,7 +107,6 @@ export function clusterItems<T extends Clusterable>(items: T[]): number[] {
 
   for (const indices of bucketMap.values()) {
     if (indices.length < 2) continue;
-    // O(k²) per bucket, but k is bounded by articles-per-topic-per-day
     for (let i = 0; i < indices.length; i++) {
       for (let j = i + 1; j < indices.length; j++) {
         const sim = jaccard(termSets[indices[i]!]!, termSets[indices[j]!]!);
