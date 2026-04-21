@@ -92,6 +92,14 @@ export const CREDIBLE_DOMAINS: ReadonlySet<string> = new Set([
  * credible without needing a code change.
  */
 const dynamicCredibleDomains = new Set<string>();
+/**
+ * Threshold for dynamic domain registration during ingest.
+ * Intentionally lower than the DB `is_credible` threshold (70) —
+ * this gives mid-tier sources (60-69) a chance to contribute toward
+ * corroboration counts via `isCredibleDomain()`, even though the
+ * DB column `sources.is_credible` (generated as credibility >= 70)
+ * uses a stricter bar for the badge-level designation.
+ */
 const DYNAMIC_CREDIBILITY_THRESHOLD = 60;
 
 export function registerDynamicCredibleDomains(

@@ -30,6 +30,7 @@
  */
 
 import type { VerificationStatus } from './types';
+import { clamp } from './scoring';
 
 const LAMBDA = 0.1;
 const CORROBORATION_BOOST = 8;
@@ -133,10 +134,6 @@ export function computeCredibilityUpdates(
   }
 
   return updates;
-}
-
-function clamp(n: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, n));
 }
 
 export { LAMBDA, CORROBORATION_BOOST, CONTRADICTION_PENALTY, SENSOR_FLOOR, WIRE_FLOOR };

@@ -16,6 +16,7 @@
  */
 
 import { extractRichTerms, weightedJaccard, type RichTermSet } from './cluster';
+import { topicGroup } from './topic-groups';
 
 /**
  * Minimal signal shape needed for cross-run matching.
@@ -36,21 +37,6 @@ interface PreparedSignal {
   terms: RichTermSet;
   day: string;
   topicGroup: string;
-}
-
-const TOPIC_AFFINITY: Record<string, string> = {
-  war: 'conflict',
-  civil: 'conflict',
-  disaster: 'hazard',
-  climate: 'hazard',
-  economy: 'economy',
-  health: 'health',
-  cyber: 'cyber',
-  other: 'other',
-};
-
-function topicGroup(topic: string): string {
-  return TOPIC_AFFINITY[topic] ?? topic;
 }
 
 const CROSS_RUN_THRESHOLD = 0.22;

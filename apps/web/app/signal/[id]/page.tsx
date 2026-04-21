@@ -54,6 +54,7 @@ export default async function SignalPage({ params }: PageProps) {
   const complexSignalReason = detectionMeta?.reason ?? null;
   const complexSourceCount = detectionMeta?.source_count ?? null;
   const complexClaimCount = detectionMeta?.claim_count ?? null;
+  const wireInfo = extractWireInfo(signal.raw_data ?? null);
 
   return (
     <article className="space-y-6">
@@ -125,6 +126,15 @@ export default async function SignalPage({ params }: PageProps) {
             This signal groups {signal.source_count} reports across {(signal.distinct_domains ?? []).length} distinct
             domains.
           </li>
+          {wireInfo && wireInfo.total > wireInfo.independent && (
+            <li>
+              Wire provenance: {wireInfo.independent} independent source{wireInfo.independent === 1 ? '' : 's'} out
+              of {wireInfo.total} total.
+              {Object.keys(wireInfo.wire_groups).length > 0 && (
+                <span> Syndicated content detected from {Object.keys(wireInfo.wire_groups).join(', ')}.</span>
+              )}
+            </li>
+          )}
           <li>
             Reliability label: <strong>{statusLabel(signal.verification_status)}</strong>.{' '}
             {statusDescription(signal.verification_status)}
@@ -379,6 +389,32 @@ function extractPhysicalEvidence(
     ? (candidate.limitations.filter((s) => typeof s === 'string') as string[])
     : [];
   return { status, confidence, sources, limitations };
+}
+
+function extractWireInfo(
+  raw: Record<string, unknown> | null,
+): { total: number; independent: number; wire_groups: Record<string, number> } | null {
+  if (!raw) return null;
+  const log = raw.decision_log;
+  if (!Array.isArray(log)) return null;
+  for (const entry of log) {
+    if (typeof entry === 'string' && entry.startsWith('wire_provenance:')) {
+      const match = entry.match(/(\d+) total domains, (\d+) independent/);
+      if (match) {
+        const wireMatch = entry.match(/wire: ({[^}]+})/);
+        let wireGroups: Record<string, number> = {};
+        if (wireMatch) {
+          try { wireGroups = JSON.parse(wireMatch[1]!.replace(/'/g, '"')); } catch {}
+        }
+        return {
+          total: parseInt(match[1]!, 10),
+          independent: parseInt(match[2]!, 10),
+          wire_groups: wireGroups,
+        };
+      }
+    }
+  }
+  return null;
 }
 
 function ScoreRow({

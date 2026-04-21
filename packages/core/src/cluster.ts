@@ -28,6 +28,7 @@
 import { porterStem } from './stemmer';
 import { extractEntities, entityTokens } from './entities';
 import { canonicalSynonym } from './synonyms';
+import { topicGroup } from './topic-groups';
 
 // ── Stop words ──────────────────────────────────────────────────────────
 const STOP_WORDS = new Set([
@@ -48,25 +49,6 @@ const STOP_WORDS = new Set([
 ]);
 
 const MERGE_THRESHOLD = 0.18;
-
-// ── Topic affinity groups ───────────────────────────────────────────────
-// Topics in the same group can cluster together. This catches events that
-// straddle categories (e.g. a war-triggered refugee crisis → war + civil,
-// an earthquake causing civil unrest → disaster + civil).
-const TOPIC_AFFINITY: Record<string, string> = {
-  war: 'conflict',
-  civil: 'conflict',
-  disaster: 'hazard',
-  climate: 'hazard',
-  economy: 'economy',
-  health: 'health',
-  cyber: 'cyber',
-  other: 'other',
-};
-
-function topicGroup(topic: string): string {
-  return TOPIC_AFFINITY[topic] ?? topic;
-}
 
 // ── Public API ──────────────────────────────────────────────────────────
 

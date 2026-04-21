@@ -23,3 +23,5 @@ export * from './entities';
 export * from './synonyms';
 export * from './wire-provenance';
 export * from './lsh-dedup';
+export * from './sensor-domains';
+export * from './topic-groups';

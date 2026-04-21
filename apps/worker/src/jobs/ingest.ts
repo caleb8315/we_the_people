@@ -9,6 +9,7 @@ import {
   detectInconsistenciesWithLimits,
   extractClaimsFromEvidence,
   extractDomain,
+  extractKeyTerms,
   heuristicConfidence,
   heuristicSeverity,
   isCredibleDomain,
@@ -18,6 +19,9 @@ import {
   reliabilityPublicLabel,
   tagWireProvenance,
   countIndependentSources,
+  MinHashSignature,
+  LshIndex,
+  getHashParams,
 } from '@osint/core';
 import { computeCredibilityUpdates, type SignalOutcome } from '@osint/core/dynamic-credibility';
 import { prepareExistingSignals, matchClustersToExisting } from '@osint/core/signal-matcher';
@@ -171,12 +175,44 @@ export async function runIngest(): Promise<{
     }
   }
 
+  // ── LSH dedup pass: merge near-duplicate clusters within this batch ───
+  const hashParams = getHashParams();
+  const lshIndex = new LshIndex(128, 32);
+  const lshMerges = new Map<string, string>(); // victim → survivor
+  for (const meta of clusterMeta) {
+    const terms = extractKeyTerms(meta.title);
+    const sig = MinHashSignature.fromTokens(terms, hashParams);
+    const candidates = lshIndex.querySorted(sig, 0.4);
+    if (candidates.length > 0) {
+      const best = candidates[0]!;
+      lshMerges.set(meta.dedupe_key, best.key);
+    } else {
+      lshIndex.insert(meta.dedupe_key, sig);
+    }
+  }
+
+  if (lshMerges.size > 0) {
+    for (const [victim, survivor] of lshMerges) {
+      const victimBucket = groups.get(victim);
+      if (victimBucket) {
+        const survivorBucket = groups.get(survivor);
+        if (survivorBucket) {
+          survivorBucket.push(...victimBucket);
+          groups.delete(victim);
+        }
+      }
+    }
+    console.log(`[ingest] LSH dedup merged ${lshMerges.size} near-duplicate clusters`);
+  }
+
   // ── Phase 1: Cross-run matching ───────────────────────────────────────
   // Compare each new cluster against recent existing signals. If a match
   // is found, remap the dedupe_key so the upsert merges evidence into
   // the existing signal instead of creating a duplicate.
   const remapping = matchClustersToExisting(clusterMeta, preparedSignals);
   let crossRunMatches = 0;
+  // Track which final dedupe_keys are cross-run targets (for additive evidence)
+  const crossRunTargets = new Set<string>();
 
   if (remapping.size > 0) {
     const remappedGroups = new Map<string, RawItem[]>();
@@ -184,6 +220,7 @@ export async function runIngest(): Promise<{
       const newKey = remapping.get(originalKey) ?? originalKey;
       if (newKey !== originalKey) {
         crossRunMatches++;
+        crossRunTargets.add(newKey);
         console.log(
           `[ingest] cross-run match: "${bucket[0]?.title?.slice(0, 60)}" → existing signal`,
         );
@@ -230,7 +267,7 @@ export async function runIngest(): Promise<{
       // For cross-run matched signals, fetch existing evidence to get the
       // full picture for verification / reliability scoring.
       let combinedEvidence = evidence;
-      if (remapping.has(dedupe_key) || crossRunMatches > 0) {
+      if (crossRunTargets.has(dedupe_key)) {
         const { data: existingRows } = await sb
           .from('signals')
           .select('id')
@@ -375,7 +412,7 @@ export async function runIngest(): Promise<{
 
       // For cross-run matches, we ADD new evidence rather than replacing
       // all evidence. For fresh signals, replace-all is still correct.
-      const isRemap = remapping.has(dedupe_key);
+      const isRemap = crossRunTargets.has(dedupe_key);
       if (!isRemap) {
         await sb.from('evidence').delete().eq('signal_id', upserted.id);
       }

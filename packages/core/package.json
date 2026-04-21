@@ -25,7 +25,9 @@
     "./wire-provenance": "./src/wire-provenance.ts",
     "./dynamic-credibility": "./src/dynamic-credibility.ts",
     "./lsh-dedup": "./src/lsh-dedup.ts",
-    "./embedding-similarity": "./src/embedding-similarity.ts"
+    "./embedding-similarity": "./src/embedding-similarity.ts",
+    "./sensor-domains": "./src/sensor-domains.ts",
+    "./topic-groups": "./src/topic-groups.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

@@ -124,20 +124,10 @@ export interface ReliabilityBreakdown {
   };
 }
 
-const USGS_DOMAINS = ['usgs.gov', 'earthquake.usgs.gov', 'volcanoes.usgs.gov'];
-const EONET_DOMAINS = ['eonet.gsfc.nasa.gov', 'eonet.sci.gsfc.nasa.gov'];
-const NASA_DOMAINS = ['nasa.gov'];
-const FIRMS_DOMAINS = ['firms.modaps.eosdis.nasa.gov'];
-
-function normalizeDomain(domain: string): string {
-  return (domain ?? '').toLowerCase().replace(/^www\./, '');
-}
-
-function matchesAny(domain: string, needles: string[]): boolean {
-  const d = normalizeDomain(domain);
-  if (!d) return false;
-  return needles.some((n) => d === n || d.endsWith('.' + n));
-}
+import {
+  detectSensorMatch,
+  normalizeSensorDomain as normalizeDomain,
+} from './sensor-domains';
 
 /**
  * Signature used to cluster claims for the agreement score.
@@ -210,16 +200,9 @@ export function computeReliabilityScores(input: ReliabilityInputs): ReliabilityB
     const d = normalizeDomain(e.domain);
     if (d) domains.add(d);
     if (e.is_credible && d) credibleDomainSet.add(d);
-    if (matchesAny(d, USGS_DOMAINS) || e.source_id === 'usgs') usgs_match = true;
-    if (
-      matchesAny(d, EONET_DOMAINS) ||
-      e.source_id === 'nasa-eonet' ||
-      matchesAny(d, NASA_DOMAINS) ||
-      matchesAny(d, FIRMS_DOMAINS) ||
-      e.source_id === 'nasa-firms'
-    ) {
-      eonet_match = true;
-    }
+    const sm = detectSensorMatch(d, e.source_id ?? null);
+    if (sm.usgs) usgs_match = true;
+    if (sm.eonet || sm.nasa || sm.firms) eonet_match = true;
   }
   credible_sources = credibleDomainSet.size;
 

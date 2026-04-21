@@ -36,23 +36,13 @@ export interface PhysicalEvidenceInputs {
   summary?: string | null;
 }
 
-// ── Detectors (private) ────────────────────────────────────────────────────
+// ── Detectors (shared via sensor-domains) ──────────────────────────────────
 
-const USGS_DOMAINS = ['usgs.gov', 'earthquake.usgs.gov', 'volcanoes.usgs.gov'];
-const EONET_DOMAINS = ['eonet.gsfc.nasa.gov', 'eonet.sci.gsfc.nasa.gov'];
-const NASA_DOMAINS = ['nasa.gov'];
-const NOAA_DOMAINS = ['noaa.gov', 'weather.gov'];
-const FIRMS_DOMAINS = ['firms.modaps.eosdis.nasa.gov'];
-
-function normalizeDomain(domain: string): string {
-  return (domain ?? '').toLowerCase().replace(/^www\./, '');
-}
-
-function matchesAny(domain: string, needles: string[]): boolean {
-  const d = normalizeDomain(domain);
-  if (!d) return false;
-  return needles.some((n) => d === n || d.endsWith('.' + n));
-}
+import {
+  detectSensorMatch,
+  normalizeSensorDomain as normalizeDomain,
+  NOAA_DOMAINS,
+} from './sensor-domains';
 
 // ── Public API ─────────────────────────────────────────────────────────────
 
@@ -81,11 +71,12 @@ export function assessPhysicalEvidence(input: PhysicalEvidenceInputs): PhysicalE
 
   for (const e of evidence) {
     const d = normalizeDomain(e.domain ?? '');
-    if (matchesAny(d, USGS_DOMAINS) || e.source_id === 'usgs') usgsMatch = true;
-    if (matchesAny(d, EONET_DOMAINS) || e.source_id === 'nasa-eonet') eonetMatch = true;
-    if (matchesAny(d, NASA_DOMAINS)) nasaMatch = true;
-    if (matchesAny(d, NOAA_DOMAINS)) noaaMatch = true;
-    if (matchesAny(d, FIRMS_DOMAINS) || e.source_id === 'nasa-firms') firmsMatch = true;
+    const sm = detectSensorMatch(d, e.source_id ?? null);
+    if (sm.usgs) usgsMatch = true;
+    if (sm.eonet) eonetMatch = true;
+    if (sm.nasa) nasaMatch = true;
+    if (sm.noaa) noaaMatch = true;
+    if (sm.firms) firmsMatch = true;
     if (e.is_credible && d) credibleDomains.add(d);
   }
   const credibleCount = credibleDomains.size;
