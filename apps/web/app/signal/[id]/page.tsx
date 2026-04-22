@@ -11,6 +11,7 @@ import { getAdminSupabase } from '@/lib/supabase-server';
 import { Badge } from '@/components/ui/badge';
 import { SeverityMeter } from '@/components/ui/severity-meter';
 import { DeepDiveReport } from '@/components/deep-dive-report';
+import { RequestDeepDive } from '@/components/request-deep-dive';
 import { Disclosure } from '@/components/ui/disclosure';
 import {
   formatContradictionInline,

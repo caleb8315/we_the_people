@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Disclosure } from '@/components/ui/disclosure';
+import { RequestDeepDive } from '@/components/request-deep-dive';
 
 interface ClaimVerdict {
   claim_id: string;
@@ -67,7 +68,7 @@ const SENSOR_ICONS: Record<string, string> = {
   satellite: 'Satellite',
 };
 
-export function DeepDiveReport({ signalId }: { signalId: string }) {
+export function DeepDiveReport({ signalId, showRequestButton = true }: { signalId: string; showRequestButton?: boolean }) {
   const [data, setData] = useState<DeepDiveData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -84,7 +85,11 @@ export function DeepDiveReport({ signalId }: { signalId: string }) {
   }, [signalId]);
 
   if (loading) return null;
-  if (!data && !error) return null;
+
+  // No deep dive exists yet — show the request button
+  if (!data && !error) {
+    return showRequestButton ? <RequestDeepDive signalId={signalId} /> : null;
+  }
 
   // API error — the deep dive service itself had an issue
   if (error) {
@@ -98,7 +103,7 @@ export function DeepDiveReport({ signalId }: { signalId: string }) {
     );
   }
 
-  if (!data) return null;
+  if (!data) return showRequestButton ? <RequestDeepDive signalId={signalId} /> : null;
 
   const verdicts = data.synthesis?.verdicts ?? [];
   const overallColor = VERDICT_COLORS[data.overall_verdict] ?? VERDICT_COLORS.unverified;

@@ -11,10 +11,12 @@ export function NavBarClient({ signedIn }: { signedIn: boolean }) {
     ? [
         { href: '/dashboard', label: 'Dashboard' },
         { href: '/feed', label: 'Feed' },
+        { href: '/verify', label: 'Verify' },
         { href: '/briefings', label: 'Briefings' },
       ]
     : [
         { href: '/feed', label: 'Feed' },
+        { href: '/verify', label: 'Verify' },
         { href: '/briefings', label: 'Briefings' },
       ];
 

@@ -612,5 +612,68 @@ export async function autoDeepDive(limit: number = 3): Promise<number> {
     }
   }
 
+  // Also process any user-requested dives (pending, with signal_id or source_url)
+  const { data: pendingDives } = await sb
+    .from('deep_dives')
+    .select('id, signal_id, source_url')
+    .eq('status', 'pending')
+    .eq('auto_generated', false)
+    .order('created_at', { ascending: true })
+    .limit(10);
+
+  for (const pending of pendingDives ?? []) {
+    try {
+      if (pending.signal_id) {
+        const { data: signal } = await sb
+          .from('signals')
+          .select('id, title, summary, topic')
+          .eq('id', pending.signal_id)
+          .single();
+        if (!signal) continue;
+
+        const { data: evidence } = await sb
+          .from('evidence')
+          .select('title, excerpt')
+          .eq('signal_id', signal.id)
+          .limit(10);
+
+        const excerpts = (evidence ?? [])
+          .map((e: any) => `${e.title ?? ''}: ${e.excerpt ?? ''}`.trim())
+          .filter(Boolean);
+
+        await runDeepDive(pending.id, signal.title, signal.summary, excerpts, signal.topic);
+        completed++;
+      } else if (pending.source_url) {
+        // For URL-only dives, fetch the page title and use it as input
+        const pageTitle = await fetchPageTitle(pending.source_url);
+        await runDeepDive(
+          pending.id,
+          pageTitle || pending.source_url,
+          null,
+          [],
+          'other',
+        );
+        completed++;
+      }
+    } catch (err) {
+      console.warn(`[deep-dive] failed for pending dive ${pending.id}: ${(err as Error).message}`);
+    }
+  }
+
   return completed;
+}
+
+async function fetchPageTitle(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { 'user-agent': 'Crosscheck-Bot/1.0' },
+      redirect: 'follow',
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    return match?.[1]?.trim() || null;
+  } catch {
+    return null;
+  }
 }
