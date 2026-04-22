@@ -27,7 +27,8 @@
     "./lsh-dedup": "./src/lsh-dedup.ts",
     "./embedding-similarity": "./src/embedding-similarity.ts",
     "./sensor-domains": "./src/sensor-domains.ts",
-    "./topic-groups": "./src/topic-groups.ts"
+    "./topic-groups": "./src/topic-groups.ts",
+    "./deep-dive": "./src/deep-dive.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

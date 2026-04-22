@@ -10,6 +10,7 @@ import type { PhysicalEvidence, ReliabilityPublicLabel } from '@osint/core';
 import { getAdminSupabase } from '@/lib/supabase-server';
 import { Badge } from '@/components/ui/badge';
 import { SeverityMeter } from '@/components/ui/severity-meter';
+import { DeepDiveReport } from '@/components/deep-dive-report';
 import { Disclosure } from '@/components/ui/disclosure';
 import {
   formatContradictionInline,
@@ -183,6 +184,8 @@ export default async function SignalPage({ params }: PageProps) {
           </dl>
         </Disclosure>
       )}
+
+      <DeepDiveReport signalId={signal.id} />
 
       <Disclosure
         title={`Source disagreement (${contradictionsCount})`}

@@ -10,6 +10,7 @@
     "alert": "tsx src/index.ts alert",
     "email": "tsx src/index.ts email",
     "backfill": "tsx src/index.ts backfill",
+    "deep-dive": "tsx src/index.ts deep-dive",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

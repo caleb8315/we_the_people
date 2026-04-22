@@ -3,6 +3,7 @@ import { runBriefing } from './jobs/brief';
 import { runAlerts } from './jobs/alert';
 import { runEmailBriefings } from './jobs/email-briefings';
 import { runBackfill } from './jobs/backfill';
+import { autoDeepDive } from './jobs/deep-dive';
 
 /**
  * CLI dispatcher. Invoked by GitHub Actions with a single command plus
@@ -22,9 +23,19 @@ const [cmd, arg] = args;
 
 async function main() {
   switch (cmd) {
-    case 'ingest':
-      await runIngest();
+    case 'ingest': {
+      const result = await runIngest();
+      // Auto deep-dive the top signals from this ingest run
+      if (result.signals > 0 && process.env.GROQ_API_KEY && process.env.GEMINI_API_KEY) {
+        try {
+          const dived = await autoDeepDive(3);
+          if (dived > 0) console.log(`[worker] auto deep-dived ${dived} signals`);
+        } catch (err) {
+          console.warn(`[worker] auto deep-dive failed: ${(err as Error).message}`);
+        }
+      }
       return;
+    }
     case 'brief':
       await runBriefing(arg === 'weekly' ? 'weekly' : 'daily');
       return;
@@ -46,9 +57,15 @@ async function main() {
       });
       return;
     }
+    case 'deep-dive': {
+      const count = Number(arg ?? '5');
+      const dived = await autoDeepDive(Number.isFinite(count) ? count : 5);
+      console.log(`[worker] deep-dived ${dived} signals`);
+      return;
+    }
     default:
       console.error(
-        `unknown command: ${cmd}. use: ingest | brief [weekly] | alert | email | backfill [hours] [--dry-run] [--limit=N]`,
+        `unknown command: ${cmd}. use: ingest | brief [weekly] | alert | email | backfill [hours] [--dry-run] [--limit=N] | deep-dive [count]`,
       );
       process.exit(2);
   }

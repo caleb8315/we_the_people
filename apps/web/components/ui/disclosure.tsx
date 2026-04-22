@@ -9,7 +9,7 @@ export function Disclosure({
   tone = 'neutral',
   children,
 }: {
-  title: string;
+  title: React.ReactNode;
   badge?: React.ReactNode;
   defaultOpen?: boolean;
   tone?: 'neutral' | 'danger' | 'warn';
