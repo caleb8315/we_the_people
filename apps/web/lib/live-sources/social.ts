@@ -285,9 +285,42 @@ interface BlueskyAuthResult {
 }
 
 async function getBlueskyAccessJwt(): Promise<BlueskyAuthResult> {
-  const identifier = process.env.BLUESKY_IDENTIFIER;
-  const password = process.env.BLUESKY_APP_PASSWORD;
+  const identifier = (process.env.BLUESKY_IDENTIFIER ?? '').trim();
+  const password = (process.env.BLUESKY_APP_PASSWORD ?? '').trim();
   if (!identifier || !password) return { token: null, error: 'missing env vars' };
+
+  // Catch the two most common Vercel misconfigs before we waste a round-trip
+  // to Bluesky (whose error codes are unhelpful). These messages surface in
+  // the coverage-strip diagnostic so the user knows what to fix.
+  if (identifier.includes('@') && identifier.includes('.')) {
+    // Could be an email OR a handle that happens to contain @ — Bluesky
+    // handles do NOT contain @. If it looks like an email, reject early.
+    const looksLikeEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(identifier);
+    if (looksLikeEmail) {
+      return {
+        token: null,
+        error:
+          'BLUESKY_IDENTIFIER looks like an email. Use your full Bluesky handle instead (e.g. "you.bsky.social"), NOT your signup email.',
+      };
+    }
+  }
+  if (identifier.startsWith('@')) {
+    return {
+      token: null,
+      error:
+        'BLUESKY_IDENTIFIER should not start with "@" — just use the bare handle, e.g. "you.bsky.social".',
+    };
+  }
+  // App passwords have a distinctive xxxx-xxxx-xxxx-xxxx format. If the
+  // configured password doesn't contain a hyphen, it's almost certainly the
+  // main account password, which Bluesky will reject.
+  if (!password.includes('-')) {
+    return {
+      token: null,
+      error:
+        'BLUESKY_APP_PASSWORD does not look like an app password (expected "xxxx-xxxx-xxxx-xxxx"). Generate one at https://bsky.app/settings/app-passwords — do NOT use your main password.',
+    };
+  }
 
   const now = Date.now();
   if (cachedBlueskyJwt && cachedBlueskyJwt.expiresAt > now) {
