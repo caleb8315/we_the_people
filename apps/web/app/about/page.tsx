@@ -63,7 +63,7 @@ export default function AboutPage() {
             Every signal links to its sources and includes a reliability label, confidence
             band, and — when relevant — a physical-evidence record with explicit limitations.
           </li>
-          <li>Privacy-first. Minimal data retention. User-owned preferences and AI state.</li>
+          <li>Privacy-first. Minimal data retention. User-owned preferences and analysis state.</li>
           <li>You control the feed. Mute sources, focus topics, set alert thresholds.</li>
         </ul>
       </section>

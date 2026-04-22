@@ -102,6 +102,36 @@ export default function TrustPage() {
       </section>
 
       <section>
+        <h2>Deep dive research</h2>
+        <p>
+          For high-priority events, Crosscheck runs an independent research process
+          that extracts the key claims from the reporting, searches public web sources
+          for corroborating or contradicting evidence, and queries physical sensor
+          networks (USGS seismic, NASA thermal detection) for on-the-ground data. The
+          results are presented as a structured report showing what was found for each
+          claim, with source links and sensor readings. This research is fully
+          automated and runs without editorial intervention.
+        </p>
+      </section>
+
+      <section>
+        <h2>How it works</h2>
+        <p>
+          Crosscheck uses a combination of deterministic algorithms (text matching,
+          entity extraction, statistical scoring) and language models (for claim
+          extraction, web research, and evidence synthesis) to process and analyse
+          public reporting. Every output — reliability scores, contradiction
+          detection, deep dive verdicts — is presented with the underlying evidence
+          so readers can evaluate it independently.
+        </p>
+        <p className="mt-2">
+          Language models are used as research tools, not as sources of truth. When
+          a model is used, the evidence it found is shown alongside the conclusion
+          so you can see whether the reasoning holds.
+        </p>
+      </section>
+
+      <section>
         <h2>What Crosscheck does not do</h2>
         <ul>
           <li>It does not tell you what happened. It describes how the public record is shaped.</li>

@@ -37,7 +37,7 @@ interface DeepDiveData {
   synthesis: { verdicts: ClaimVerdict[] };
   summary: string;
   overall_verdict: string;
-  auto_generated: boolean;
+  auto_generated?: boolean;
   completed_at: string;
   raw_data: { research_duration_ms?: number; error?: string };
 }
@@ -91,8 +91,8 @@ export function DeepDiveReport({ signalId }: { signalId: string }) {
     return (
       <section className="rounded-card border border-white/10 bg-white/[0.03] px-4 py-3">
         <p className="text-sm text-white/60">
-          Deep dive research is temporarily unavailable. The cross-source analysis,
-          reliability scores, and contradiction detection above remain fully operational.
+          Deep dive research is temporarily unavailable. Cross-source analysis,
+          reliability scoring, and source disagreement detection remain fully operational above.
         </p>
       </section>
     );
@@ -124,7 +124,7 @@ export function DeepDiveReport({ signalId }: { signalId: string }) {
             {overallLabel}
           </span>
           {data.auto_generated && (
-            <span className="text-[10px] text-white/40">auto-generated</span>
+            <span className="text-[10px] text-white/40">automatic</span>
           )}
         </span>
       }
@@ -236,8 +236,8 @@ export function DeepDiveReport({ signalId }: { signalId: string }) {
               Claims Identified
             </h4>
             <p className="text-xs text-white/50">
-              These claims were extracted from the reporting but could not be
-              automatically assessed at this time. You can verify them using the
+              These claims were identified in the reporting but could not be
+              independently assessed at this time. You can verify them using the
               source links in the evidence section.
             </p>
             <ul className="space-y-1">
@@ -281,7 +281,7 @@ export function DeepDiveReport({ signalId }: { signalId: string }) {
         {/* Footer */}
         <div className="flex items-center justify-between text-[10px] text-white/35">
           <span>
-            {data.auto_generated ? 'Automatically researched' : 'Researched on demand'}
+            {data.auto_generated ? 'Researched automatically' : 'Researched on demand'}
             {data.completed_at && ` · ${new Date(data.completed_at).toLocaleString()}`}
             {duration && ` · ${duration}`}
           </span>

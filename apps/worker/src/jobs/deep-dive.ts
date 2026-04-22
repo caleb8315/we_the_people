@@ -260,9 +260,9 @@ function buildFallbackResult(
 
   let fallbackSummary: string;
   if (failures.length === 3) {
-    fallbackSummary = `Automated research services are temporarily at capacity. This event is tracked by ${sourceCount} source${sourceCount === 1 ? '' : 's'} in our monitoring network.`;
+    fallbackSummary = `Research services are temporarily at capacity. This event is tracked by ${sourceCount} source${sourceCount === 1 ? '' : 's'} in our monitoring network.`;
   } else {
-    fallbackSummary = `Some research steps could not be completed (${failures.join(', ')}). The information below reflects what was available.`;
+    fallbackSummary = `Some research steps could not be completed at this time. The information below reflects what was available.`;
   }
 
   if (hasSensorConfirmation) {
@@ -435,7 +435,7 @@ ${claimQueries.map((q, i) => `${i + 1}. ${q}`).join('\n')}`;
       failures.push('synthesis parsing');
       verdicts = buildFallbackVerdicts(claims, research, sensorData);
       overall = deriveFallbackOverall(verdicts);
-      summaryText = 'Research was completed but the automated synthesis encountered an issue. The claims and evidence below are presented as-is for your review.';
+      summaryText = 'Research was completed but the final synthesis encountered an issue. The claims and evidence below are presented as-is for your review.';
     }
   } else {
     failures.push('synthesis');
@@ -481,15 +481,15 @@ function buildFallbackVerdicts(
     if (hasResearch && sensorRelevant?.confirms_event) {
       verdict = 'partially_supported';
       confidence = 45;
-      explanation = 'Web research found relevant coverage and sensor data is available. Automated synthesis was unavailable — review the research trail and sensor readings below for details.';
+      explanation = 'Web research found relevant coverage and sensor data is available. Full synthesis was unavailable — review the research trail and sensor readings below for details.';
     } else if (hasResearch) {
       verdict = 'unverified';
       confidence = 25;
-      explanation = 'Web research found relevant coverage but automated synthesis could not assess it. Review the research trail below to evaluate this claim.';
+      explanation = 'Web research found relevant coverage but full analysis could not be completed. Review the research trail below to evaluate this claim.';
     } else {
       verdict = 'unverified';
       confidence = 0;
-      explanation = 'Research services were temporarily unavailable. This claim has not been independently verified through our automated system.';
+      explanation = 'Research services were temporarily unavailable. This claim has not been independently verified.';
     }
 
     return {
