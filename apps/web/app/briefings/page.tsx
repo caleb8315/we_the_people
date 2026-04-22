@@ -62,11 +62,11 @@ export default async function BriefingsPage({ searchParams }: { searchParams: { 
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Briefings</h1>
-            <p className="mt-1 text-sm text-white/60">
+            <p className="mt-1 text-sm text-ink-500">
               Personal briefing is tuned to your settings. Global briefing shows platform-wide coverage.
             </p>
             {!userId && (
-              <p className="mt-1 text-xs text-white/45">
+              <p className="mt-1 text-xs text-ink-400">
                 Public view: these briefings are global and not connected to any user profile.
               </p>
             )}
@@ -92,12 +92,12 @@ export default async function BriefingsPage({ searchParams }: { searchParams: { 
           <Card
             title="Top signals in your current brief context"
             action={
-              <Link href="/feed" className="text-xs text-brand-300 hover:underline">
+              <Link href="/feed" className="text-xs text-brand-700 hover:underline">
                 Open my feed
               </Link>
             }
           >
-            <p className="-mt-2 mb-3 text-xs text-white/55">
+            <p className="-mt-2 mb-3 text-xs text-ink-500">
               Preview reflects your topics and mute settings so you can confirm personalization at a glance.
             </p>
             {personalized.length === 0 ? (
@@ -110,7 +110,7 @@ export default async function BriefingsPage({ searchParams }: { searchParams: { 
               <ul className="space-y-3">
                 {personalized.slice(0, 5).map((s) => (
                   <li key={s.id}>
-                    <SignalCard s={s as any} />
+                    <SignalCard s={s} />
                   </li>
                 ))}
               </ul>
@@ -130,7 +130,7 @@ export default async function BriefingsPage({ searchParams }: { searchParams: { 
       {(mode === 'global' || !userId) && (
         <section>
           <header className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-white/70">Global briefings</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-600">Global briefings</h2>
           </header>
           {globalBriefings == null || globalBriefings.length === 0 ? (
             <EmptyState
@@ -143,16 +143,16 @@ export default async function BriefingsPage({ searchParams }: { searchParams: { 
                 <li key={b.id}>
                   <Link
                     href={`/briefings/${b.id}`}
-                    className="block rounded-card border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/20 hover:bg-white/[0.06]"
+                    className="block rounded-card border border-ink-100 bg-paper p-4 transition hover:border-ink-200 hover:bg-canvas-50"
                   >
-                    <div className="flex items-center gap-2 text-xs text-white/60">
+                    <div className="flex items-center gap-2 text-xs text-ink-500">
                       <Badge variant="neutral" withIcon={false}>
                         {b.kind}
                       </Badge>
                       <span>{new Date(b.period_start).toLocaleString()}</span>
                     </div>
                     <h3 className="mt-2 text-base font-semibold clamp-2">{b.headline}</h3>
-                    <p className="mt-1 text-xs text-white/50">{(b.topics ?? []).join(' · ')}</p>
+                    <p className="mt-1 text-xs text-ink-400">{(b.topics ?? []).join(' · ')}</p>
                   </Link>
                 </li>
               ))}

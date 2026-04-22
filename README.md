@@ -37,7 +37,9 @@ osint-platform/
 │   └── migrations/       Database schema with RLS (013–016 roll out the
 │                         reliability / contradictions / label / evidence
 │                         contracts)
-├── .github/workflows/    Scheduled ingest / briefing / alert / backfill jobs
+├── .github/workflows/    Scheduled jobs: ingest, briefing, alert,
+│                         email-briefings, develop (story enrichment),
+│                         backfill
 ├── docs/                 Architecture, security, privacy, runbooks,
 │                         migration-plan.md
 └── scripts/              Local dev helpers

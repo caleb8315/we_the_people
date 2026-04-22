@@ -127,7 +127,7 @@ export function assessPhysicalEvidence(input: PhysicalEvidenceInputs): PhysicalE
   }
   if (credibleCount === 0) {
     limitations.push(
-      'No credible-tier outlets in the evidence set; reporting may be early, syndicated, or single-source.',
+      'No outlets on our trusted-source list matched yet — reporting may be early, syndicated, independent, or niche. Read the sources directly.',
     );
   }
 

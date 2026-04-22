@@ -37,7 +37,7 @@ export default async function AiPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">AI workspace</h1>
-        <p className="mt-1 text-sm text-white/60">
+        <p className="mt-1 text-sm text-ink-500">
           User-isolated chat memory and model context. Your sessions are private to your account.
         </p>
       </header>

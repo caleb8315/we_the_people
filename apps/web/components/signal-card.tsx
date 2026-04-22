@@ -1,16 +1,24 @@
 import Link from 'next/link';
-import {
-  reliabilityPublicLabel,
-  reliabilityPublicLabelDisplay,
-  statusLabel,
-} from '@osint/core';
-import type { PhysicalEvidence, ReliabilityPublicLabel } from '@osint/core';
+import { statusLabel } from '@osint/core';
+import type { ConfidenceBand, ConfidenceReport, PhysicalEvidence } from '@osint/core';
 import {
   formatContradictionInline,
   type ContradictionInline,
 } from '@/lib/contradictions-display';
 import { Badge } from './ui/badge';
-import { SeverityMeter } from './ui/severity-meter';
+import { RelativeTime } from './relative-time';
+
+/**
+ * Light-theme Signal card (April 2026 redesign).
+ *
+ * Layout is inspired by the "Travel Package" card in the reference
+ * mockup: a colorful topic tile on the left, content + band-aware
+ * confidence header on the right, and a small amber action affordance
+ * at the card's bottom-right.
+ *
+ * Still consumes the unified `ConfidenceReport` contract — no parallel
+ * band logic lives here.
+ */
 
 export interface SignalRow {
   id: string;
@@ -24,201 +32,215 @@ export interface SignalRow {
   verification_status: 'verified' | 'developing' | 'unverified' | 'quarantined' | 'blocked';
   source_count: number;
   credible_source_count: number;
-  distinct_domains: string[];
+  // Accept `null` so we can assign `DecoratedSignal` (which carries the raw
+  // DB column shape) directly without casting through `any`. The card treats
+  // null the same as an empty list.
+  distinct_domains: string[] | null;
   occurred_at?: string | null;
   first_seen_at: string;
   contradictions_count?: number;
   is_disputed?: boolean;
   is_new_since?: boolean;
-  /** Signal-level tags; Phase-7 uses `complex_signal` for detection skips. */
   tags?: string[] | null;
-  // Phase-3 reliability contract
-  reliability_score?: number | null;
-  reliability_label?: ReliabilityPublicLabel | null;
-  reliability_summary?: string | null;
-  // Phase-4 / Phase-5 enrichments (populated by decorateSignals):
-  contradictions_inline?: ContradictionInline[];
+  confidence_report?: ConfidenceReport;
   physical_evidence?: PhysicalEvidence | null;
-  has_usgs_confirmation?: boolean;
-  has_satellite_confirmation?: boolean;
+  contradictions_inline?: ContradictionInline[];
 }
 
-/**
- * Topics where a geophysical / satellite absence-of-confirmation is
- * informative. We hide the evidence block for topics where neither sensor
- * network would ever be expected (economy, cyber, health, civil, other) —
- * showing "✗ No seismic confirmation" on a markets story is just noise.
- */
 const PHYSICAL_EVIDENCE_TOPICS = new Set(['war', 'disaster', 'climate']);
 
+const TOPIC_TILE: Record<string, string> = {
+  war: 'tile-war',
+  economy: 'tile-economy',
+  climate: 'tile-climate',
+  health: 'tile-health',
+  civil: 'tile-civil',
+  cyber: 'tile-cyber',
+  disaster: 'tile-disaster',
+};
+
+const TOPIC_GLYPH: Record<string, string> = {
+  war: '⚔',
+  economy: '₵',
+  climate: '❅',
+  health: '✚',
+  civil: '☷',
+  cyber: '⌬',
+  disaster: '⚠',
+};
+
 export function SignalCard({ s }: { s: SignalRow }) {
-  const confLabel = confidenceLabel(s.confidence);
-  const disputed = s.is_disputed ?? (s.contradictions_count ?? 0) > 0;
-
-  // Phase-3: prefer the persisted label; otherwise derive from the score.
-  const publicLabel: ReliabilityPublicLabel | null =
-    s.reliability_label ??
-    (typeof s.reliability_score === 'number'
-      ? reliabilityPublicLabel(s.reliability_score)
-      : null);
-
-  const inline = (s.contradictions_inline ?? []).slice(0, 3);
-  const hasInlineContradictions = inline.length > 0;
-  const showEvidenceBlock = PHYSICAL_EVIDENCE_TOPICS.has(s.topic ?? '');
-  // Phase 7 — detection was skipped because the signal exceeded the
-  // source/claim caps. Show an honest note instead of a silent zero.
+  const report = s.confidence_report;
+  const band: ConfidenceBand = report?.band ?? 'low';
   const isComplexSignal = (s.tags ?? []).includes('complex_signal');
+  const inline = (s.contradictions_inline ?? []).slice(0, 3);
+  const disputed = s.is_disputed ?? (s.contradictions_count ?? 0) > 0;
+  const showEvidenceBlock = PHYSICAL_EVIDENCE_TOPICS.has(s.topic ?? '');
+
+  const tileClass = TOPIC_TILE[s.topic ?? ''] ?? 'tile-default';
+  const glyph = TOPIC_GLYPH[s.topic ?? ''] ?? '◎';
 
   return (
     <Link
       href={`/signal/${s.id}`}
-      className="group block rounded-card border border-white/10 bg-white/[0.03] p-3 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:border-brand-500/50 sm:p-5"
+      className="group block overflow-hidden rounded-card border border-ink-100 bg-paper shadow-card transition hover:shadow-card-hover focus-visible:border-amber-400"
     >
-      {/* Phase 4 — top-of-card reliability header: color dot + label + 1-line summary. */}
-      {publicLabel && (
-        <div className="mb-3 flex items-start gap-2.5">
-          <span
-            aria-hidden="true"
-            className={`mt-1.5 inline-block h-2.5 w-2.5 shrink-0 rounded-full ${reliabilityDotClass(publicLabel)}`}
-          />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold leading-snug text-white">
-              {reliabilityPublicLabelDisplay(publicLabel)}
-              {typeof s.reliability_score === 'number' && (
-                <span className="ml-1.5 font-mono text-[11px] font-normal text-white/55">
-                  {s.reliability_score}/100
-                </span>
-              )}
-            </p>
-            {s.reliability_summary && (
-              <p className="clamp-1 text-xs text-white/65">{s.reliability_summary}</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2">
-        <SeverityMeter severity={s.severity} />
-        <Badge
-          variant={s.verification_status}
-          title="Reliability label reflects how well this event is corroborated across credible sources."
+      <div className="flex flex-col sm:flex-row">
+        {/* Topic tile — acts as the "image" in the reference's Travel Package
+            cards. On mobile it's a full-width band; on desktop it's a
+            fixed-width panel on the left. */}
+        <div
+          className={`relative flex h-28 items-end justify-between px-4 py-3 sm:h-auto sm:w-44 sm:min-w-[11rem] sm:flex-col sm:items-start ${tileClass}`}
+          aria-hidden="true"
         >
-          {statusLabel(s.verification_status)}
-        </Badge>
-        {s.topic && (
-          <Badge variant="topic" withIcon={false}>
-            {s.topic}
-          </Badge>
-        )}
-        {s.country_code && (
-          <Badge variant="country" withIcon={false}>
-            {s.country_code}
-          </Badge>
-        )}
-        {disputed && (
-          <Badge variant="disputed" title="Sources disagree on a material detail of this signal">
-            Sources disagree
-          </Badge>
-        )}
-        {s.is_new_since && (
-          <Badge variant="new" title="New since your last visit">
-            New
-          </Badge>
-        )}
-        {isComplexSignal && (
-          <Badge
-            variant="muted"
-            withIcon={false}
-            title={`Too many sources for inline disagreement detection (limit ${s.source_count} > 20). Open the signal to review evidence directly.`}
-          >
-            Complex signal
-          </Badge>
-        )}
-      </div>
-
-      <h3 className="mt-2 text-[17px] font-semibold tracking-tight clamp-2 group-hover:text-white sm:text-[16px]">
-        {s.title}
-      </h3>
-      {s.summary && <p className="mt-1 text-[14px] text-white/70 clamp-2 sm:text-sm">{s.summary}</p>}
-
-      {/* Phase 4 — key differences block. Always visible when we have
-          disagreements; 1-line bullets each. No click required. Phase 7
-          overrides this block with an honest "detection skipped" note when
-          the signal was flagged `complex_signal` (too many sources for the
-          deterministic detector to reason about). */}
-      {isComplexSignal ? (
-        <div className="mt-3 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-[12px] text-white/60">
-          <p>
-            Source-disagreement detection was skipped for this signal — it exceeds the inline limit
-            of {20} sources. Open the signal page to review evidence directly.
-          </p>
+          <span className="text-4xl font-semibold text-white/85 mix-blend-overlay">{glyph}</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/75 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink-700 backdrop-blur">
+            {s.topic ?? 'signal'}
+            {s.country_code && <span className="text-ink-500">· {s.country_code}</span>}
+          </span>
         </div>
-      ) : (
-        hasInlineContradictions && (
-          <div className="mt-3 rounded-md border border-danger-500/30 bg-danger-500/[0.06] px-3 py-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-danger-300">
-              ⚠ Key differences detected
+
+        <div className="min-w-0 flex-1 p-4 sm:p-5">
+          {/* Event title first — the thing the reader is here to see. */}
+          <h3 className="text-[18px] font-semibold leading-snug tracking-tight text-ink clamp-2 group-hover:text-ink-700 sm:text-[20px]">
+            {s.title}
+          </h3>
+          {s.summary && (
+            <p className="mt-1.5 text-[14px] leading-relaxed text-ink-500 clamp-2 sm:text-[15px]">
+              {s.summary}
             </p>
-            <ul className="mt-1.5 space-y-0.5 text-[13px] text-white/85">
-              {inline.map((c, i) => (
-                <li key={i} className="clamp-1">
-                  <span aria-hidden="true" className="text-white/40">•</span>{' '}
-                  {formatContradictionInline(c)}
-                </li>
-              ))}
-            </ul>
-            {(s.contradictions_count ?? 0) > inline.length && (
-              <p className="mt-1 text-[11px] text-white/50">
-                +{(s.contradictions_count ?? 0) - inline.length} more on the signal page
+          )}
+
+          {/* Verdict callout — the single line the reader is here for.
+              Band-tinted background so it reads as the card's headline
+              judgement rather than a subtle footer. The bullets that
+              used to sit beneath it moved to the signal-detail page —
+              on a feed card they added noise without adding new info. */}
+          {report && (
+            <div
+              className={`mt-3 flex items-start gap-2.5 rounded-xl border px-3 py-2.5 ${bandCalloutClass(band)}`}
+            >
+              <span
+                aria-hidden="true"
+                className={`mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full ${bandDotClass(band)}`}
+              />
+              <p className="min-w-0 text-[14px] leading-snug clamp-3 sm:text-[15px]">
+                <span className="font-semibold text-ink">{report.label_display}.</span>{' '}
+                <span className="text-ink-700">{report.summary}</span>
               </p>
-            )}
+            </div>
+          )}
+
+          {isComplexSignal && (
+            <div className="mt-3 rounded-xl border border-ink-100 bg-canvas-100 px-3 py-2 text-[12px] text-ink-500">
+              Source-disagreement detection was skipped (over inline limit). Open the signal page
+              to review evidence directly.
+            </div>
+          )}
+
+          {!isComplexSignal && inline.length > 0 && (
+            <div className="mt-3 rounded-xl border border-danger-200 bg-danger-50 px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-danger-700">
+                Key differences detected
+              </p>
+              <ul className="mt-1.5 space-y-0.5 text-[13px] text-ink-700">
+                {inline.map((c, i) => (
+                  <li key={i} className="clamp-1">
+                    <span aria-hidden="true" className="text-danger-500">
+                      •
+                    </span>{' '}
+                    {formatContradictionInline(c)}
+                  </li>
+                ))}
+              </ul>
+              {(s.contradictions_count ?? 0) > inline.length && (
+                <p className="mt-1 text-[11px] text-danger-600">
+                  +{(s.contradictions_count ?? 0) - inline.length} more on the signal page
+                </p>
+              )}
+            </div>
+          )}
+
+          {showEvidenceBlock && s.physical_evidence && (
+            <PhysicalEvidenceBlock pe={s.physical_evidence} />
+          )}
+
+          {/* Meta + CTA row */}
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-400 sm:text-[12px]">
+              <Badge
+                variant={s.verification_status}
+                title="Reliability label reflects how well this event is corroborated across credible sources."
+              >
+                {statusLabel(s.verification_status)}
+              </Badge>
+              {disputed && (
+                <Badge
+                  variant="disputed"
+                  title="Sources disagree on a material detail of this signal"
+                >
+                  Sources disagree
+                </Badge>
+              )}
+              {s.is_new_since && (
+                <Badge variant="new" title="New since your last visit">
+                  New
+                </Badge>
+              )}
+              <span>
+                <strong className="text-ink-700">{s.source_count}</strong> source
+                {s.source_count === 1 ? '' : 's'}
+              </span>
+              <span aria-hidden="true">·</span>
+              <RelativeTime iso={s.occurred_at ?? s.first_seen_at} />
+            </div>
+            <span
+              aria-hidden="true"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white shadow-[0_6px_16px_-4px_rgba(245,158,11,0.55)] transition group-hover:bg-amber-600"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M5 12h14" />
+                <path d="m13 5 7 7-7 7" />
+              </svg>
+            </span>
           </div>
-        )
-      )}
-
-      {/* Phase 5 — structured physical evidence block. Only rendered for
-          topics where geophysical confirmation is meaningful (war / disaster
-          / climate). Never phrases absence as a factual denial — when no
-          sensor data supports the report we say "No physical evidence
-          detected", never "did not happen". Always shows the limitations
-          list so readers can calibrate coverage gaps themselves. */}
-      {showEvidenceBlock &&
-        (s.physical_evidence ? (
-          <PhysicalEvidenceBlock pe={s.physical_evidence} />
-        ) : (
-          <LegacyEvidenceBlock
-            hasUsgs={!!s.has_usgs_confirmation}
-            hasSatellite={!!s.has_satellite_confirmation}
-          />
-        ))}
-
-      <div className="mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-white/55 sm:gap-x-3 sm:text-[12px]">
-        <span>
-          Sources <strong className="text-white/80">{s.source_count}</strong>
-        </span>
-        <span aria-hidden="true">·</span>
-        <span>
-          Credible <strong className="text-white/80">{s.credible_source_count}</strong>
-        </span>
-        <span aria-hidden="true">·</span>
-        <span>
-          Confidence <strong className="text-white/80">{confLabel}</strong>
-        </span>
-        <span aria-hidden="true">·</span>
-        <span>{relativeTime(s.occurred_at ?? s.first_seen_at)}</span>
+        </div>
       </div>
     </Link>
   );
 }
 
-function reliabilityDotClass(label: ReliabilityPublicLabel): string {
-  switch (label) {
-    case 'LIKELY_ACCURATE':
+function bandDotClass(band: ConfidenceBand): string {
+  switch (band) {
+    case 'high':
       return 'bg-brand-500';
-    case 'UNCLEAR':
-      return 'bg-warn-500';
-    case 'LIKELY_UNRELIABLE':
+    case 'medium':
+      return 'bg-amber-500';
+    case 'contested':
       return 'bg-danger-500';
+    case 'low':
+      return 'bg-ink-300';
+  }
+}
+
+function bandCalloutClass(band: ConfidenceBand): string {
+  switch (band) {
+    case 'high':
+      return 'border-brand-200 bg-brand-50/70';
+    case 'medium':
+      return 'border-amber-200 bg-amber-50/80';
+    case 'contested':
+      return 'border-danger-200 bg-danger-50';
+    case 'low':
+      return 'border-ink-100 bg-canvas-50';
   }
 }
 
@@ -231,108 +253,38 @@ function PhysicalEvidenceBlock({ pe }: { pe: PhysicalEvidence }) {
         : 'None detected';
   const statusTone =
     pe.status === 'confirmed'
-      ? 'text-brand-300'
+      ? 'text-brand-600'
       : pe.status === 'partial'
-        ? 'text-warn-400'
-        : 'text-white/55';
+        ? 'text-amber-600'
+        : 'text-ink-400';
   return (
-    <div className="mt-3 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">
+    <div className="mt-3 rounded-xl border border-ink-100 bg-canvas-50 px-3 py-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-white/55">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">
           Physical evidence
         </p>
-        <p className="text-[11px] font-mono text-white/55">
-          <span className={statusTone}>{statusLabelText}</span>
-          <span className="text-white/40"> · confidence {pe.confidence}/100</span>
-        </p>
+        <p className={`text-[11px] font-semibold ${statusTone}`}>{statusLabelText}</p>
       </div>
       <ul className="mt-1.5 space-y-0.5 text-[13px]">
         {pe.sources.length > 0 ? (
-          pe.sources.map((src, i) => (
-            <li key={i} className="text-white/85">
-              <span aria-hidden="true" className="mr-1.5 font-mono text-brand-300">
+          pe.sources.slice(0, 3).map((src, i) => (
+            <li key={i} className="text-ink-700">
+              <span aria-hidden="true" className="mr-1.5 text-brand-600">
                 ✓
               </span>
               {src}
             </li>
           ))
         ) : (
-          <li className="text-white/60">
-            <span aria-hidden="true" className="mr-1.5 font-mono text-white/40">
+          <li className="text-ink-500">
+            <span aria-hidden="true" className="mr-1.5 text-ink-300">
               ·
             </span>
             No physical evidence detected from available sensor networks.
           </li>
         )}
       </ul>
-      {pe.limitations.length > 0 && (
-        <p className="mt-2 clamp-2 text-[11px] text-white/50">
-          <span className="text-white/40">Limitations:</span> {pe.limitations.join(' · ')}
-        </p>
-      )}
     </div>
   );
 }
 
-/**
- * Fallback for signals ingested before Phase 5 added `physical_evidence` to
- * `raw_data`. Uses the Phase-4 boolean flags and preserves the wording rule
- * (absence → "No X detected", never "did not happen").
- */
-function LegacyEvidenceBlock({
-  hasUsgs,
-  hasSatellite,
-}: {
-  hasUsgs: boolean;
-  hasSatellite: boolean;
-}) {
-  return (
-    <div className="mt-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-white/55">
-        Physical evidence
-      </p>
-      <ul className="mt-1 space-y-0.5 text-[13px]">
-        <li className={hasUsgs ? 'text-white/85' : 'text-white/55'}>
-          <span
-            aria-hidden="true"
-            className={`mr-1.5 font-mono ${hasUsgs ? 'text-brand-300' : 'text-white/35'}`}
-          >
-            {hasUsgs ? '✓' : '·'}
-          </span>
-          {hasUsgs ? 'USGS seismic confirmation' : 'No seismic confirmation detected (USGS)'}
-        </li>
-        <li className={hasSatellite ? 'text-white/85' : 'text-white/55'}>
-          <span
-            aria-hidden="true"
-            className={`mr-1.5 font-mono ${hasSatellite ? 'text-brand-300' : 'text-white/35'}`}
-          >
-            {hasSatellite ? '✓' : '·'}
-          </span>
-          {hasSatellite
-            ? 'Satellite confirmation (NASA EONET)'
-            : 'No satellite confirmation detected'}
-        </li>
-      </ul>
-    </div>
-  );
-}
-
-function confidenceLabel(n: number): string {
-  if (n >= 75) return 'high';
-  if (n >= 45) return 'medium';
-  return 'low';
-}
-
-function relativeTime(iso: string): string {
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return '';
-  const diff = Date.now() - t;
-  const mins = Math.round(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  if (days < 14) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
-}

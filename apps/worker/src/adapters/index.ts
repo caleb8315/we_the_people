@@ -9,6 +9,9 @@ import { YahooFinanceAdapter } from './yahoo-finance';
 import { GdeltAdapter } from './gdelt';
 import { SwpcAlertsAdapter } from './swpc-alerts';
 import { CisaKevAdapter } from './cisa-kev';
+import { RedditAdapter } from './reddit';
+import { BlueskyAdapter } from './bluesky';
+import { MastodonAdapter } from './mastodon';
 import { supabase } from '../lib/supabase';
 
 /**
@@ -42,6 +45,13 @@ export async function loadAdapters(): Promise<Adapter[]> {
   if (enabledIds.has('gdelt-doc')) adapters.push(new GdeltAdapter());
   if (enabledIds.has('swpc-alerts')) adapters.push(new SwpcAlertsAdapter());
   if (enabledIds.has('cisa-kev')) adapters.push(new CisaKevAdapter());
+  // Phase 4 — free-tier social Tier-B sources. Social evidence never
+  // anchors high confidence on its own; the ConfidenceReport + decide
+  // verification logic continue to enforce the credible-source
+  // requirement for `HIGH` bands.
+  if (enabledIds.has('reddit-public')) adapters.push(new RedditAdapter());
+  if (enabledIds.has('bluesky-public')) adapters.push(new BlueskyAdapter());
+  if (enabledIds.has('mastodon-public')) adapters.push(new MastodonAdapter());
 
   return adapters;
 }

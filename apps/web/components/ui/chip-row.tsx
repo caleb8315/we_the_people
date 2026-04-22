@@ -26,10 +26,10 @@ export function ChipRow({
       <div className="no-scrollbar flex flex-1 items-center gap-2 overflow-x-auto">
         {options.map((opt) => {
           const isActive = opt.value === active;
-          const cls = `shrink-0 rounded-full border px-3 py-1 text-xs capitalize transition ${
+          const cls = `shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium capitalize transition ${
             isActive
-              ? 'border-brand-500/40 bg-brand-500/15 text-brand-200'
-              : 'border-white/10 bg-white/[0.03] text-white/65 hover:border-white/25 hover:text-white'
+              ? 'border-ink-900 bg-ink-900 text-white shadow-sm'
+              : 'border-ink-100 bg-paper text-ink-500 hover:border-ink-200 hover:text-ink'
           }`;
           if (opt.href) {
             return (
@@ -49,7 +49,7 @@ export function ChipRow({
         <button
           type="button"
           onClick={onClear}
-          className="shrink-0 rounded-full border border-white/10 px-3 py-1 text-xs text-white/60 hover:text-white"
+          className="shrink-0 rounded-full border border-ink-100 bg-paper px-3 py-1.5 text-xs text-ink-500 hover:text-ink"
         >
           {clearLabel}
         </button>

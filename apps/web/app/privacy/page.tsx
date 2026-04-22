@@ -2,7 +2,7 @@ export const metadata = { title: 'Privacy · Crosscheck' };
 
 export default function PrivacyPage() {
   return (
-    <article className="prose-osint max-w-3xl space-y-6 text-white/80">
+    <article className="prose-osint max-w-3xl space-y-6 text-ink-600">
       <header>
         <h1 className="text-3xl font-semibold tracking-tight">Privacy</h1>
       </header>

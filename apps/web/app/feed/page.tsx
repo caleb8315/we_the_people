@@ -19,6 +19,15 @@ const VIEWS = ['list', 'map'] as const;
 type FeedMode = (typeof MODES)[number];
 type FeedView = (typeof VIEWS)[number];
 
+interface SavedViewRow {
+  id: string;
+  name: string;
+  context: string;
+  view_mode: string;
+  filters: Record<string, unknown> | null;
+  updated_at: string;
+}
+
 export default async function FeedPage({
   searchParams,
 }: {
@@ -36,15 +45,21 @@ export default async function FeedPage({
   const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent);
   const { data: auth } = await sb.auth.getUser();
   const userId = auth.user?.id ?? null;
+  const userName = (() => {
+    const meta = (auth.user?.user_metadata ?? {}) as Record<string, unknown>;
+    if (typeof meta.full_name === 'string' && meta.full_name) return meta.full_name as string;
+    if (typeof meta.name === 'string' && meta.name) return meta.name as string;
+    return auth.user?.email?.split('@')[0] ?? null;
+  })();
 
   const [{ data: prefs }, { data: savedViews }] = await Promise.all([
     userId
-    ? await sb
-        .from('preferences')
-        .select('topics, muted_sources, muted_topics, countries_of_focus, feed_mode_preference, feed_view_preference')
-        .eq('user_id', userId)
-        .maybeSingle()
-    : Promise.resolve({ data: null }),
+      ? await sb
+          .from('preferences')
+          .select('topics, muted_sources, muted_topics, countries_of_focus, feed_mode_preference, feed_view_preference')
+          .eq('user_id', userId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
     userId
       ? sb
           .from('user_saved_views')
@@ -128,7 +143,10 @@ export default async function FeedPage({
     void logProductEvent(sb, {
       userId,
       eventName: 'feed_scrolled_depth',
-      eventProps: { context: 'feed', depth_bucket: signals.length >= 25 ? 'deep' : signals.length >= 10 ? 'mid' : 'shallow' },
+      eventProps: {
+        context: 'feed',
+        depth_bucket: signals.length >= 25 ? 'deep' : signals.length >= 10 ? 'mid' : 'shallow',
+      },
     });
   }
 
@@ -137,31 +155,118 @@ export default async function FeedPage({
   const severityStops = [0, 60, 75, 85] as const;
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-3 sm:gap-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Live feed</h1>
-            <p className="mt-1 text-sm text-white/60">
-              {mode === 'personalized'
-                ? `Your personalized queue for the past ${hours}h.`
-                : `Global queue ranked by severity for the past ${hours}h.`}
-            </p>
-            {!userId && (
-              <p className="mt-1 text-xs text-white/45">
-                Public view: this feed is not connected to any user profile.
-              </p>
-            )}
-          </div>
+    <div className="space-y-8">
+      {/* Greeting hero — mirrors the reference "let's go trip to africa" header. */}
+      <section>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">
+          {userName ? `Hello, ${userName}` : 'Live coverage'}
+        </p>
+        <h1 className="mt-2 max-w-2xl text-[34px] font-semibold leading-[1.1] tracking-tight text-ink sm:text-[44px]">
+          what&apos;s moving
+          <br />
+          <span className="text-ink-500">the world right now.</span>
+        </h1>
 
+        {/* Search + filter button. The amber square on the right matches the
+            reference's filter affordance. */}
+        <form action="/feed" className="mt-6 flex max-w-xl items-center gap-3">
+          <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-ink-100 bg-paper px-4 py-3 shadow-card">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-4 w-4 shrink-0 text-ink-400"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <input
+              name="topic"
+              type="search"
+              defaultValue={topic !== 'all' ? topic : ''}
+              placeholder="Search topics, countries, outlets"
+              className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-ink-400 focus:outline-none"
+            />
+            <input type="hidden" name="hours" value={String(hours)} />
+            <input type="hidden" name="view" value={view} />
+            <input type="hidden" name="mode" value={mode} />
+          </label>
+          <button
+            type="submit"
+            aria-label="Apply search"
+            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-[0_8px_20px_-6px_rgba(245,158,11,0.55)] hover:bg-amber-600"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="4" y1="6" x2="20" y2="6" />
+              <line x1="7" y1="12" x2="17" y2="12" />
+              <line x1="10" y1="18" x2="14" y2="18" />
+            </svg>
+          </button>
+        </form>
+      </section>
+
+      {/* Topic browser row. */}
+      <section>
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight text-ink sm:text-xl">Topics</h2>
+            <p className="mt-0.5 text-sm text-ink-500">
+              Filter the feed by the category you care about.
+            </p>
+          </div>
+          {topic !== 'all' && (
+            <Link
+              href={qp(mode, 'all')}
+              className="text-sm font-semibold text-amber-600 hover:text-amber-700"
+            >
+              Clear
+            </Link>
+          )}
+        </div>
+        <div className="mt-3">
+          <ChipRow
+            active={topic}
+            options={TOPICS.map((t) => ({ label: t, value: t, href: qp(mode, t) }))}
+            onClear={undefined}
+          />
+        </div>
+      </section>
+
+      {/* Results header — mode / view / severity + count summary. */}
+      <section>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight text-ink sm:text-xl">
+              {mode === 'personalized' ? 'Your feed' : 'Global feed'}
+            </h2>
+            <p className="mt-0.5 text-sm text-ink-500">
+              <strong className="text-ink-700">{signals.length}</strong> signal
+              {signals.length === 1 ? '' : 's'} · past {hours}h
+              {topic !== 'all' && <> · topic: {topic}</>}
+              {minSeverity > 0 && <> · severity {minSeverity}+</>}
+            </p>
+          </div>
           {userId && (
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
+            <div className="flex flex-wrap gap-2">
               <Segmented
                 ariaLabel="Feed mode"
                 active={mode}
                 options={[
                   { label: 'My feed', value: 'personalized', href: qp('personalized', topic) },
-                  { label: 'Global feed', value: 'global', href: qp('global', topic) },
+                  { label: 'Global', value: 'global', href: qp('global', topic) },
                 ]}
               />
               <Segmented
@@ -176,36 +281,42 @@ export default async function FeedPage({
           )}
         </div>
 
-        <ChipRow
-          active={topic}
-          options={TOPICS.map((t) => ({ label: t, value: t, href: qp(mode, t) }))}
-          onClear={undefined}
-        />
+        <div className="mt-3 flex flex-wrap gap-2">
+          {severityStops.map((sev) => (
+            <a
+              key={sev}
+              href={qp(mode, topic, view, sev)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                sev === minSeverity
+                  ? 'border-ink-900 bg-ink-900 text-white'
+                  : 'border-ink-100 bg-paper text-ink-500 hover:border-ink-200 hover:text-ink'
+              }`}
+            >
+              {sev === 0 ? 'All severities' : `Severity ${sev}+`}
+            </a>
+          ))}
+        </div>
 
-        {userId && (
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-white/55">Saved views:</span>
-            {(savedViews ?? []).length === 0 ? (
-              <span className="text-white/45">none yet</span>
-            ) : (
-              (savedViews ?? []).map((sv: any) => {
-                const f = (sv.filters ?? {}) as Record<string, unknown>;
-                const savedTopic = typeof f.topic === 'string' ? f.topic : 'all';
-                const savedMode = typeof f.mode === 'string' ? f.mode : mode;
-                const savedHours = Number(f.hours ?? hours);
-                const savedMinSev = Number(f.min_severity ?? 0);
-                const href = `/feed?mode=${savedMode}&topic=${savedTopic}&hours=${savedHours}&view=${sv.view_mode}&min_severity=${savedMinSev}`;
-                return (
-                  <Link
-                    key={sv.id}
-                    href={href}
-                    className="rounded-full border border-white/15 px-2.5 py-1 text-white/70 hover:border-white/30 hover:text-white"
-                  >
-                    {sv.name}
-                  </Link>
-                );
-              })
-            )}
+        {userId && (savedViews ?? []).length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-500">
+            <span>Saved views:</span>
+            {(savedViews ?? []).map((sv: SavedViewRow) => {
+              const f = (sv.filters ?? {}) as Record<string, unknown>;
+              const savedTopic = typeof f.topic === 'string' ? f.topic : 'all';
+              const savedMode = typeof f.mode === 'string' ? f.mode : mode;
+              const savedHours = Number(f.hours ?? hours);
+              const savedMinSev = Number(f.min_severity ?? 0);
+              const href = `/feed?mode=${savedMode}&topic=${savedTopic}&hours=${savedHours}&view=${sv.view_mode}&min_severity=${savedMinSev}`;
+              return (
+                <Link
+                  key={sv.id}
+                  href={href}
+                  className="rounded-full border border-ink-100 bg-paper px-2.5 py-1 text-ink-600 hover:border-ink-200 hover:text-ink"
+                >
+                  {sv.name}
+                </Link>
+              );
+            })}
             <SaveViewButton
               view={view}
               payload={{
@@ -217,48 +328,9 @@ export default async function FeedPage({
             />
           </div>
         )}
+      </section>
 
-        <div className="flex flex-wrap gap-2">
-          {severityStops.map((sev) => (
-            <a
-              key={sev}
-              href={qp(mode, topic, view, sev)}
-              className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                sev === minSeverity
-                  ? 'border-brand-500/40 bg-brand-500/15 text-brand-200'
-                  : 'border-white/10 text-white/65 hover:border-white/25 hover:text-white'
-              }`}
-            >
-              {sev === 0 ? 'All severities' : `Severity ${sev}+`}
-            </a>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/55">
-          <span>
-            Showing <strong className="text-white/80">{signals.length}</strong> signal
-            {signals.length === 1 ? '' : 's'}
-          </span>
-          <span aria-hidden="true">·</span>
-          <span>past {hours}h</span>
-          <span aria-hidden="true">·</span>
-          <span>view: {view}</span>
-          {minSeverity > 0 && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span>sev {minSeverity}+</span>
-            </>
-          )}
-          {topic !== 'all' && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span>topic: {topic}</span>
-            </>
-          )}
-        </div>
-      </header>
-
-      {error && <p className="text-sm text-danger-400">Error: {error.message}</p>}
+      {error && <p className="text-sm text-danger-600">Error: {error.message}</p>}
 
       {signals.length === 0 ? (
         <EmptyState
@@ -283,15 +355,16 @@ export default async function FeedPage({
             mapHeightClass="h-[42vh] min-h-[260px] sm:h-[52vh] sm:min-h-[360px]"
             emptyMessage="No mappable signals in this filter window yet."
           />
-          <div className="rounded-card border border-white/10 bg-white/[0.03] p-3 text-xs text-white/60">
-            Tip: markers without exact coordinates are placed at country centroids and labeled as approximate.
+          <div className="rounded-card border border-ink-100 bg-paper p-3 text-xs text-ink-500 shadow-card">
+            Tip: markers without exact coordinates are placed at country centroids and labeled as
+            approximate.
           </div>
         </div>
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-4">
           {signals.map((s) => (
             <li key={s.id}>
-              <SignalCard s={s as any} />
+              <SignalCard s={s} />
             </li>
           ))}
         </ul>
@@ -330,11 +403,10 @@ function SaveViewButton({
       <input type="hidden" name="filters" value={JSON.stringify(payload)} />
       <button
         type="submit"
-        className="rounded-full border border-brand-500/40 bg-brand-500/10 px-2.5 py-1 text-brand-200 hover:bg-brand-500/20"
+        className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 font-medium text-amber-700 hover:bg-amber-100"
       >
         Save current view
       </button>
     </form>
   );
 }
-

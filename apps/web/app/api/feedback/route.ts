@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { getClientKey, limit } from '@/lib/rate-limit';
+import { logProductEvent } from '@/lib/product-events';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -30,6 +31,21 @@ export async function POST(req: Request) {
 
   const { error } = await sb.from('feedback').insert({ user_id: auth.user.id, ...parsed.data });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Phase 5 — KPI instrumentation (helpful %, quality signal).
+  try {
+    await logProductEvent(sb, {
+      userId: auth.user.id,
+      eventName: 'signal_feedback_sent',
+      eventProps: {
+        signal_id: parsed.data.signal_id ?? null,
+        briefing_id: parsed.data.briefing_id ?? null,
+        kind: parsed.data.kind,
+      },
+    });
+  } catch {
+    // telemetry is best-effort
+  }
 
   return NextResponse.json({ ok: true });
 }

@@ -1,5 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { PhysicalEvidence } from '@osint/core';
+import {
+  buildConfidenceReport,
+  type ConfidenceReport,
+  type EvidenceItem,
+  type PhysicalEvidence,
+  type VerificationStatus,
+} from '@osint/core';
 import type { ContradictionInline } from './contradictions-display';
 
 export interface SignalRowRaw {
@@ -55,6 +61,11 @@ export interface DecoratedSignal extends SignalRowRaw {
    */
   has_usgs_confirmation: boolean;
   has_satellite_confirmation: boolean;
+  /**
+   * Unified confidence contract (Phase 0). Every UI surface consumes this —
+   * never re-derives bands / bullets / source trace from the raw columns.
+   */
+  confidence_report: ConfidenceReport;
 }
 
 const INLINE_CONTRADICTIONS_PER_SIGNAL = 3;
@@ -95,6 +106,12 @@ function readPhysicalEvidence(
  *
  * Safe to call as the authed user or service role; the `contradictions`
  * table is public-readable, so either works.
+ *
+ * Phase 0: we also fetch the top `TRACE_EVIDENCE_PER_SIGNAL` evidence rows
+ * per signal so `buildConfidenceReport` can produce a real `source_trace`
+ * without the caller having to run a second query. When the feed renders
+ * many signals we keep the fetch bounded — the detail page always has the
+ * full evidence list available via its own query.
  */
 export async function decorateSignals(
   sb: SupabaseClient,
@@ -107,14 +124,31 @@ export async function decorateSignals(
   // Phase 4 — the signal card needs contradictions visible without a click,
   // so we fetch the full contract columns (type / severity / summary /
   // metadata) up front and carry a trimmed inline array per signal.
-  const { data: contradictionRows } = await sb
-    .from('contradictions')
-    .select('signal_id, type, severity, summary, metadata, created_at')
-    .in('signal_id', ids)
-    .order('created_at', { ascending: true });
+  const [{ data: contradictionRows }, { data: evidenceRows }] = await Promise.all([
+    sb
+      .from('contradictions')
+      .select('signal_id, type, severity, summary, metadata, evidence_ids, created_at')
+      .in('signal_id', ids)
+      .order('created_at', { ascending: true }),
+    sb
+      .from('evidence')
+      .select('signal_id, source_id, url, domain, title, published_at, is_credible, excerpt')
+      .in('signal_id', ids)
+      .order('published_at', { ascending: false }),
+  ]);
 
   const counts = new Map<string, number>();
   const inline = new Map<string, ContradictionInline[]>();
+  const contradictionsBySignal = new Map<
+    string,
+    Array<{
+      type: string | null;
+      severity: string | null;
+      summary: string | null;
+      metadata: Record<string, unknown> | null;
+      evidence_ids: string[];
+    }>
+  >();
   for (const row of contradictionRows ?? []) {
     const r = row as {
       signal_id: string;
@@ -122,6 +156,7 @@ export async function decorateSignals(
       severity: string | null;
       summary: string | null;
       metadata: Record<string, unknown> | null;
+      evidence_ids: string[] | null;
     };
     counts.set(r.signal_id, (counts.get(r.signal_id) ?? 0) + 1);
     const bucket = inline.get(r.signal_id) ?? [];
@@ -134,24 +169,90 @@ export async function decorateSignals(
       });
       inline.set(r.signal_id, bucket);
     }
+    const full = contradictionsBySignal.get(r.signal_id) ?? [];
+    full.push({
+      type: r.type,
+      severity: r.severity,
+      summary: r.summary,
+      metadata: r.metadata,
+      evidence_ids: Array.isArray(r.evidence_ids) ? r.evidence_ids : [],
+    });
+    contradictionsBySignal.set(r.signal_id, full);
+  }
+
+  const evidenceBySignal = new Map<string, EvidenceItem[]>();
+  for (const row of evidenceRows ?? []) {
+    const r = row as {
+      signal_id: string;
+      source_id: string | null;
+      url: string;
+      domain: string;
+      title: string | null;
+      published_at: string | null;
+      is_credible: boolean | null;
+      excerpt: string | null;
+    };
+    const bucket = evidenceBySignal.get(r.signal_id) ?? [];
+    if (bucket.length < TRACE_EVIDENCE_PER_SIGNAL) {
+      bucket.push({
+        source_id: r.source_id,
+        url: r.url,
+        domain: r.domain,
+        title: r.title,
+        published_at: r.published_at,
+        is_credible: Boolean(r.is_credible),
+        excerpt: r.excerpt,
+      });
+      evidenceBySignal.set(r.signal_id, bucket);
+    }
   }
 
   const newSinceTs = opts.newSince ? Date.parse(opts.newSince) : 0;
 
   return signals.map((s) => {
     const count = counts.get(s.id) ?? 0;
+    const physical_evidence = readPhysicalEvidence(s.raw_data ?? null);
+    const contradictionsForReport = (contradictionsBySignal.get(s.id) ?? []).map((c) => ({
+      type: (c.type ?? 'cause_conflict') as
+        | 'cause_conflict'
+        | 'numeric_conflict'
+        | 'presence_conflict',
+      severity: (c.severity ?? 'medium') as 'low' | 'medium' | 'high',
+      summary: c.summary ?? '',
+      metadata: c.metadata ?? {},
+      evidence_ids: c.evidence_ids ?? [],
+    }));
+    const isComplex = Array.isArray(s.tags) && s.tags.includes('complex_signal');
+    const confidence_report = buildConfidenceReport({
+      verification_status: s.verification_status as VerificationStatus,
+      reliability_score: s.reliability_score ?? null,
+      reliability_label: (s.reliability_label as
+        | 'LIKELY_ACCURATE'
+        | 'UNCLEAR'
+        | 'LIKELY_UNRELIABLE'
+        | null) ?? null,
+      evidence: evidenceBySignal.get(s.id) ?? [],
+      contradictions: contradictionsForReport,
+      physical_evidence,
+      source_count: s.source_count ?? 0,
+      credible_source_count: s.credible_source_count ?? 0,
+      complex_signal: isComplex,
+    });
     return {
       ...s,
       contradictions_count: count,
       contradictions_inline: inline.get(s.id) ?? [],
       is_disputed: count > 0,
       is_new_since: newSinceTs > 0 && Date.parse(s.first_seen_at) > newSinceTs,
-      physical_evidence: readPhysicalEvidence(s.raw_data ?? null),
+      physical_evidence,
       has_usgs_confirmation: readBoolFlag(s.raw_data ?? null, 'usgs_match'),
       has_satellite_confirmation: readBoolFlag(s.raw_data ?? null, 'eonet_match'),
+      confidence_report,
     };
   });
 }
+
+const TRACE_EVIDENCE_PER_SIGNAL = 8;
 
 export interface PreferenceFilter {
   topics?: string[] | null;

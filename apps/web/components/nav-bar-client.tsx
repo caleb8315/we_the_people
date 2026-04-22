@@ -4,35 +4,63 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { SignOutButton } from './signout-button';
 
-export function NavBarClient({ signedIn }: { signedIn: boolean }) {
+/**
+ * Light-theme navigation bar (April 2026 redesign).
+ *
+ * Mobile: minimal header — amber logo tile, greeting + location, avatar.
+ * Desktop (sm+): same row, plus a horizontal pill nav centered between
+ * the greeting and the avatar.
+ *
+ * Global bottom pill nav handles the primary navigation on mobile.
+ */
+
+export function NavBarClient({
+  signedIn,
+  displayName,
+}: {
+  signedIn: boolean;
+  displayName: string | null;
+}) {
   const pathname = usePathname();
 
-  const links = signedIn
-    ? [
-        { href: '/dashboard', label: 'Dashboard' },
-        { href: '/feed', label: 'Feed' },
-        { href: '/briefings', label: 'Briefings' },
-      ]
-    : [
-        { href: '/feed', label: 'Feed' },
-        { href: '/briefings', label: 'Briefings' },
-      ];
+  const links = [
+    { href: '/feed', label: 'Feed' },
+    { href: '/verify', label: 'Verify' },
+    { href: '/briefings', label: 'Briefings' },
+    ...(signedIn ? [{ href: '/dashboard', label: 'Dashboard' }] : []),
+  ];
+
+  const greeting = displayName ? `Hello, ${displayName}` : 'Hello there';
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-base-900/80 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:gap-6 sm:px-5 sm:py-3.5">
-        <Link href="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+    <header className="sticky top-0 z-40 border-b border-ink-100/70 bg-canvas/85 backdrop-blur">
+      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:gap-6 sm:px-6 sm:py-4">
+        {/* Amber logo tile — mirrors the reference's square app icon. */}
+        <Link href="/" className="group flex items-center gap-3">
           <span
             aria-hidden="true"
-            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-[11px] font-bold text-black"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500 text-base font-bold text-white shadow-sm"
           >
             ✓
           </span>
-          <span>
-            Crosscheck
+          <span className="hidden flex-col leading-tight sm:flex">
+            <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-ink-400">
+              {greeting}
+            </span>
+            <span className="text-sm font-semibold text-ink">Crosscheck</span>
           </span>
         </Link>
-        <nav className="hidden flex-1 items-center gap-1 text-sm md:flex">
+
+        {/* Mobile: compact greeting stack */}
+        <div className="flex min-w-0 flex-col leading-tight sm:hidden">
+          <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-ink-400">
+            {greeting}
+          </span>
+          <span className="truncate text-[13px] font-semibold text-ink">Live coverage feed</span>
+        </div>
+
+        {/* Desktop pill nav */}
+        <nav className="ml-auto hidden items-center gap-1 rounded-full border border-ink-100 bg-paper/70 p-1 shadow-sm md:flex">
           {links.map((l) => {
             const isActive = pathname === l.href || (l.href !== '/' && pathname.startsWith(l.href));
             return (
@@ -40,55 +68,40 @@ export function NavBarClient({ signedIn }: { signedIn: boolean }) {
                 key={l.href}
                 href={l.href}
                 aria-current={isActive ? 'page' : undefined}
-                className={`relative rounded-full px-3 py-1.5 transition ${
-                  isActive ? 'text-white' : 'text-white/65 hover:text-white'
+                className={`rounded-full px-4 py-1.5 text-sm transition ${
+                  isActive
+                    ? 'bg-ink-900 text-white shadow-sm'
+                    : 'text-ink-500 hover:bg-ink-100 hover:text-ink'
                 }`}
               >
                 {l.label}
-                {isActive && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute inset-x-3 -bottom-[14px] h-[2px] rounded-full bg-brand-500"
-                  />
-                )}
               </Link>
             );
           })}
         </nav>
-        <div className="ml-auto hidden items-center gap-2 text-sm md:flex">
+
+        <div className="ml-auto flex items-center gap-2 md:ml-0">
           {signedIn ? (
             <>
               <Link
                 href="/settings"
-                className="rounded-full border border-white/10 px-3 py-1.5 text-white/75 hover:border-white/25 hover:text-white"
+                aria-label="Account settings"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-ink-100 bg-paper text-ink-500 hover:border-ink-200 hover:text-ink"
               >
-                Settings
+                <span className="text-sm font-semibold">
+                  {(displayName ?? '?').slice(0, 1).toUpperCase()}
+                </span>
               </Link>
-              <SignOutButton />
+              <span className="hidden md:inline">
+                <SignOutButton />
+              </span>
             </>
           ) : (
             <Link
               href="/login"
-              className="rounded-full bg-white px-4 py-1.5 text-sm font-medium text-black hover:bg-white/90"
+              className="rounded-full bg-ink-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-ink-700"
             >
               Sign in
-            </Link>
-          )}
-        </div>
-        <div className="ml-auto flex items-center gap-2 md:hidden">
-          {!signedIn ? (
-            <Link
-              href="/login"
-              className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-black hover:bg-white/90"
-            >
-              Sign in
-            </Link>
-          ) : (
-            <Link
-              href="/settings"
-              className="rounded-full border border-white/15 px-2.5 py-1.5 text-xs text-white/80 hover:bg-white/10"
-            >
-              Settings
             </Link>
           )}
         </div>

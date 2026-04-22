@@ -1,0 +1,26 @@
+import { VerifyClient } from './verify-client';
+
+export const metadata = { title: 'Verify · Crosscheck' };
+
+export default function VerifyPage() {
+  return (
+    <div className="space-y-8">
+      <header>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">
+          Verification
+        </p>
+        <h1 className="mt-2 max-w-2xl text-[34px] font-semibold leading-[1.1] tracking-tight text-ink sm:text-[44px]">
+          Check a claim,
+          <br />
+          <span className="text-ink-500">before you share it.</span>
+        </h1>
+        <p className="mt-4 max-w-2xl text-sm text-ink-500 sm:text-base">
+          Paste a URL or claim. You&rsquo;ll get a confidence band, a plain-language explanation,
+          and the sources we checked. Social posts cap at{' '}
+          <strong className="text-ink-700">medium</strong> on their own.
+        </p>
+      </header>
+      <VerifyClient />
+    </div>
+  );
+}

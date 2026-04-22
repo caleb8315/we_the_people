@@ -226,6 +226,25 @@ export function SettingsForm({
     window.location.href = '/login';
   }
 
+  async function deleteAccount() {
+    const confirmed = window.confirm(
+      'Delete your Crosscheck account? This removes your profile, preferences, saved views, feedback, and AI chat history. It cannot be undone.',
+    );
+    if (!confirmed) return;
+    setAccountStatus('Deleting account…');
+    try {
+      const res = await fetch('/api/account/delete', { method: 'POST' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setAccountStatus(body?.error ?? 'Could not delete account. Try again later or contact support.');
+        return;
+      }
+      window.location.href = '/?deleted=1';
+    } catch {
+      setAccountStatus('Could not reach the server. Try again.');
+    }
+  }
+
   return (
     <div className="space-y-8 pb-28">
       <Section title="Topics I care about">
@@ -253,7 +272,7 @@ export function SettingsForm({
 
       <Section title="Countries of focus (ISO 2-letter, comma-separated)">
         <input
-          className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-brand-500/50"
+          className="w-full rounded-md border border-ink-100 bg-canvas-50 px-3 py-2 text-sm outline-none focus:border-brand-300"
           value={countries}
           onChange={(e) => setCountries(e.target.value)}
           placeholder="US, UA, RU, IL"
@@ -264,7 +283,7 @@ export function SettingsForm({
         <div className="space-y-4">
           {SOURCE_GROUP_ORDER.filter((k) => groupedSources.has(k)).map((group) => (
             <div key={group}>
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/55">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-500">
                 {SOURCE_GROUP_LABELS[group]}
               </p>
               <ul className="grid gap-2 sm:grid-cols-2">
@@ -281,13 +300,13 @@ export function SettingsForm({
                         }
                         className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${
                           isMuted
-                            ? 'border-danger-500/30 bg-danger-500/10 text-danger-400'
-                            : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'
+                            ? 'border-danger-200 bg-danger-50 text-danger-600'
+                            : 'border-ink-100 bg-paper hover:bg-canvas-50'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-medium clamp-1">{s.name}</span>
-                          <span className="text-[11px] text-white/55">
+                          <span className="text-[11px] text-ink-500">
                             {isMuted ? 'muted' : `cred ${s.credibility}`}
                           </span>
                         </div>
@@ -329,11 +348,11 @@ export function SettingsForm({
           </Field>
 
           <div className="flex flex-wrap items-center gap-6">
-            <label className="flex items-center gap-2 text-sm text-white/85">
+            <label className="flex items-center gap-2 text-sm text-ink-700">
               <input type="checkbox" checked={email} onChange={(e) => setEmail(e.target.checked)} />
               Daily email briefing
             </label>
-            <label className="flex items-center gap-2 text-sm text-white/85">
+            <label className="flex items-center gap-2 text-sm text-ink-700">
               <input type="checkbox" checked={alerts} onChange={(e) => setAlerts(e.target.checked)} />
               Priority alerts
             </label>
@@ -378,7 +397,7 @@ export function SettingsForm({
       <Section title="Weather location">
         <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
           <input
-            className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-brand-500/50"
+            className="rounded-md border border-ink-100 bg-canvas-50 px-3 py-2 text-sm outline-none focus:border-brand-300"
             value={weatherLabel}
             onChange={(e) => setWeatherLabel(e.target.value)}
             placeholder="Denver, CO or 80202"
@@ -387,25 +406,25 @@ export function SettingsForm({
             type="button"
             onClick={geocodeNow}
             disabled={geocoding || !weatherLabel.trim()}
-            className="rounded-full border border-white/15 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-60"
+            className="rounded-full border border-ink-100 px-3 py-2 text-sm hover:bg-ink-100 disabled:opacity-60"
           >
             {geocoding ? 'Resolving…' : 'Auto-resolve'}
           </button>
         </div>
-        <p className="mt-2 text-xs text-white/50">
+        <p className="mt-2 text-xs text-ink-400">
           We convert this to coordinates automatically for weather signals.
           {weatherLat && weatherLon ? ` Current: ${weatherLat}, ${weatherLon}` : ''}
         </p>
       </Section>
 
       <Section title="Account">
-        <div className="space-y-3 rounded-card border border-white/10 bg-white/[0.03] p-4">
-          <p className="text-sm text-white/70">
-            Email: <span className="font-mono text-white/90">{account.email}</span>
+        <div className="space-y-3 rounded-card border border-ink-100 bg-paper p-4">
+          <p className="text-sm text-ink-600">
+            Email: <span className="font-mono text-ink-700">{account.email}</span>
           </p>
           <Field label="Display name">
             <input
-              className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-brand-500/50"
+              className="w-full rounded-md border border-ink-100 bg-canvas-50 px-3 py-2 text-sm outline-none focus:border-brand-300"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="Analyst Zero"
@@ -415,7 +434,7 @@ export function SettingsForm({
             <input
               type="password"
               minLength={8}
-              className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-brand-500/50"
+              className="w-full rounded-md border border-ink-100 bg-canvas-50 px-3 py-2 text-sm outline-none focus:border-brand-300"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="Minimum 8 characters"
@@ -425,38 +444,52 @@ export function SettingsForm({
             <button
               type="button"
               onClick={saveAccount}
-              className="rounded-full border border-white/15 px-3 py-2 text-sm hover:bg-white/10"
+              className="rounded-full border border-ink-100 px-3 py-2 text-sm hover:bg-ink-100"
             >
               Save account
             </button>
             <button
               type="button"
               onClick={signOut}
-              className="rounded-full border border-danger-500/30 px-3 py-2 text-sm text-danger-400 hover:bg-danger-500/10"
+              className="rounded-full border border-danger-200 px-3 py-2 text-sm text-danger-600 hover:bg-danger-50"
             >
               Sign out
             </button>
           </div>
-          {accountStatus && <p className="text-sm text-white/70">{accountStatus}</p>}
+          {accountStatus && <p className="text-sm text-ink-600">{accountStatus}</p>}
+        </div>
+        <div className="rounded-card border border-danger-200 bg-danger-50/50 p-4">
+          <h3 className="text-sm font-semibold text-danger-700">Delete account</h3>
+          <p className="mt-1 text-sm text-ink-600">
+            Removes your profile, preferences, saved views, feedback, and AI chat history.
+            This cannot be undone.
+          </p>
+          <button
+            type="button"
+            onClick={deleteAccount}
+            className="mt-3 rounded-full border border-danger-300 bg-white px-3 py-2 text-sm font-medium text-danger-700 hover:bg-danger-100"
+          >
+            Delete my account
+          </button>
         </div>
       </Section>
 
       <Section title="Trust & methodology">
-        <div className="rounded-card border border-white/10 bg-white/[0.03] p-4">
-          <p className="text-sm text-white/70">
+        <div className="rounded-card border border-ink-100 bg-paper p-4">
+          <p className="text-sm text-ink-600">
             Reliability labels, confidence bands, source-disagreement wording, and the legal boundaries we work
             within are documented here.
           </p>
-          <a href="/trust" className="mt-3 inline-block text-sm text-brand-300 underline">
+          <a href="/trust" className="mt-3 inline-block text-sm text-brand-700 underline">
             Open trust documentation
           </a>
         </div>
       </Section>
 
       {/* Sticky save bar */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-base-900/90 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-base-900/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3">
-          <p className="text-xs text-white/60">{status ?? 'Changes are saved to your account only.'}</p>
+          <p className="text-xs text-ink-500">{status ?? 'Changes are saved to your account only.'}</p>
           <button
             onClick={save}
             disabled={saving}
@@ -486,7 +519,7 @@ async function geocodeLocation(
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/60">{title}</h2>
+      <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-500">{title}</h2>
       {children}
     </section>
   );
@@ -494,10 +527,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <label className="block text-sm text-white/80">
-      <span className="mb-1 inline-block text-xs font-medium uppercase tracking-wide text-white/55">{label}</span>
+    <label className="block text-sm text-ink-600">
+      <span className="mb-1 inline-block text-xs font-medium uppercase tracking-wide text-ink-500">{label}</span>
       {children}
-      {hint && <p className="mt-1 text-xs text-white/50">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-ink-400">{hint}</p>}
     </label>
   );
 }
@@ -520,11 +553,11 @@ function ChipGroup({
         const activeClass =
           tone === 'danger'
             ? on
-              ? 'border-danger-500/40 bg-danger-500/15 text-danger-400'
-              : 'border-white/10 text-white/65 hover:border-white/25 hover:text-white'
+              ? 'border-danger-200 bg-danger-50 text-danger-600'
+              : 'border-ink-100 text-ink-600 hover:border-ink-200 hover:text-ink'
             : on
-              ? 'border-brand-500/40 bg-brand-500/15 text-brand-200'
-              : 'border-white/10 text-white/65 hover:border-white/25 hover:text-white';
+              ? 'border-brand-200 bg-brand-50 text-brand-700'
+              : 'border-ink-100 text-ink-600 hover:border-ink-200 hover:text-ink';
         return (
           <button
             key={t}

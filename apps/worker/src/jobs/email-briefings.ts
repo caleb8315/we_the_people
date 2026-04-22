@@ -82,7 +82,9 @@ export async function runEmailBriefings(): Promise<{ sent: number; failed: numbe
 
     const { data: signals } = await sb
       .from('signals')
-      .select('title, topic, severity, verification_status, url')
+      .select(
+        'title, topic, severity, verification_status, url, source_count, credible_source_count, distinct_domains, last_enriched_at',
+      )
       .in('verification_status', ['verified', 'developing'])
       .in('topic', pref.topics ?? ['war', 'economy', 'climate'])
       .order('severity', { ascending: false })
@@ -150,18 +152,43 @@ function buildUserBriefingHtml(input: {
   headline: string;
   body: string;
   focusTopics: string[];
-  signals: Array<{ title: string; topic: string; severity: number; verification_status: string; url?: string | null }>;
+  signals: Array<{
+    title: string;
+    topic: string;
+    severity: number;
+    verification_status: string;
+    url?: string | null;
+    source_count?: number | null;
+    credible_source_count?: number | null;
+    distinct_domains?: string[] | null;
+    last_enriched_at?: string | null;
+  }>;
   weather?: string | null;
 }) {
   const focus = input.focusTopics.length ? input.focusTopics.join(', ') : 'global';
   const cards = input.signals
-    .map(
-      (s) =>
-        `<li><strong>[${escapeHtml(String(s.topic ?? 'other'))}]</strong> ${escapeHtml(s.title)} ` +
-        `(sev ${s.severity}, reliability: ${escapeHtml(statusLabel(s.verification_status as VerificationStatus))})` +
-        (s.url ? ` — <a href="${escapeHtml(String(s.url))}">source</a>` : '') +
-        `</li>`,
-    )
+    .map((s) => {
+      const total = s.source_count ?? 0;
+      const credible = s.credible_source_count ?? 0;
+      const domains = (s.distinct_domains ?? []).slice(0, 3).join(', ');
+      const sourcesLine = total > 0
+        ? `${total} source${total === 1 ? '' : 's'}` +
+          (credible > 0 ? ` (${credible} on trusted list)` : '') +
+          (domains ? ` — ${escapeHtml(domains)}` : '')
+        : '';
+      const fresh = s.last_enriched_at
+        ? `<div style="color:#b45309;font-size:12px;margin-top:2px">Freshly corroborated — new sources surfaced in our latest live-search pass.</div>`
+        : '';
+      return (
+        `<li style="margin-bottom:10px">` +
+        `<strong>[${escapeHtml(String(s.topic ?? 'other'))}]</strong> ${escapeHtml(s.title)} ` +
+        `<span style="color:#555">(sev ${s.severity}, ${escapeHtml(statusLabel(s.verification_status as VerificationStatus))})</span>` +
+        (s.url ? ` — <a href="${escapeHtml(String(s.url))}">open</a>` : '') +
+        (sourcesLine ? `<div style="color:#555;font-size:12px;margin-top:2px">${sourcesLine}</div>` : '') +
+        fresh +
+        `</li>`
+      );
+    })
     .join('');
 
   return `
@@ -171,10 +198,11 @@ function buildUserBriefingHtml(input: {
       ${input.weather ? `<p><strong>Local weather signal:</strong> ${escapeHtml(input.weather)}</p>` : ''}
       <p>${escapeHtml(input.body).slice(0, 2200).replace(/\n/g, '<br/>')}</p>
       <h3>Top signals for your profile</h3>
-      <ul>${cards || '<li>No high-priority signals matched your current topics today.</li>'}</ul>
+      <ul style="padding-left:18px">${cards || '<li>No high-priority signals matched your current topics today.</li>'}</ul>
       <p style="color:#666;font-size:12px">
-        Reliability labels reflect how many independent credible sources are reporting each signal. They are not
-        claims of factual truth. This briefing is generated per account; your preferences and AI state are isolated.
+        Labels describe how many independent sources are reporting each signal and how many match our
+        trusted-source list. They are not claims of factual truth. This briefing is generated per
+        account; your preferences and AI state are isolated.
       </p>
     </div>
   `;

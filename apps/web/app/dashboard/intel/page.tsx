@@ -91,7 +91,7 @@ export default async function IntelWorkspacePage({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Priority workspace</h1>
-            <p className="mt-1 text-sm text-white/60">
+            <p className="mt-1 text-sm text-ink-500">
               Prioritized by your focus topics and how well each signal is corroborated. Alert intensity:{' '}
               {prefs?.alert_intensity_preference ?? 'critical_only'}. Threshold: {prefs?.min_alert_severity ?? 70}.
             </p>
@@ -106,9 +106,9 @@ export default async function IntelWorkspacePage({
           />
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-          <span className="text-white/55">Saved views:</span>
+          <span className="text-ink-500">Saved views:</span>
           {(savedViews ?? []).length === 0 ? (
-            <span className="text-white/45">none yet</span>
+            <span className="text-ink-400">none yet</span>
           ) : (
             (savedViews ?? []).map((sv: any) => {
               const f = (sv.filters ?? {}) as Record<string, unknown>;
@@ -118,7 +118,7 @@ export default async function IntelWorkspacePage({
                 <Link
                   key={sv.id}
                   href={href}
-                  className="rounded-full border border-white/15 px-2 py-1 text-[11px] text-white/70 hover:border-white/30 hover:text-white sm:px-2.5 sm:text-xs"
+                  className="rounded-full border border-ink-100 px-2 py-1 text-[11px] text-ink-600 hover:border-ink-200 hover:text-ink sm:px-2.5 sm:text-xs"
                 >
                   {sv.name}
                 </Link>
@@ -139,7 +139,7 @@ export default async function IntelWorkspacePage({
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-white/70">Priority queue</h2>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-600">Priority queue</h2>
         {prioritized.length === 0 ? (
           <EmptyState
             title="Nothing here yet."
@@ -157,7 +157,7 @@ export default async function IntelWorkspacePage({
           <ul className="space-y-3">
             {prioritized.slice(0, 25).map((s) => (
               <li key={s.id}>
-                <SignalCard s={s as any} />
+                <SignalCard s={s} />
               </li>
             ))}
           </ul>
@@ -165,16 +165,16 @@ export default async function IntelWorkspacePage({
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-white/70">Additional global signals</h2>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-600">Additional global signals</h2>
         {overflow.length === 0 ? (
-          <p className="rounded-card border border-white/10 bg-white/[0.03] p-4 text-sm text-white/55">
+          <p className="rounded-card border border-ink-100 bg-paper p-4 text-sm text-ink-500">
             No additional signals right now.
           </p>
         ) : (
           <ul className="space-y-3">
             {overflow.slice(0, 15).map((s) => (
               <li key={s.id}>
-                <SignalCard s={s as any} />
+                <SignalCard s={s} />
               </li>
             ))}
           </ul>
@@ -211,7 +211,7 @@ function SaveIntelViewButton({
       />
       <button
         type="submit"
-        className="rounded-full border border-brand-500/40 bg-brand-500/10 px-2.5 py-1 text-brand-200 hover:bg-brand-500/20"
+        className="rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-brand-700 hover:bg-brand-100"
       >
         Save current view
       </button>

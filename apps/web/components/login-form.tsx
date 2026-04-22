@@ -102,33 +102,41 @@ export function LoginForm({ next }: { next: string }) {
         <button
           type="submit"
           disabled={loading || !email || !password}
-          className="w-full rounded-full bg-white px-4 py-2.5 font-medium text-black hover:bg-white/90 disabled:opacity-60"
+          className="w-full rounded-full bg-amber-500 px-4 py-3 text-sm font-medium text-white shadow-[0_8px_20px_-6px_rgba(245,158,11,0.55)] transition hover:bg-amber-600 disabled:opacity-60"
         >
           {loading ? 'Working…' : mode === 'signin' ? 'Sign in' : 'Create account'}
         </button>
       </form>
 
       {result && (
-        <p className={`text-sm ${result.ok ? 'text-brand-300' : 'text-danger-400'}`}>{result.message}</p>
+        <p className={`text-sm ${result.ok ? 'text-brand-700' : 'text-danger-600'}`}>
+          {result.message}
+        </p>
       )}
 
-      <p className="text-xs text-white/50">
-        MVP mode: email/password auth. In Supabase Auth settings, disable “Confirm email” for instant signup login.
+      <p className="text-xs text-ink-400">
+        MVP mode: email/password auth. In Supabase Auth settings, disable “Confirm email” for
+        instant signup login.
       </p>
 
       <style jsx>{`
         .input {
           width: 100%;
-          border-radius: 8px;
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          background: rgba(255, 255, 255, 0.05);
-          padding: 10px 12px;
-          color: white;
+          border-radius: 9999px;
+          border: 1px solid #e5e8ef;
+          background: #ffffff;
+          padding: 12px 16px;
+          color: #0f172a;
           outline: none;
-          transition: border-color 120ms ease;
+          transition: border-color 120ms ease, box-shadow 120ms ease;
+          box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
         }
         .input:focus {
-          border-color: rgba(16, 185, 129, 0.6);
+          border-color: #fbb024;
+          box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+        }
+        .input::placeholder {
+          color: #9ca3af;
         }
       `}</style>
     </div>
@@ -137,8 +145,10 @@ export function LoginForm({ next }: { next: string }) {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block text-sm text-white/75">
-      <span className="mb-1 inline-block text-xs font-medium uppercase tracking-wide text-white/55">{label}</span>
+    <label className="block text-sm text-ink-600">
+      <span className="mb-1 inline-block text-[11px] font-semibold uppercase tracking-wider text-ink-400">
+        {label}
+      </span>
       {children}
     </label>
   );

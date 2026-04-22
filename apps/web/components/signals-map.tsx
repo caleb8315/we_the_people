@@ -10,7 +10,7 @@ const SignalsMapClient = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-full w-full items-center justify-center text-xs text-white/55">
+      <div className="flex h-full w-full items-center justify-center text-xs text-ink-500">
         <span className="inline-flex items-center gap-2">
           <span
             aria-hidden="true"
@@ -40,7 +40,7 @@ export function SignalsMap({
 
   if (points.length === 0) {
     return (
-      <div className="rounded-card border border-white/10 bg-white/[0.03] p-5 text-sm text-white/60">
+      <div className="rounded-card border border-ink-100 bg-paper p-5 text-sm text-ink-500">
         {emptyMessage ?? 'No map points available for this filter set yet.'}
       </div>
     );
@@ -48,13 +48,13 @@ export function SignalsMap({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2 text-xs text-white/65">
-        <span className="rounded-full border border-white/15 px-2 py-1">{points.length} points</span>
-        <span className="rounded-full border border-white/15 px-2 py-1">{exact} exact</span>
-        <span className="rounded-full border border-white/15 px-2 py-1">{approximate} approximate</span>
-        <span className="rounded-full border border-white/15 px-2 py-1">{corroborated} corroborated</span>
+      <div className="flex flex-wrap items-center gap-2 text-xs text-ink-600">
+        <span className="rounded-full border border-ink-100 px-2 py-1">{points.length} points</span>
+        <span className="rounded-full border border-ink-100 px-2 py-1">{exact} exact</span>
+        <span className="rounded-full border border-ink-100 px-2 py-1">{approximate} approximate</span>
+        <span className="rounded-full border border-ink-100 px-2 py-1">{corroborated} corroborated</span>
       </div>
-      <div className={`overflow-hidden rounded-card border border-white/10 bg-black/20 ${mapHeightClass}`}>
+      <div className={`overflow-hidden rounded-card border border-ink-100 bg-black/20 ${mapHeightClass}`}>
         <SignalsMapClient points={points} context={context} />
       </div>
     </div>

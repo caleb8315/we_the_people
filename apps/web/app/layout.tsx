@@ -14,37 +14,43 @@ import { getServerSupabase } from '@/lib/supabase-server';
 export const metadata: Metadata = {
   title: 'Crosscheck — see where reporting agrees, conflicts, and lacks evidence',
   description:
-    'Crosscheck clusters public reporting and open sensor data by event, then shows how sources agree, where they conflict, and which pieces of evidence are missing. Not an OSINT investigation tool. Not a news app. A system for source consistency.',
+    'Crosscheck clusters public reporting and open sensor data by event, then shows how sources agree, where they conflict, and which pieces of evidence are missing.',
   robots: { index: true, follow: true },
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   let signedIn = false;
+  let userEmail: string | null = null;
   try {
     const sb = getServerSupabase();
     const { data } = await sb.auth.getUser();
     signedIn = !!data.user;
+    userEmail = data.user?.email ?? null;
   } catch {
     // keep anonymous fallback
   }
 
   return (
     <html lang="en">
-      <body className="min-h-screen antialiased">
+      <body className="min-h-screen bg-canvas text-ink antialiased">
         <NavBar />
-        <main className="mx-auto max-w-6xl px-4 py-5 pb-28 sm:px-5 sm:py-10 sm:pb-24">{children}</main>
+        <main className="mx-auto max-w-6xl px-4 pb-28 pt-4 sm:px-6 sm:pb-16 sm:pt-8">
+          {children}
+        </main>
         <MobileBottomNav signedIn={signedIn} />
-        <footer className="mx-auto hidden max-w-6xl px-4 pb-24 pt-10 text-xs text-white/50 sm:block sm:px-5 sm:pb-10">
+        <footer className="mx-auto hidden max-w-6xl px-6 pb-16 pt-10 text-xs text-ink-400 sm:block">
           <div className="flex flex-wrap items-center gap-4">
             <span>© {new Date().getFullYear()} Crosscheck</span>
-            <Link href="/privacy" className="hover:text-white">
+            <Link href="/about" className="hover:text-ink-700">
+              About
+            </Link>
+            <Link href="/privacy" className="hover:text-ink-700">
               Privacy
             </Link>
-            {!signedIn && (
-              <Link href="/trust" className="hover:text-white">
-                Methodology
-              </Link>
-            )}
+            <Link href="/trust" className="hover:text-ink-700">
+              Methodology
+            </Link>
+            {userEmail && <span className="ml-auto text-ink-300">Signed in as {userEmail}</span>}
           </div>
           <p className="mt-3 max-w-2xl">
             Crosscheck describes how public reporting agrees, conflicts, and where evidence is

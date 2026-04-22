@@ -12,7 +12,9 @@ export function supabase(): SupabaseClient {
   return client;
 }
 
-export async function startEngineRun(job: 'ingest' | 'brief' | 'alert'): Promise<string | null> {
+export async function startEngineRun(
+  job: 'ingest' | 'brief' | 'alert' | 'develop',
+): Promise<string | null> {
   const { data, error } = await supabase()
     .from('engine_runs')
     .insert({ job, status: 'running' })

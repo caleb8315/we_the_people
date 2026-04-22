@@ -27,7 +27,7 @@ export default async function BriefingPage({ params }: { params: { id: string } 
           <Badge variant="neutral" withIcon={false}>
             {data.kind}
           </Badge>
-          <span className="text-xs text-white/55">{new Date(data.period_start).toLocaleString()}</span>
+          <span className="text-xs text-ink-500">{new Date(data.period_start).toLocaleString()}</span>
         </div>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{data.headline}</h1>
         {(data.topics ?? []).length > 0 && (
@@ -41,14 +41,14 @@ export default async function BriefingPage({ params }: { params: { id: string } 
         )}
       </header>
 
-      <div className="rounded-card border border-white/10 bg-white/[0.03] p-5">
-        <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-white/85">
+      <div className="rounded-card border border-ink-100 bg-paper p-5">
+        <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-ink-700">
           {data.body_markdown}
         </pre>
       </div>
 
-      <p className="text-xs text-white/50">
-        <Link href="/briefings" className="underline hover:text-white">
+      <p className="text-xs text-ink-400">
+        <Link href="/briefings" className="underline hover:text-ink">
           Back to briefings
         </Link>
       </p>

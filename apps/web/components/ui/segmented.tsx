@@ -23,14 +23,14 @@ export function Segmented({
     <div
       role={onSelect ? 'tablist' : undefined}
       aria-label={ariaLabel}
-      className={`inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] p-1 text-sm ${className}`}
+      className={`inline-flex items-center rounded-full border border-ink-100 bg-paper p-1 text-sm shadow-sm ${className}`}
     >
       {options.map((opt) => {
         const isActive = opt.value === active;
-        const cls = `rounded-full px-3 py-1.5 text-sm transition ${
+        const cls = `rounded-full px-3 py-1.5 text-sm font-medium transition ${
           isActive
-            ? 'bg-white text-black font-medium shadow-sm'
-            : 'text-white/70 hover:text-white'
+            ? 'bg-ink-900 text-white shadow-sm'
+            : 'text-ink-500 hover:text-ink'
         }`;
         if (opt.href) {
           return (

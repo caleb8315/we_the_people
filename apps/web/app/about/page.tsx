@@ -2,10 +2,10 @@ export const metadata = { title: 'About · Crosscheck' };
 
 export default function AboutPage() {
   return (
-    <article className="prose-osint max-w-3xl space-y-6 text-white/80">
+    <article className="prose-osint max-w-3xl space-y-6 text-ink-600">
       <header>
         <h1 className="text-3xl font-semibold tracking-tight">About Crosscheck</h1>
-        <p className="mt-2 text-white/70">
+        <p className="mt-2 text-ink-600">
           See where reporting agrees, conflicts, and lacks evidence.
         </p>
       </header>

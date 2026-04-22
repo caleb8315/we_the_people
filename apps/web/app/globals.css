@@ -3,13 +3,13 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html,
 body {
-  background: #0b0d12;
-  color: #e6e8ee;
+  background: #f6f7fa;
+  color: #0f172a;
   min-height: 100%;
   font-feature-settings: 'ss01', 'cv11';
   font-size: 16px;
@@ -22,11 +22,11 @@ a {
   color: inherit;
 }
 
-/* Consistent focus ring across interactive elements */
+/* Consistent focus ring — amber matches the new accent */
 :where(button, a, input, select, textarea, [role='button']):focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.6);
-  border-radius: 6px;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.55);
+  border-radius: 8px;
 }
 
 /* Line-clamp utilities for scannable cards */
@@ -38,10 +38,31 @@ a {
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* Indeterminate progress sweep — used by the verify loading card when the
+   fan-out goes past its expected p95 window. */
+@keyframes progressSweep {
+  0%   { left: -33%; }
+  50%  { left: 50%; }
+  100% { left: 100%; }
+}
+
 /* Article typography used on briefing detail + long pages */
-.prose-osint p { line-height: 1.7; }
-.prose-osint h1, .prose-osint h2, .prose-osint h3 { letter-spacing: -0.01em; }
+.prose-osint p { line-height: 1.7; color: #1f2937; }
+.prose-osint h1, .prose-osint h2, .prose-osint h3 {
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
 .prose-osint h2 { font-size: 20px; font-weight: 600; margin-top: 1.25em; }
 .prose-osint h3 { font-size: 16px; font-weight: 600; margin-top: 1em; }
 .prose-osint ul { padding-left: 1.15em; list-style: disc; }
 .prose-osint li { margin-top: 0.25em; }
+
+/* Topic tile gradients — used for SignalCard header tiles + topic chips. */
+.tile-war       { background: linear-gradient(135deg, #fff1f2 0%, #fecdd3 60%, #fda4af 100%); }
+.tile-economy   { background: linear-gradient(135deg, #ecfeff 0%, #a5f3fc 60%, #67e8f9 100%); }
+.tile-climate   { background: linear-gradient(135deg, #ecfdf5 0%, #a7f3d0 60%, #6ee7b7 100%); }
+.tile-health    { background: linear-gradient(135deg, #f5f3ff 0%, #ddd6fe 60%, #c4b5fd 100%); }
+.tile-civil     { background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 60%, #fdba74 100%); }
+.tile-cyber     { background: linear-gradient(135deg, #eef2ff 0%, #c7d2fe 60%, #a5b4fc 100%); }
+.tile-disaster  { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 55%, #f59e0b 100%); }
+.tile-default   { background: linear-gradient(135deg, #f1f5f9 0%, #cbd5e1 60%, #94a3b8 100%); }

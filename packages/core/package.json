@@ -17,10 +17,14 @@
     "./budget": "./src/budget.ts",
     "./normalize": "./src/normalize.ts",
     "./evidence": "./src/evidence.ts",
-    "./cluster": "./src/cluster.ts"
+    "./cluster": "./src/cluster.ts",
+    "./confidence": "./src/confidence.ts",
+    "./social": "./src/social.ts",
+    "./media": "./src/media.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/__tests__/*.test.ts"
   },
   "devDependencies": {
     "typescript": "^5.7.3"

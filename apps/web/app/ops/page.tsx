@@ -12,7 +12,7 @@ export default async function OpsPage() {
   const { data: auth } = await sb.auth.getUser();
   if (!auth.user) redirect('/login?next=/ops');
   if (!isAdminEmail(auth.user.email)) {
-    return <p className="text-sm text-white/70">You are signed in, but this page is restricted to operators.</p>;
+    return <p className="text-sm text-ink-600">You are signed in, but this page is restricted to operators.</p>;
   }
 
   const admin = getAdminSupabase();
@@ -72,11 +72,11 @@ export default async function OpsPage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Ops dashboard</h1>
-          <p className="text-sm text-white/60">Observability for ingest / brief / alert workers.</p>
+          <p className="text-sm text-ink-500">Observability for ingest / brief / alert workers.</p>
         </div>
         <a
           href="/ops/requests"
-          className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-sm hover:bg-white/10"
+          className="rounded-full border border-ink-100 bg-canvas-50 px-3 py-1.5 text-sm hover:bg-ink-100"
         >
           Access requests →
         </a>
@@ -101,13 +101,13 @@ export default async function OpsPage() {
       </section>
 
       <Card title="UX validation hints">
-        <ul className="space-y-1 text-sm text-white/70">
+        <ul className="space-y-1 text-sm text-ink-600">
           <li>
-            Map discoverability is healthy if map feed share reaches at least <strong className="text-white">20%</strong> in
+            Map discoverability is healthy if map feed share reaches at least <strong className="text-ink">20%</strong> in
             early cohorts.
           </li>
           <li>
-            Map utility improves when <strong className="text-white">signal_opened_from_map / map_opened</strong> trends up.
+            Map utility improves when <strong className="text-ink">signal_opened_from_map / map_opened</strong> trends up.
           </li>
           <li>
             Mobile UX should increase mobile feed share and keep useful-alert ratio above guardrail.
@@ -117,12 +117,12 @@ export default async function OpsPage() {
 
       <Card title="Usage today">
         {usageByBucket.size === 0 ? (
-          <p className="text-sm text-white/55">No LLM calls logged today.</p>
+          <p className="text-sm text-ink-500">No LLM calls logged today.</p>
         ) : (
           <ul className="grid gap-2 sm:grid-cols-3">
             {[...usageByBucket.entries()].map(([b, c]) => (
-              <li key={b} className="rounded-md border border-white/10 p-3">
-                <div className="text-xs uppercase tracking-wide text-white/55">{b}</div>
+              <li key={b} className="rounded-md border border-ink-100 p-3">
+                <div className="text-xs uppercase tracking-wide text-ink-500">{b}</div>
                 <div className="text-lg font-semibold tabular-nums">{c}</div>
               </li>
             ))}
@@ -131,10 +131,10 @@ export default async function OpsPage() {
       </Card>
 
       <section>
-        <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/60">Recent engine runs</h2>
-        <div className="overflow-x-auto rounded-card border border-white/10">
+        <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-500">Recent engine runs</h2>
+        <div className="overflow-x-auto rounded-card border border-ink-100">
           <table className="w-full text-sm">
-            <thead className="bg-white/[0.05] text-left text-white/60">
+            <thead className="bg-canvas-50 text-left text-ink-500">
               <tr>
                 <th className="p-2">Started</th>
                 <th className="p-2">Job</th>
@@ -146,15 +146,15 @@ export default async function OpsPage() {
             </thead>
             <tbody>
               {(runs ?? []).map((r: any) => (
-                <tr key={r.id} className="border-t border-white/5">
-                  <td className="p-2 font-mono text-xs text-white/70">{new Date(r.started_at).toLocaleString()}</td>
+                <tr key={r.id} className="border-t border-ink-100">
+                  <td className="p-2 font-mono text-xs text-ink-600">{new Date(r.started_at).toLocaleString()}</td>
                   <td className="p-2">{r.job}</td>
                   <td className="p-2">
                     <span className={`rounded px-2 py-0.5 text-xs ${statusClass(r.status)}`}>{r.status}</span>
                   </td>
                   <td className="p-2">{r.records_in}</td>
                   <td className="p-2">{r.records_out}</td>
-                  <td className="p-2 text-xs text-white/60">
+                  <td className="p-2 text-xs text-ink-500">
                     {(r.errors ?? []).length > 0 ? r.errors[0] : '—'}
                   </td>
                 </tr>
@@ -168,8 +168,8 @@ export default async function OpsPage() {
 }
 
 function statusClass(s: string): string {
-  if (s === 'success') return 'bg-brand-500/15 text-brand-300';
-  if (s === 'partial') return 'bg-warn-500/15 text-warn-400';
-  if (s === 'failed') return 'bg-danger-500/15 text-danger-400';
-  return 'bg-white/10 text-white/60';
+  if (s === 'success') return 'bg-brand-50 text-brand-700';
+  if (s === 'partial') return 'bg-amber-50 text-amber-700';
+  if (s === 'failed') return 'bg-danger-50 text-danger-600';
+  return 'bg-ink-100 text-ink-500';
 }

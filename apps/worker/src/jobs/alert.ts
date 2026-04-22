@@ -22,7 +22,9 @@ export async function runAlerts(): Promise<{ sent: number }> {
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const { data, error } = await sb
     .from('signals')
-    .select('id, title, summary, severity, verification_status, topic, country_code, url, first_seen_at, source_id')
+    .select(
+      'id, title, summary, severity, verification_status, topic, country_code, url, first_seen_at, source_id, source_count, credible_source_count, distinct_domains, last_enriched_at',
+    )
     .gte('first_seen_at', since)
     .gte('severity', 80)
     .order('severity', { ascending: false })
@@ -142,11 +144,15 @@ export async function runAlerts(): Promise<{ sent: number }> {
 
   for (const s of candidates) {
     const reliability = statusLabel(s.verification_status as VerificationStatus);
+    const credible = s.credible_source_count ?? 0;
+    const total = s.source_count ?? 0;
+    const sourcesPart = total > 0 ? `sources: ${credible}/${total} credible` : 'sources: corroboration pending';
+    const freshPart = s.last_enriched_at ? ' · freshly corroborated' : '';
     const ok = await sendOperatorTelegram(
       [
         `🟡 PRIORITY · ${s.topic?.toUpperCase() ?? 'EVENT'}`,
         `${s.title}`,
-        `severity=${s.severity} · reliability: ${reliability} · ${s.country_code ?? '—'}`,
+        `severity=${s.severity} · reliability: ${reliability} · ${sourcesPart}${freshPart} · ${s.country_code ?? '—'}`,
         s.url ?? '',
       ].join('\n'),
     );
@@ -196,24 +202,45 @@ async function sendUserAlertEmail(input: {
     verification_status: string;
     country_code: string | null;
     url: string | null;
+    source_count?: number | null;
+    credible_source_count?: number | null;
+    distinct_domains?: string[] | null;
+    last_enriched_at?: string | null;
   };
 }): Promise<{ ok: boolean; error?: string }> {
   if (!input.from || !input.apiKey) {
     return { ok: false, error: 'email config missing (BRIEFING_FROM_EMAIL/RESEND_API_KEY)' };
   }
   const reliability = statusLabel(input.signal.verification_status as VerificationStatus);
+  const credible = input.signal.credible_source_count ?? 0;
+  const total = input.signal.source_count ?? 0;
+  const domains = (input.signal.distinct_domains ?? []).slice(0, 3);
+  const moreDomains = (input.signal.distinct_domains ?? []).length - domains.length;
+  const sourcesLine =
+    total > 0
+      ? `${credible}/${total} credible sources` +
+        (domains.length > 0
+          ? ` — ${domains.map(escapeHtml).join(', ')}${moreDomains > 0 ? ` + ${moreDomains} more` : ''}`
+          : '')
+      : 'Sources still being corroborated';
+  const freshLine = input.signal.last_enriched_at
+    ? '<p style="color:#92400e;font-size:12px;margin:4px 0">Freshly corroborated — additional sources surfaced in our latest live-search pass.</p>'
+    : '';
   const html = `
     <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.5;color:#111">
       <h2>Priority alert: ${escapeHtml(input.signal.title)}</h2>
       <p><strong>Topic:</strong> ${escapeHtml(String(input.signal.topic ?? 'other'))}</p>
       <p><strong>Severity:</strong> ${input.signal.severity} / 100</p>
       <p><strong>Reliability:</strong> ${escapeHtml(reliability)}</p>
+      <p><strong>Sources:</strong> ${escapeHtml(sourcesLine)}</p>
+      ${freshLine}
       <p><strong>Country:</strong> ${escapeHtml(input.signal.country_code ?? '-')}</p>
       <p>${escapeHtml(input.signal.summary ?? 'No summary provided.')}</p>
       ${input.signal.url ? `<p><a href="${escapeHtml(input.signal.url)}">Open source link</a></p>` : ''}
       <p style="font-size:12px;color:#666">
-        Reliability reflects how many independent credible sources are reporting this signal. It is not a claim
-        of factual truth. Beta limit: up to 5 priority alerts/day per user.
+        Reliability reflects how many independent credible sources are reporting this signal, not a claim
+        of factual truth. Source counts update as our live-search fan-out (web + Reddit + Bluesky +
+        GDELT + sensors) finds more coverage. Beta limit: up to 5 priority alerts/day per user.
       </p>
     </div>
   `;

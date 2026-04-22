@@ -1,48 +1,127 @@
 import { statusLabel, statusShortLabel } from '@osint/core';
 import type { VerificationStatus } from '@osint/core/types';
+import { env } from '../lib/env';
 import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
 import { callLlm } from '../lib/llm';
+import {
+  callDevelopEndpoint,
+  DEVELOP_INTER_CALL_DELAY_MS,
+  sleep,
+} from '../lib/develop-client';
 
 /**
  * Brief job — daily / weekly.
  *
- * Cheap path: rank top signals heuristically, then ONE LLM call to
- * synthesize a short narrative (ONLY if budget allows). If LLM is
- * skipped, we ship a deterministic bullet-list briefing instead.
+ * Phase 9: the briefing now pre-enriches its top candidate signals using
+ * the same live-corroboration fan-out (/api/signal/:id/develop) that
+ * powers the /verify flow and the signal-detail "Develop this story"
+ * button. This means a briefing synthesized at 08:00 UTC sees whatever
+ * new web / Reddit / Bluesky / GDELT / sensor coverage has surfaced in
+ * the last hour — not just the ingest adapters' last pass.
+ *
+ * Pipeline:
+ *   1. Select the top-severity corroborated signals in the briefing window.
+ *   2. Pre-enrich those whose `last_enriched_at` is stale (null or >2h
+ *      ago). Capped at MAX_PREENRICH signals so the briefing stays fast.
+ *   3. Re-load the signals after enrichment so source counts / reliability
+ *      labels / verification_status reflect the fresh corpus.
+ *   4. Load contradictions for the final set so the briefing can call
+ *      out source disagreements explicitly.
+ *   5. Feed corroboration context into both the LLM prompt and the
+ *      deterministic bullet list.
+ *
+ * Cheap path: ONE LLM call to synthesize the narrative (only if budget
+ * allows). If the LLM is skipped, the deterministic briefing still
+ * carries the enriched data — users don't lose the story-development
+ * benefit just because the LLM budget is exhausted.
  */
+
+const MAX_PREENRICH = 5;
+const PREENRICH_STALE_HOURS = 2;
+
 export async function runBriefing(kind: 'daily' | 'weekly'): Promise<{ briefing_id: string | null }> {
   const runId = await startEngineRun('brief');
   const windowHours = kind === 'weekly' ? 24 * 7 : 24;
   const since = new Date(Date.now() - windowHours * 3600 * 1000);
+  const errors: string[] = [];
 
   const sb = supabase();
 
-  const { data: signals, error } = await sb
-    .from('signals')
-    .select('id, title, summary, topic, country_code, severity, confidence, verification_status, url, first_seen_at')
-    .in('verification_status', ['verified', 'developing'])
-    .gte('first_seen_at', since.toISOString())
-    .order('severity', { ascending: false })
-    .limit(kind === 'weekly' ? 40 : 15);
-
-  if (error) {
-    await finishEngineRun(runId, { status: 'failed', errors: [error.message] });
+  // 1. Load candidates. We pull richer columns than before so the
+  //    briefing can cite source counts, contradictions totals, and fresh
+  //    enrichment timestamps without extra queries per signal.
+  const candidatesRes = await loadCandidates(sb, since, kind);
+  if (candidatesRes.error) {
+    await finishEngineRun(runId, { status: 'failed', errors: [candidatesRes.error] });
     return { briefing_id: null };
   }
-
-  const items = signals ?? [];
+  let items = candidatesRes.items;
   if (items.length === 0) {
     await finishEngineRun(runId, { status: 'success', records_in: 0, records_out: 0 });
     return { briefing_id: null };
   }
 
-  const topics = [...new Set(items.map(s => s.topic).filter(Boolean))] as string[];
-  const deterministic = renderDeterministic(kind, items);
+  // 2. Pre-enrich the top N that are stale. Best-effort: enrichment
+  //    failures don't block the briefing — we still have the pre-enrich
+  //    data on file. We only enrich when WEB_APP_URL is configured.
+  const webUrl = env().WEB_APP_URL?.replace(/\/$/, '') ?? null;
+  let preEnriched = 0;
+  if (webUrl) {
+    const staleCutoff = Date.now() - PREENRICH_STALE_HOURS * 3600 * 1000;
+    const stale = items
+      .filter((s) => {
+        const t = s.last_enriched_at ? new Date(s.last_enriched_at).getTime() : 0;
+        return !t || t < staleCutoff;
+      })
+      .slice(0, MAX_PREENRICH);
+    console.log(
+      `[brief] pre-enriching ${stale.length}/${items.length} stale signals (cutoff=${PREENRICH_STALE_HOURS}h)`,
+    );
+    for (let i = 0; i < stale.length; i++) {
+      const row = stale[i];
+      if (!row) continue;
+      const r = await callDevelopEndpoint(webUrl, row.id);
+      if (r.status === 'enriched') {
+        preEnriched++;
+        console.log(
+          `[brief] pre-enrich id=${row.id} new_evidence=${r.new_evidence_count} status ${r.previous_verification_status}→${r.updated_verification_status}`,
+        );
+      } else if (r.status !== 'cooldown') {
+        errors.push(`pre-enrich signal=${row.id}: ${r.note ?? r.status}`);
+      }
+      if (i < stale.length - 1) await sleep(DEVELOP_INTER_CALL_DELAY_MS);
+    }
+    // 3. Re-load the candidates — if enrichment flipped any
+    //    verification_status or updated source counts, the briefing
+    //    should reflect the post-enrichment state.
+    if (preEnriched > 0) {
+      const reloaded = await loadCandidates(sb, since, kind);
+      if (!reloaded.error && reloaded.items.length > 0) {
+        items = reloaded.items;
+      }
+    }
+  } else {
+    console.log('[brief] WEB_APP_URL not set — skipping pre-enrichment.');
+  }
 
-  const prompt = buildPrompt(kind, items);
+  // 4. Load contradictions for the final candidate set. We load all at
+  //    once and bucket by signal_id to avoid N+1 queries.
+  const contradictionsBySignal = await loadContradictions(
+    sb,
+    items.map((s) => s.id),
+  );
+
+  const topics = [...new Set(items.map((s) => s.topic).filter(Boolean))] as string[];
+  const enriched = items.map((s) => ({
+    ...s,
+    contradictions: contradictionsBySignal.get(s.id) ?? [],
+  }));
+
+  const deterministic = renderDeterministic(kind, enriched);
+  const prompt = buildPrompt(kind, enriched);
   const llm = await callLlm(prompt, { bucket: 'briefing', maxTokens: 900, temperature: 0.3 });
   const body = llm.text ? `${llm.text}\n\n---\n*Evidence:*\n${deterministic}` : deterministic;
-  const headline = deriveHeadline(items);
+  const headline = deriveHeadline(enriched);
 
   const { data: ins, error: insErr } = await sb
     .from('briefings')
@@ -53,7 +132,7 @@ export async function runBriefing(kind: 'daily' | 'weekly'): Promise<{ briefing_
         period_end: new Date().toISOString(),
         headline,
         body_markdown: body,
-        signal_ids: items.map(s => s.id),
+        signal_ids: items.map((s) => s.id),
         topics,
       },
       { onConflict: 'kind,period_start' },
@@ -67,23 +146,136 @@ export async function runBriefing(kind: 'daily' | 'weekly'): Promise<{ briefing_
   }
 
   await finishEngineRun(runId, {
-    status: 'success',
+    status: errors.length === 0 ? 'success' : 'partial',
     records_in: items.length,
     records_out: 1,
-    meta: { provider: llm.provider, llm_skipped: llm.provider === 'skipped', reason: llm.reason },
+    errors,
+    meta: {
+      provider: llm.provider,
+      llm_skipped: llm.provider === 'skipped',
+      reason: llm.reason,
+      pre_enriched: preEnriched,
+      total_contradictions: [...contradictionsBySignal.values()].reduce((n, a) => n + a.length, 0),
+    },
   });
-  console.log(`[brief] ${kind} briefing ${ins.id} (llm=${llm.provider})`);
+  console.log(
+    `[brief] ${kind} briefing ${ins.id} (llm=${llm.provider}, pre_enriched=${preEnriched})`,
+  );
   return { briefing_id: ins.id as string };
 }
 
-function buildPrompt(kind: 'daily' | 'weekly', items: any[]): string {
+// ─── data loading ──────────────────────────────────────────────────────────
+
+interface BriefingSignal {
+  id: string;
+  title: string;
+  summary: string | null;
+  topic: string | null;
+  country_code: string | null;
+  severity: number;
+  confidence: number;
+  verification_status: string;
+  url: string | null;
+  first_seen_at: string;
+  source_count: number;
+  credible_source_count: number;
+  distinct_domains: string[] | null;
+  last_enriched_at: string | null;
+  tags: string[] | null;
+}
+
+interface ContradictionRow {
+  type: string | null;
+  severity: string | null;
+  summary: string | null;
+}
+
+async function loadCandidates(
+  sb: ReturnType<typeof supabase>,
+  since: Date,
+  kind: 'daily' | 'weekly',
+): Promise<{ items: BriefingSignal[]; error?: string }> {
+  const { data, error } = await sb
+    .from('signals')
+    .select(
+      'id,title,summary,topic,country_code,severity,confidence,verification_status,url,first_seen_at,source_count,credible_source_count,distinct_domains,last_enriched_at,tags',
+    )
+    .in('verification_status', ['verified', 'developing'])
+    .gte('first_seen_at', since.toISOString())
+    .order('severity', { ascending: false })
+    .limit(kind === 'weekly' ? 40 : 15);
+  if (error) return { items: [], error: error.message };
+  return { items: (data ?? []) as BriefingSignal[] };
+}
+
+async function loadContradictions(
+  sb: ReturnType<typeof supabase>,
+  signalIds: string[],
+): Promise<Map<string, ContradictionRow[]>> {
+  const out = new Map<string, ContradictionRow[]>();
+  if (signalIds.length === 0) return out;
+  const { data } = await sb
+    .from('contradictions')
+    .select('signal_id,type,severity,summary')
+    .in('signal_id', signalIds);
+  for (const row of (data ?? []) as Array<
+    ContradictionRow & { signal_id: string }
+  >) {
+    const bucket = out.get(row.signal_id) ?? [];
+    bucket.push({ type: row.type, severity: row.severity, summary: row.summary });
+    out.set(row.signal_id, bucket);
+  }
+  return out;
+}
+
+// ─── briefing rendering ────────────────────────────────────────────────────
+
+type EnrichedSignal = BriefingSignal & { contradictions: ContradictionRow[] };
+
+/**
+ * LLM prompt. The signals list now carries corroboration + contradictions
+ * context so the model can describe HOW the story is being reported
+ * (e.g. "4 credible outlets report X; 1 disagrees on casualty count")
+ * instead of guessing from the title alone.
+ */
+function buildPrompt(kind: 'daily' | 'weekly', items: EnrichedSignal[]): string {
   const list = items
     .slice(0, 12)
-    .map(
-      (s, i) =>
-        `${i + 1}. [${s.topic}/${statusShortLabel(s.verification_status as VerificationStatus)}] ${s.title} (sev=${s.severity})`,
-    )
+    .map((s, i) => {
+      const label = statusShortLabel(s.verification_status as VerificationStatus);
+      const topDomains = (s.distinct_domains ?? []).slice(0, 3).join(', ') || 'none';
+      const contra = s.contradictions.length > 0
+        ? `, ${s.contradictions.length} source disagreement${s.contradictions.length === 1 ? '' : 's'}`
+        : '';
+      const enriched = s.last_enriched_at ? ', freshly corroborated' : '';
+      return (
+        `${i + 1}. [${s.topic}/${label}] ${s.title} ` +
+        `(sev=${s.severity}, ${s.credible_source_count}/${s.source_count} credible sources, ` +
+        `domains: ${topDomains}${contra}${enriched})`
+      );
+    })
     .join('\n');
+
+  const contradictionsDetail = items
+    .flatMap((s) =>
+      s.contradictions.slice(0, 2).map((c) => ({
+        title: s.title,
+        type: c.type ?? 'unknown',
+        severity: c.severity ?? 'medium',
+        summary: c.summary ?? '',
+      })),
+    )
+    .slice(0, 8);
+
+  const contradictionsBlock =
+    contradictionsDetail.length === 0
+      ? 'None flagged this window.'
+      : contradictionsDetail
+          .map(
+            (d) =>
+              `- [${d.type}/${d.severity}] ${d.title.slice(0, 80)} — ${d.summary.slice(0, 140)}`,
+          )
+          .join('\n');
 
   return `
 You are the Crosscheck analyst writing a ${kind} briefing. Crosscheck describes how public
@@ -92,30 +284,56 @@ It is not an OSINT investigation tool and not a news app.
 
 Hard rules:
 - Never tell the reader what happened or what is correct. Describe how credible public sources
-  are reporting it, and cite them.
+  are reporting it, and cite them by outlet name when possible.
 - Prefer the words agreement, conflict, corroboration, confidence, evidence, and limitation.
 - Neutral tone. Never accuse. Prefer language like "reports indicate", "sources disagree",
   "observed data suggests", "corroboration is developing", "no sensor confirmation detected".
 - When sources disagree, surface the disagreement (both sides + citations) rather than picking one.
 - Group by topic. 3–5 short paragraphs. Under 350 words.
+- When a signal shows "freshly corroborated", it means our live-search fan-out surfaced additional
+  sources after the initial ingest — treat that as legitimate growth of coverage, not as a new event.
 - End with a one-line "what to watch next 48h".
 
-Signals (format: topic/reliability):
+Signals (format: topic/reliability, with credible/total source count and top domains):
 ${list}
+
+Source disagreements flagged this window:
+${contradictionsBlock}
 `.trim();
 }
 
-function renderDeterministic(kind: 'daily' | 'weekly', items: any[]): string {
-  const lines = items.slice(0, 12).map(s => {
+/**
+ * Deterministic evidence section. Appears below the LLM narrative (or
+ * replaces it when the LLM is skipped). Now shows source counts, top
+ * credible domains, and a warning when contradictions are flagged —
+ * so users get real corroboration context even on LLM-skipped runs.
+ */
+function renderDeterministic(kind: 'daily' | 'weekly', items: EnrichedSignal[]): string {
+  const lines = items.slice(0, 12).map((s) => {
     const url = s.url ? ` — ${s.url}` : '';
     const label = statusLabel(s.verification_status as VerificationStatus);
-    return `- **[${s.topic}]** ${s.title} _(severity ${s.severity}, reliability: ${label})_${url}`;
+    const sources = `${s.credible_source_count}/${s.source_count} credible sources`;
+    const domainsList = (s.distinct_domains ?? []).slice(0, 3);
+    const moreDomains = (s.distinct_domains ?? []).length > domainsList.length
+      ? `, +${(s.distinct_domains ?? []).length - domainsList.length} more`
+      : '';
+    const domains = domainsList.length > 0
+      ? `domains: ${domainsList.join(', ')}${moreDomains}`
+      : 'no domains';
+    const contraBadge =
+      s.contradictions.length > 0
+        ? ` ⚠ ${s.contradictions.length} source disagreement${s.contradictions.length === 1 ? '' : 's'}`
+        : '';
+    const freshBadge = s.last_enriched_at ? ' · freshly corroborated' : '';
+    return (
+      `- **[${s.topic}]** ${s.title} _(severity ${s.severity}, reliability: ${label}, ${sources}, ${domains}${contraBadge}${freshBadge})_${url}`
+    );
   });
   return `### ${kind === 'weekly' ? 'Weekly' : 'Daily'} — key signals\n\n${lines.join('\n')}`;
 }
 
-function deriveHeadline(items: any[]): string {
+function deriveHeadline(items: EnrichedSignal[]): string {
   if (items.length === 0) return 'Quiet window — no high-signal events.';
-  const top = items[0];
-  return `${top.topic.toUpperCase()}: ${top.title}`.slice(0, 160);
+  const top = items[0]!;
+  return `${(top.topic ?? 'event').toUpperCase()}: ${top.title}`.slice(0, 160);
 }

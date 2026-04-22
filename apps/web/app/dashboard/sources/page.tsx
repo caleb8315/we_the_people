@@ -113,7 +113,7 @@ export default async function SourcesPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Source control</h1>
-        <p className="mt-1 text-sm text-white/60">
+        <p className="mt-1 text-sm text-ink-500">
           Grouped by type, sorted by credibility. Your muted sources are flagged and excluded from your personal view.
         </p>
       </header>
@@ -129,7 +129,7 @@ export default async function SourcesPage() {
         .filter((k) => groups.has(k))
         .map((k) => (
           <section key={k}>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-white/70">
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-600">
               {GROUP_LABELS[k] ?? k}
             </h2>
             <ul className="grid gap-2 sm:grid-cols-2">
@@ -139,14 +139,14 @@ export default async function SourcesPage() {
                   <li
                     key={s.id}
                     className={`rounded-card border p-3 text-sm ${
-                      isMuted ? 'border-danger-500/25 bg-danger-500/[0.04]' : 'border-white/10 bg-white/[0.03]'
+                      isMuted ? 'border-danger-200 bg-danger-50' : 'border-ink-100 bg-paper'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-medium clamp-1">{s.name}</p>
                       <CredibilityMeter value={s.credibility} />
                     </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-white/55">
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-ink-500">
                       <Badge variant="neutral" withIcon={false}>
                         {s.kind}
                       </Badge>
@@ -170,9 +170,9 @@ export default async function SourcesPage() {
           </section>
         ))}
 
-      <p className="text-xs text-white/55">
+      <p className="text-xs text-ink-500">
         Want to mute or unmute sources?{' '}
-        <Link href="/settings" className="underline hover:text-white">
+        <Link href="/settings" className="underline hover:text-ink">
           Open settings
         </Link>
       </p>
@@ -185,10 +185,10 @@ function CredibilityMeter({ value }: { value: number }) {
   const tone = pct >= 80 ? 'bg-brand-500' : pct >= 65 ? 'bg-warn-500' : 'bg-white/40';
   return (
     <div className="flex items-center gap-2" aria-label={`Credibility ${pct} of 100`}>
-      <div className="h-1 w-16 overflow-hidden rounded-full bg-white/10">
+      <div className="h-1 w-16 overflow-hidden rounded-full bg-ink-100">
         <div className={`h-1 ${tone}`} style={{ width: `${pct}%` }} />
       </div>
-      <span className="text-[11px] text-white/65 tabular-nums">{pct}</span>
+      <span className="text-[11px] text-ink-600 tabular-nums">{pct}</span>
     </div>
   );
 }

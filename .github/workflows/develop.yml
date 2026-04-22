@@ -1,0 +1,59 @@
+name: Develop signals
+
+# Periodically enriches the top-priority developing/unverified signals
+# using the live-corroboration fan-out (web search + Reddit + Bluesky +
+# Wikipedia + GDELT + sensor networks). Runs by calling the deployed
+# web app's /api/signal/:id/develop endpoint, so Firecrawl / Brave /
+# Bluesky creds stay on the web side only.
+#
+# Cadence: every 2 hours at :37 (offset from ingest at :17).
+# Per run: up to 6 stale signals, spaced 6s apart, ~60-90s total.
+# This is the "automatic enrichment" path — see the note in
+# apps/worker/src/jobs/develop.ts for why we don't enrich every signal
+# at ingest time.
+
+on:
+  schedule:
+    - cron: '37 */2 * * *'
+  workflow_dispatch:
+    inputs:
+      max:
+        description: 'Max signals to enrich this run'
+        required: false
+        default: '6'
+      dry_run:
+        description: 'If "true", list candidates without calling the endpoint'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: develop
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # The worker calls POST $WEB_APP_URL/api/signal/:id/develop. That
+      # endpoint holds the Firecrawl / Brave / Bluesky credentials on
+      # the web side, so we only need the URL here — not the secrets.
+      WEB_APP_URL: ${{ vars.WEB_APP_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run develop
+        run: |
+          max="${{ github.event.inputs.max || '6' }}"
+          dry="${{ github.event.inputs.dry_run || 'false' }}"
+          args="--max=$max"
+          if [ "$dry" = "true" ]; then args="$args --dry-run"; fi
+          npm run develop -- $args

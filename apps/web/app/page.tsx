@@ -1,10 +1,18 @@
 import Link from 'next/link';
 import { getServerSupabase } from '@/lib/supabase-server';
-import { Card } from '@/components/ui/card';
 
 export const metadata = {
   title: 'Crosscheck — see where reporting agrees, conflicts, and lacks evidence',
 };
+
+const TOPIC_TILES: Array<{ label: string; slug: string; tile: string; kicker: string }> = [
+  { label: 'Conflict', slug: 'war', tile: 'tile-war', kicker: 'Global' },
+  { label: 'Economy', slug: 'economy', tile: 'tile-economy', kicker: 'Markets' },
+  { label: 'Climate', slug: 'climate', tile: 'tile-climate', kicker: 'Sensors' },
+  { label: 'Cyber', slug: 'cyber', tile: 'tile-cyber', kicker: 'Incidents' },
+  { label: 'Disaster', slug: 'disaster', tile: 'tile-disaster', kicker: 'Realtime' },
+  { label: 'Civil', slug: 'civil', tile: 'tile-civil', kicker: 'Society' },
+];
 
 export default async function LandingPage() {
   let signedIn = false;
@@ -17,90 +25,174 @@ export default async function LandingPage() {
   }
 
   return (
-    <div className="space-y-16">
-      <section className="rounded-card border border-white/10 bg-gradient-to-br from-brand-500/10 via-white/5 to-transparent p-6 sm:p-10">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-300">
+    <div className="space-y-10 sm:space-y-14">
+      <section>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">
           Source consistency
         </p>
-        <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
-          See where reporting agrees, conflicts, and lacks evidence.
+        <h1 className="mt-3 max-w-3xl text-[40px] font-semibold leading-[1.05] tracking-tight text-ink sm:text-[56px]">
+          let&apos;s find out <br className="hidden sm:block" />
+          <span className="text-ink-500">what the world actually agrees on.</span>
         </h1>
-        <p className="mt-4 max-w-2xl text-base text-white/75 sm:text-lg">
-          Crosscheck reads public reporting and open sensor networks (seismic, satellite, weather,
-          market, cyber), clusters them by event, and shows three things for each: how sources
-          agree, where they conflict, and which pieces of evidence are missing. No scoring of
-          right and wrong — only visibility into the shape of the reporting.
+        <p className="mt-5 max-w-2xl text-base text-ink-500 sm:text-lg">
+          Crosscheck reads public reporting and open sensor networks, clusters them by event, and
+          shows three things for each: how sources agree, where they conflict, and which pieces of
+          evidence are still missing.
         </p>
+
+        {/* Search-like CTA row matching the reference's rounded input + filter button. */}
+        <form action="/feed" className="mt-7 flex max-w-xl items-center gap-3">
+          <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-ink-100 bg-paper px-4 py-3 shadow-card">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-4 w-4 shrink-0 text-ink-400"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <input
+              name="topic"
+              type="search"
+              placeholder="Search signals, topics, countries"
+              className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-ink-400 focus:outline-none"
+            />
+          </label>
+          <button
+            type="submit"
+            aria-label="Browse feed"
+            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-[0_8px_20px_-6px_rgba(245,158,11,0.55)] hover:bg-amber-600"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M5 12h14" />
+              <path d="m13 5 7 7-7 7" />
+            </svg>
+          </button>
+        </form>
+
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
             href={signedIn ? '/dashboard' : '/login'}
-            className="rounded-full bg-white px-5 py-2.5 text-sm font-medium text-black hover:bg-white/90"
+            className="rounded-full bg-ink-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-ink-700"
           >
             {signedIn ? 'Open dashboard' : 'Get your workspace'}
           </Link>
           <Link
-            href="/feed"
-            className="rounded-full border border-white/15 px-5 py-2.5 text-sm hover:border-white/35"
+            href="/verify"
+            className="rounded-full border border-ink-100 bg-paper px-5 py-2.5 text-sm font-medium text-ink hover:border-ink-200"
           >
-            Explore live feed
+            Verify a claim
           </Link>
           <Link
             href="/trust"
-            className="rounded-full border border-white/15 px-5 py-2.5 text-sm hover:border-white/35"
+            className="rounded-full border border-ink-100 bg-paper px-5 py-2.5 text-sm font-medium text-ink-500 hover:text-ink"
           >
             Methodology
           </Link>
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        <Feature
-          title="Agreement"
-          body="Cluster public reports by event, show how many independent credible sources are telling the same story, and mark the parts that line up across all of them."
-        />
-        <Feature
-          title="Conflicts"
-          body="Surface numeric mismatches, cause disagreements, and presence vs. absence discrepancies between sources — with a one-line summary and direct citations."
-        />
-        <Feature
-          title="Evidence gaps"
-          body="Report when seismic, satellite, or weather-service sensor data supports a claim, and just as clearly when it doesn't. Limitations are always stated alongside."
-        />
+      {/* Topic browser — the reference's "Travel Place" row, adapted. */}
+      <section>
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight text-ink sm:text-2xl">
+              Browse by topic
+            </h2>
+            <p className="mt-1 text-sm text-ink-500">
+              Pick a topic to jump straight into today&apos;s corroboration map.
+            </p>
+          </div>
+          <Link
+            href="/feed"
+            className="text-sm font-semibold text-amber-600 hover:text-amber-700"
+          >
+            See all
+          </Link>
+        </div>
+        <ul className="no-scrollbar mt-4 flex snap-x gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible lg:grid-cols-6">
+          {TOPIC_TILES.map((t) => (
+            <li key={t.slug} className="snap-start">
+              <Link
+                href={`/feed?topic=${t.slug}`}
+                className="group flex w-44 flex-col overflow-hidden rounded-card border border-ink-100 bg-paper shadow-card transition hover:shadow-card-hover sm:w-auto"
+              >
+                <span className={`block h-28 ${t.tile} sm:h-32`} aria-hidden="true" />
+                <span className="flex items-center justify-between gap-2 px-4 py-3">
+                  <span className="flex flex-col">
+                    <span className="text-sm font-semibold text-ink">{t.label}</span>
+                    <span className="text-[11px] uppercase tracking-wider text-ink-400">
+                      {t.kicker}
+                    </span>
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-white transition group-hover:bg-amber-600"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-3.5 w-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M5 12h14" />
+                      <path d="m13 5 7 7-7 7" />
+                    </svg>
+                  </span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2">
-        <Card title="What you get after sign-in">
-          <ul className="space-y-2 text-sm text-white/80">
-            <li>Personal dashboard with your focus topics and alert thresholds</li>
-            <li>Priority workspace for high-severity, well-corroborated signals</li>
-            <li>Source control panel with credibility tiers and mute controls</li>
-            <li>Per-account AI analyst sessions and chat memory</li>
-            <li>Daily personal briefings (email + in-app archive)</li>
-          </ul>
-        </Card>
-        <Card title="What Crosscheck is not">
-          <p className="text-sm text-white/80">
-            Crosscheck is not an OSINT investigation tool and not a news app. It doesn&apos;t tell
-            you what happened — it tells you how the public record about an event is or
-            isn&apos;t lining up across sources and sensor evidence. Every signal is traceable
-            to the underlying reports; every disagreement is shown with both sides.
-          </p>
-          <div className="mt-4">
-            <Link href="/about" className="text-sm text-brand-300 underline">
-              Read what this is and isn&apos;t
-            </Link>
-          </div>
-        </Card>
+      {/* What you get — feature trio, now on the light canvas. */}
+      <section>
+        <h2 className="text-xl font-semibold tracking-tight text-ink sm:text-2xl">
+          What Crosscheck gives you
+        </h2>
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <Feature
+            title="Agreement"
+            body="Cluster public reports by event and show how many independent credible sources are telling the same story."
+          />
+          <Feature
+            title="Conflicts"
+            body="Surface numeric mismatches, cause disagreements, and presence vs. absence discrepancies — with direct citations."
+          />
+          <Feature
+            title="Evidence gaps"
+            body="Report when seismic, satellite, or weather-service sensor data supports a claim, and just as clearly when it doesn't."
+          />
+        </div>
       </section>
+
     </div>
   );
 }
 
 function Feature({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-card border border-white/10 bg-white/[0.03] p-5">
-      <h3 className="text-base font-semibold">{title}</h3>
-      <p className="mt-2 text-sm text-white/70">{body}</p>
+    <div className="rounded-card border border-ink-100 bg-paper p-5 shadow-card">
+      <h3 className="text-base font-semibold text-ink">{title}</h3>
+      <p className="mt-2 text-sm text-ink-500">{body}</p>
     </div>
   );
 }

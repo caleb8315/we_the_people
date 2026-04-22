@@ -4,10 +4,10 @@ export const metadata = { title: 'Methodology · Crosscheck' };
 
 export default function TrustPage() {
   return (
-    <article className="prose-osint max-w-3xl space-y-6 text-white/80">
+    <article className="prose-osint max-w-3xl space-y-6 text-ink-600">
       <header>
         <h1 className="text-3xl font-semibold tracking-tight">Methodology</h1>
-        <p className="mt-2 text-white/70">
+        <p className="mt-2 text-ink-600">
           Crosscheck shows three things per event: how public reporting agrees, where it
           conflicts, and which pieces of evidence are missing. This page explains the labels
           and how they&apos;re derived.
@@ -16,7 +16,7 @@ export default function TrustPage() {
 
       <section>
         <h2>Reliability labels</h2>
-        <p className="text-white/70">
+        <p className="text-ink-600">
           A reliability label reflects how many independent, credible public sources are
           reporting the same underlying event. It is a description of coverage, not an
           assessment of whether the event occurred.
@@ -43,7 +43,7 @@ export default function TrustPage() {
 
       <section>
         <h2>Reliability score</h2>
-        <p className="text-white/70">
+        <p className="text-ink-600">
           A composite 0–100 score derived from four dimensions — agreement across sources,
           independence of domains, strength of physical evidence, and narrative divergence.
           The score is mapped to a public label:
@@ -62,7 +62,7 @@ export default function TrustPage() {
             reports before relying on the event.
           </li>
         </ul>
-        <p className="text-xs text-white/60">
+        <p className="text-xs text-ink-500">
           &quot;Likely accurate&quot; describes how well the reporting is corroborated — it is
           not a judgment about the event itself.
         </p>

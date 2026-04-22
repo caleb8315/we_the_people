@@ -15,19 +15,21 @@ export function Card({
 }) {
   const toneClass =
     tone === 'accent'
-      ? 'border-brand-500/35 bg-brand-500/[0.04]'
+      ? 'border-brand-200 bg-brand-50/60'
       : tone === 'danger'
-        ? 'border-danger-500/35 bg-danger-500/[0.04]'
+        ? 'border-danger-200 bg-danger-50/60'
         : tone === 'warn'
-          ? 'border-warn-500/35 bg-warn-500/[0.04]'
-          : 'border-white/10 bg-white/[0.03]';
+          ? 'border-amber-200 bg-amber-50/60'
+          : 'border-ink-100 bg-paper';
 
   return (
-    <section className={`rounded-card border ${toneClass} p-5 ${className}`}>
+    <section className={`rounded-card border ${toneClass} p-5 shadow-card ${className}`}>
       {(title || action) && (
         <header className="mb-3 flex items-center justify-between gap-3">
           {typeof title === 'string' ? (
-            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-white/60">{title}</h2>
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-400">
+              {title}
+            </h2>
           ) : (
             title
           )}

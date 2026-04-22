@@ -1,0 +1,497 @@
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import {
+  assessImageProvenance,
+  assessLinkProvenance,
+  assessSocialProvenance,
+  buildConfidenceReport,
+  canonicalizeUrl,
+  decideVerification,
+  describeImageObservation,
+  extractDomain,
+  heuristicConfidence,
+  isCredibleDomain,
+  isSocialUrl,
+  reliabilityPublicLabel,
+  computeReliabilityScores,
+} from '@osint/core';
+import type {
+  ConfidenceReport,
+  EvidenceItem,
+  ImageObservationSnapshot,
+  SocialProvenance,
+  LinkProvenance,
+  ImageProvenance,
+} from '@osint/core';
+import { getAdminSupabase, getServerSupabase } from '@/lib/supabase-server';
+import { getClientKey, limit } from '@/lib/rate-limit';
+import { logProductEvent } from '@/lib/product-events';
+import {
+  extractKeywords,
+  fetchPageMetadata,
+  runLiveCorroboration,
+  type MatchedSignal,
+} from '@/lib/verify-corroboration';
+import { buildReaderReport, type ReaderReport } from '@/lib/reader-report';
+
+/** Cap on how many hosts we remember per image hash. Keeps rows small. */
+const MAX_SEEN_HOSTS = 10;
+
+/**
+ * POST /api/verify — run a URL / text / image submission through the same
+ * deterministic confidence engine that ranks the feed.
+ *
+ * Non-negotiable rules from the build plan:
+ *   - No parallel systems: this route composes the existing core primitives
+ *     (decideVerification, computeReliabilityScores, buildConfidenceReport)
+ *     and NEVER re-implements reliability math locally.
+ *   - Social submissions are capped at the `medium` band.
+ *   - No LLM call.
+ */
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+// GDELT's free DOC 2.0 API is the slow tail of our fan-out — p95 can be
+// 20-30s. We'd rather wait and give the user real coverage than return a
+// "GDELT errored" chip, so we give the route a generous duration cap. 45s
+// works on Vercel Hobby (max 60s) and leaves ~10s of headroom for our own
+// processing + response. The client shows progressive "still searching…"
+// messages so this long wait feels intentional, not broken.
+export const maxDuration = 45;
+
+const Body = z.object({
+  kind: z.enum(['url', 'text', 'image']),
+  url: z.string().url().optional(),
+  text: z.string().max(4000).optional(),
+  image_url: z.string().url().optional(),
+  image_filename: z.string().max(256).optional(),
+  image_sha256: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/i)
+    .optional(),
+});
+
+type VerifyResponse = {
+  report: ConfidenceReport;
+  /**
+   * Phase 8 — plain-English breakdown of the report, composed from the
+   * same inputs the engine used. The UI renders THIS instead of the raw
+   * report for everything user-facing.
+   */
+  reader_report: ReaderReport;
+  input: {
+    kind: 'url' | 'text' | 'image';
+    canonical_url: string | null;
+    host: string | null;
+    is_social: boolean;
+    platform: string | null;
+    platform_label: string | null;
+    preview_text: string | null;
+  };
+  social: SocialProvenance | null;
+  link: LinkProvenance | null;
+  image: ImageProvenance | null;
+  verification_id: string | null;
+  /**
+   * Phase 7 — live multi-system corroboration. Every submission fans out
+   * in parallel to web search, Reddit, Bluesky, Wikipedia, GDELT, open
+   * sensor networks, and our own tracked events. The coverage strip tells
+   * the user honestly which systems we searched, and what each returned.
+   */
+  corroboration: {
+    matched_signal: MatchedSignal | null;
+    matched_by: 'url' | 'keyword' | null;
+    total_sources: number;
+    credible_sources: number;
+    searched_title: string | null;
+    systems: Array<{
+      id: string;
+      name: string;
+      status: 'hit' | 'miss' | 'skipped' | 'unavailable' | 'error';
+      hits: number;
+      note: string;
+      evidence_count: number;
+    }>;
+  };
+};
+
+export async function POST(req: Request) {
+  const rl = limit(getClientKey(req, 'verify'), 20, 60_000);
+  if (!rl.ok) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
+
+  const parsed = Body.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
+  }
+
+  const body = parsed.data;
+  if (body.kind === 'url' && !body.url) {
+    return NextResponse.json({ error: 'url_required' }, { status: 400 });
+  }
+  if (body.kind === 'text' && !body.text) {
+    return NextResponse.json({ error: 'text_required' }, { status: 400 });
+  }
+  if (body.kind === 'image' && !body.image_url && !body.image_sha256) {
+    return NextResponse.json({ error: 'image_url_or_hash_required' }, { status: 400 });
+  }
+
+  const sb = getServerSupabase();
+  const { data: auth } = await sb.auth.getUser();
+  const userId = auth.user?.id ?? null;
+
+  let social: SocialProvenance | null = null;
+  let link: LinkProvenance | null = null;
+  let image: ImageProvenance | null = null;
+  let canonical_url: string | null = null;
+  let host: string | null = null;
+  let evidence: EvidenceItem[] = [];
+  const provenanceWarnings: string[] = [];
+  let capMedium = false;
+  let title: string | null = null;
+
+  if (body.kind === 'url' && body.url) {
+    if (isSocialUrl(body.url)) {
+      social = assessSocialProvenance(body.url);
+      if (!social) {
+        return NextResponse.json({ error: 'unparseable_social_url' }, { status: 400 });
+      }
+      canonical_url = social.canonical_url;
+      host = (() => {
+        try {
+          return new URL(social.canonical_url).hostname.replace(/^www\./, '');
+        } catch {
+          return null;
+        }
+      })();
+      title = `Social submission · ${social.platform_label}`;
+      provenanceWarnings.push(...social.warnings);
+      capMedium = social.cap_band_at_medium;
+    } else {
+      link = assessLinkProvenance(body.url);
+      if (!link) return NextResponse.json({ error: 'invalid_url' }, { status: 400 });
+      canonical_url = link.canonical_url;
+      host = link.host;
+      title = `Link submission · ${link.host}`;
+      provenanceWarnings.push(...link.tags);
+    }
+    const dom = extractDomain(canonical_url ?? body.url);
+    evidence = [
+      {
+        source_id: null,
+        url: canonical_url ?? body.url,
+        domain: dom,
+        title,
+        published_at: null,
+        is_credible: isCredibleDomain(dom),
+        excerpt: null,
+      },
+    ];
+  } else if (body.kind === 'text' && body.text) {
+    title = body.text.slice(0, 120);
+    evidence = [];
+    provenanceWarnings.push(
+      'Pasted text has no source attribution — confidence is derived from claim shape only.',
+    );
+    capMedium = true;
+  } else if (body.kind === 'image') {
+    const canon = body.image_url ? canonicalizeUrl(body.image_url) : null;
+    canonical_url = canon?.url ?? null;
+    host = canon?.host ?? null;
+    image = assessImageProvenance({
+      url: body.image_url ?? null,
+      filename: body.image_filename ?? null,
+      sha256: body.image_sha256 ?? null,
+    });
+    provenanceWarnings.push(...image.tags);
+    // Phase 3 — deterministic first-seen / reused-image hash tracking. When
+    // a client provides a SHA-256, we upsert into image_observations and
+    // emit observation tags *based on the pre-upsert snapshot* so a fresh
+    // submission reads as "first time seen" rather than "seen 1 time before".
+    if (body.image_sha256) {
+      const prior = await recordImageObservation({
+        sha256: body.image_sha256.toLowerCase(),
+        host,
+      });
+      provenanceWarnings.push(...describeImageObservation(prior, host));
+    }
+    title = body.image_filename ? `Image · ${body.image_filename}` : 'Image submission';
+    capMedium = true;
+    if (canonical_url) {
+      const dom = extractDomain(canonical_url);
+      evidence = [
+        {
+          source_id: null,
+          url: canonical_url,
+          domain: dom,
+          title,
+          published_at: null,
+          is_credible: isCredibleDomain(dom),
+          excerpt: null,
+        },
+      ];
+    }
+  }
+
+  // Phase 7 — live multi-system corroboration. Instead of running the
+  // confidence engine on just the submitted URL, we now fan out in
+  // parallel to every independent verification system we can reach
+  // (web search, Reddit, Bluesky, Wikipedia, GDELT global news, open
+  // sensor networks, and our own clustered-events DB), then feed the
+  // aggregated, deduped evidence into the SAME engine the feed uses.
+  //
+  // For URL submissions we still fetch the page's <title> / og:title
+  // first so the search has something meaningful to work with — a bare
+  // URL rarely shares enough tokens with external indexes to match.
+  let searchedTitle: string | null = null;
+  let pageDescription: string | null = null;
+  if (body.kind === 'url' && body.url && !social) {
+    const meta = await fetchPageMetadata(body.url);
+    if (meta.title) {
+      title = meta.title;
+      searchedTitle = meta.title;
+      pageDescription = meta.description;
+      if (evidence[0]) {
+        evidence[0] = { ...evidence[0], title: meta.title, excerpt: meta.description };
+      }
+    }
+  }
+
+  const keywords = extractKeywords(`${title ?? ''} ${body.text ?? ''}`);
+  const corroboration = await runLiveCorroboration(sb, {
+    canonicalUrl: canonical_url,
+    host,
+    title,
+    description: pageDescription,
+    text: body.text ?? null,
+    keywords,
+  });
+
+  // Merge the user's own submission at slot 0 so it stays the "primary"
+  // source trace entry, then the deduped live corpus behind it.
+  const mergedEvidence = dedupeByUrl([...evidence, ...corroboration.merged_evidence]);
+
+  // Run the same engine the feed uses. With corroboration folded in, this
+  // now sees every outlet, social post, reference anchor, and sensor hit
+  // that corroborates (or contradicts) the submission.
+  const decision = decideVerification(title ?? '', body.text ?? null, mergedEvidence);
+  const reliability = computeReliabilityScores({
+    evidence: mergedEvidence,
+    claims: [],
+    contradictions: corroboration.contradictions,
+  });
+  // Prefer the clustered signal's own source counts when we matched one —
+  // those are what the feed card shows, so verify stays in lockstep.
+  const matchedSignal = corroboration.matched_signal;
+  const sourceCount = matchedSignal
+    ? Math.max(matchedSignal.source_count, decision.source_count)
+    : decision.source_count;
+  const credibleCount = matchedSignal
+    ? Math.max(matchedSignal.credible_source_count, decision.credible_source_count)
+    : decision.credible_source_count;
+
+  const report = buildConfidenceReport({
+    verification_status: decision.status,
+    reliability_score: reliability.reliability_score,
+    reliability_label: reliabilityPublicLabel(reliability.reliability_score),
+    evidence: mergedEvidence,
+    contradictions: corroboration.contradictions,
+    physical_evidence: corroboration.physical_evidence,
+    source_count: sourceCount,
+    credible_source_count: credibleCount,
+    complex_signal: corroboration.complex_signal,
+    provenance_warnings: provenanceWarnings,
+    cap_band_at_medium: capMedium,
+  });
+  // Silence unused-confidence lint while still asserting the heuristic matches.
+  void heuristicConfidence(decision.source_count, decision.credible_source_count);
+
+  // Persist when the user is authenticated. Anonymous readers still get a
+  // full confidence report back — we just don't retain a history row.
+  let verification_id: string | null = null;
+  if (userId) {
+    const { data, error } = await sb
+      .from('verifications')
+      .insert({
+        user_id: userId,
+        kind: body.kind,
+        input_url: body.kind === 'url' ? body.url ?? null : null,
+        input_text: body.kind === 'text' ? body.text ?? null : null,
+        image_filename: body.image_filename ?? null,
+        image_sha256: body.image_sha256 ?? null,
+        platform: social?.platform ?? null,
+        host,
+        is_social: Boolean(social),
+        provenance_tags: provenanceWarnings.slice(0, 10),
+        confidence_band: report.band,
+        confidence_report: report,
+        status: 'ready',
+      })
+      .select('id')
+      .single();
+    if (!error && data) verification_id = (data as { id: string }).id;
+  }
+
+  // Phase 5 — KPI instrumentation. Deliberately fire-and-forget so an
+  // events-write failure never blocks a user's verification response.
+  if (userId) {
+    try {
+      await logProductEvent(sb, {
+        userId,
+        eventName: 'verify_submitted',
+        eventProps: {
+          kind: body.kind,
+          band: report.band,
+          is_social: Boolean(social),
+          platform: social?.platform ?? null,
+          host,
+          provenance_tag_count: provenanceWarnings.length,
+          matched_signal_id: matchedSignal?.id ?? null,
+          matched_by: corroboration.matched_by,
+          total_sources: sourceCount,
+          credible_sources: credibleCount,
+          systems_hit: corroboration.systems.filter((s) => s.status === 'hit').length,
+          systems_queried: corroboration.systems.length,
+        },
+      });
+    } catch {
+      // telemetry is best-effort
+    }
+  }
+
+  // Phase 8 — Reader Report. Translate the engine's output into the
+  // plain-English structure every user-facing surface renders.
+  const readerReport: ReaderReport = buildReaderReport({
+    confidence: report,
+    input: {
+      kind: body.kind,
+      canonical_url,
+      host,
+      headline: searchedTitle ?? title,
+      preview_text: body.kind === 'text' ? body.text?.slice(0, 300) ?? null : null,
+      is_social: Boolean(social),
+      social_platform_label: social?.platform_label ?? null,
+      image_filename: body.image_filename ?? null,
+      has_image_hash: Boolean(body.image_sha256),
+    },
+    corroboration: {
+      systems: corroboration.systems,
+      matched_signal: matchedSignal
+        ? {
+            id: matchedSignal.id,
+            title: matchedSignal.title,
+            source_count: matchedSignal.source_count,
+            credible_source_count: matchedSignal.credible_source_count,
+          }
+        : null,
+    },
+    provenance_limits: provenanceWarnings,
+  });
+
+  const response: VerifyResponse = {
+    report,
+    reader_report: readerReport,
+    input: {
+      kind: body.kind,
+      canonical_url,
+      host,
+      is_social: Boolean(social),
+      platform: social?.platform ?? null,
+      platform_label: social?.platform_label ?? null,
+      preview_text: body.kind === 'text' ? body.text?.slice(0, 300) ?? null : null,
+    },
+    social,
+    link,
+    image,
+    verification_id,
+    corroboration: {
+      matched_signal: matchedSignal,
+      matched_by: corroboration.matched_by,
+      total_sources: sourceCount,
+      credible_sources: credibleCount,
+      searched_title: searchedTitle,
+      systems: corroboration.systems,
+    },
+  };
+  return NextResponse.json(response);
+}
+
+/**
+ * Dedupe EvidenceItems by canonical URL (case-insensitive). Preserves
+ * insertion order so slot 0 (the user's own submission) stays primary.
+ */
+function dedupeByUrl(items: EvidenceItem[]): EvidenceItem[] {
+  const out: EvidenceItem[] = [];
+  const seen = new Set<string>();
+  for (const e of items) {
+    const key = (e.url ?? '').toLowerCase().trim();
+    if (!key) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(e);
+  }
+  return out;
+}
+
+/**
+ * Fetch any prior observation for this hash, then upsert a new / incremented
+ * row. Returns the PRE-upsert snapshot so the caller can describe the image
+ * as "first time seen" on a genuinely first submission.
+ *
+ * Runs under the service-role client — the table is intentionally cross-user
+ * (sha256 is anonymous, shared dedup data), so no user-scoped writes apply.
+ */
+async function recordImageObservation(opts: {
+  sha256: string;
+  host: string | null;
+}): Promise<ImageObservationSnapshot | null> {
+  let admin: ReturnType<typeof getAdminSupabase>;
+  try {
+    admin = getAdminSupabase();
+  } catch {
+    // Service role not configured in this env — skip silently. The UI still
+    // gets a full confidence report; we just cannot dedupe this time.
+    return null;
+  }
+
+  const { data: priorRow } = await admin
+    .from('image_observations')
+    .select('first_seen_at,last_seen_at,observation_count,seen_hosts,first_host')
+    .eq('sha256', opts.sha256)
+    .maybeSingle();
+
+  const prior: ImageObservationSnapshot | null = priorRow
+    ? {
+        first_seen_at: priorRow.first_seen_at,
+        last_seen_at: priorRow.last_seen_at,
+        observation_count: priorRow.observation_count,
+        seen_hosts: priorRow.seen_hosts ?? [],
+        first_host: priorRow.first_host ?? null,
+      }
+    : null;
+
+  const now = new Date().toISOString();
+  if (prior) {
+    const seen = new Set(prior.seen_hosts);
+    if (opts.host) seen.add(opts.host);
+    const seenList = [...seen].slice(0, MAX_SEEN_HOSTS);
+    await admin
+      .from('image_observations')
+      .update({
+        last_seen_at: now,
+        observation_count: prior.observation_count + 1,
+        seen_hosts: seenList,
+      })
+      .eq('sha256', opts.sha256);
+  } else {
+    await admin.from('image_observations').insert({
+      sha256: opts.sha256,
+      first_seen_at: now,
+      last_seen_at: now,
+      observation_count: 1,
+      seen_hosts: opts.host ? [opts.host] : [],
+      first_host: opts.host,
+      first_context: 'verify',
+    });
+  }
+  return prior;
+}

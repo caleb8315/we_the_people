@@ -60,22 +60,68 @@ export async function runIngest(): Promise<{
     console.log(`[ingest] registered ${sourceRows.length} DB sources for dynamic credibility`);
   }
 
-  // Parallel fetch.
+  // Parallel fetch — each adapter is timed so we can upsert a per-run row
+  // into `source_health` (migration 018). Downstream ops surfaces read
+  // from that table to spot degraded or stale providers, and Phase 4's
+  // diversity balancing uses the `items_fetched` counter to detect when
+  // a single ecosystem is overrepresenting the feed.
+  const startedAt = adapters.map(() => Date.now());
   const results = await Promise.allSettled(adapters.map(a => a.fetch()));
   const items: RawItem[] = [];
   let fetched = 0;
+  const healthRows: Array<{
+    source_id: string;
+    status: 'ok' | 'degraded' | 'failed';
+    latency_ms: number;
+    items_fetched: number;
+    error: string | null;
+  }> = [];
   results.forEach((r, i) => {
     const a = adapters[i]!;
+    const latency = Date.now() - (startedAt[i] ?? Date.now());
     if (r.status === 'fulfilled') {
       items.push(...r.value);
       fetched += r.value.length;
-      console.log(`[ingest] ${a.id}: ${r.value.length}`);
+      console.log(`[ingest] ${a.id}: ${r.value.length} (${latency}ms)`);
+      healthRows.push({
+        source_id: a.id,
+        status: r.value.length === 0 ? 'degraded' : 'ok',
+        latency_ms: latency,
+        items_fetched: r.value.length,
+        error: null,
+      });
     } else {
       const msg = `${a.id}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`;
       console.warn('[ingest] fetch failed — ' + msg);
       errors.push(msg);
+      healthRows.push({
+        source_id: a.id,
+        status: 'failed',
+        latency_ms: latency,
+        items_fetched: 0,
+        error: msg.slice(0, 500),
+      });
     }
   });
+
+  // Record source health. This write is best-effort — a DB hiccup here
+  // must never kill the ingest run. We guard against FK errors (row for
+  // an unknown source_id) by filtering via an id whitelist before insert.
+  if (healthRows.length > 0) {
+    try {
+      const { data: enabledRows } = await supabase()
+        .from('sources')
+        .select('id');
+      const known = new Set((enabledRows ?? []).map((r: { id: string }) => r.id));
+      const writable = healthRows.filter(row => known.has(row.source_id));
+      if (writable.length > 0) {
+        const { error } = await supabase().from('source_health').insert(writable);
+        if (error) console.warn('[ingest] source_health insert failed:', error.message);
+      }
+    } catch (err) {
+      console.warn('[ingest] source_health exception:', (err as Error).message);
+    }
+  }
 
   // ── Classify topics up-front (needed for both clustering and dedupe) ──
   const itemTopics: string[] = items.map(

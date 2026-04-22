@@ -29,13 +29,13 @@ export default async function OnboardingPage() {
   return (
     <div className="mx-auto max-w-xl space-y-5">
       <header>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-300">Welcome</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-700">Welcome</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Set up your workspace</h1>
-        <p className="mt-2 text-sm text-white/70">
+        <p className="mt-2 text-sm text-ink-600">
           One-time setup. Pick your identity, focus topics, and delivery defaults. You can change anything later.
         </p>
       </header>
-      <div className="rounded-card border border-white/10 bg-white/[0.03] p-5">
+      <div className="rounded-card border border-ink-100 bg-paper p-5">
         <OnboardingForm defaultName={defaultName} />
       </div>
     </div>

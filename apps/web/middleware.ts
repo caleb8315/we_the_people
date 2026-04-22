@@ -13,7 +13,25 @@ export async function middleware(request: NextRequest) {
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const supabaseConfigured = !!url && !!anon;
 
-  if (supabaseConfigured) {
+  const protectedPrefixes = ['/settings', '/ops', '/dashboard', '/onboarding'];
+  const isProtectedRoute = protectedPrefixes.some((p) =>
+    request.nextUrl.pathname.startsWith(p),
+  );
+
+  // Fail CLOSED on protected routes when auth isn't configured. A previous
+  // version left these routes open if the Supabase env vars were missing,
+  // which would silently disable the auth gate on any misconfigured deploy.
+  if (!supabaseConfigured) {
+    if (isProtectedRoute) {
+      const redirect = request.nextUrl.clone();
+      redirect.pathname = '/login';
+      redirect.searchParams.set('next', request.nextUrl.pathname);
+      redirect.searchParams.set('reason', 'auth_unavailable');
+      return NextResponse.redirect(redirect);
+    }
+    // Public routes continue — they don't require auth — but we still set
+    // the CSP header below so the app stays behind the same CSP.
+  } else {
     const supabase = createServerClient(url!, anon!, {
       cookies: {
         get: (name: string) => request.cookies.get(name)?.value,
@@ -26,17 +44,12 @@ export async function middleware(request: NextRequest) {
       },
     });
 
-    await supabase.auth.getUser();
-
-    const protectedPrefixes = ['/settings', '/ops', '/dashboard', '/onboarding'];
-    if (protectedPrefixes.some(p => request.nextUrl.pathname.startsWith(p))) {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
-        const redirect = request.nextUrl.clone();
-        redirect.pathname = '/login';
-        redirect.searchParams.set('next', request.nextUrl.pathname);
-        return NextResponse.redirect(redirect);
-      }
+    const { data } = await supabase.auth.getUser();
+    if (isProtectedRoute && !data.user) {
+      const redirect = request.nextUrl.clone();
+      redirect.pathname = '/login';
+      redirect.searchParams.set('next', request.nextUrl.pathname);
+      return NextResponse.redirect(redirect);
     }
   }
 

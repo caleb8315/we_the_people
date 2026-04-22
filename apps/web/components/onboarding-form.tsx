@@ -55,7 +55,7 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
           maxLength={40}
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
-          className="w-full rounded-md border border-white/15 bg-white/5 px-3 py-2 text-white outline-none focus:border-brand-500/50"
+          className="w-full rounded-md border border-ink-100 bg-canvas-50 px-3 py-2 text-ink outline-none focus:border-brand-300"
           placeholder="Analyst Zero"
         />
       </Section>
@@ -75,8 +75,8 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
                 }
                 className={`rounded-full border px-3 py-1.5 text-sm capitalize transition ${
                   selected
-                    ? 'border-brand-500/40 bg-brand-500/15 text-brand-200'
-                    : 'border-white/10 text-white/65 hover:border-white/25 hover:text-white'
+                    ? 'border-brand-200 bg-brand-50 text-brand-700'
+                    : 'border-ink-100 text-ink-600 hover:border-ink-200 hover:text-ink'
                 }`}
               >
                 {topic}
@@ -142,7 +142,7 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
         {saving ? 'Finishing…' : 'Enter dashboard'}
       </button>
 
-      {error && <p className="text-sm text-danger-400">{error}</p>}
+      {error && <p className="text-sm text-danger-600">{error}</p>}
     </form>
   );
 }
@@ -150,8 +150,8 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-white/60">{title}</h2>
-      {hint && <p className="mb-2 mt-1 text-xs text-white/50">{hint}</p>}
+      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">{title}</h2>
+      {hint && <p className="mb-2 mt-1 text-xs text-ink-400">{hint}</p>}
       <div className={hint ? '' : 'mt-2'}>{children}</div>
     </section>
   );

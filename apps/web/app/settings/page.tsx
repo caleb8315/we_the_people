@@ -23,8 +23,8 @@ export default async function SettingsPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-sm text-white/60">
-          Signed in as <span className="font-mono text-white/80">{auth.user.email}</span>.
+        <p className="text-sm text-ink-500">
+          Signed in as <span className="font-mono text-ink-600">{auth.user.email}</span>.
         </p>
       </header>
       <SettingsForm

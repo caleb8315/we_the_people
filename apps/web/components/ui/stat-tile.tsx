@@ -16,18 +16,18 @@ export function StatTile({
 }) {
   const toneClass =
     tone === 'accent'
-      ? 'border-brand-500/35 bg-brand-500/[0.06]'
+      ? 'border-brand-200 bg-brand-50'
       : tone === 'danger'
-        ? 'border-danger-500/35 bg-danger-500/[0.06]'
+        ? 'border-danger-200 bg-danger-50'
         : tone === 'warn'
-          ? 'border-warn-500/35 bg-warn-500/[0.06]'
-          : 'border-white/10 bg-white/[0.03]';
+          ? 'border-amber-200 bg-amber-50'
+          : 'border-ink-100 bg-paper';
 
   const content = (
-    <div className={`rounded-card border ${toneClass} p-4 transition hover:bg-white/[0.06]`}>
-      <p className="text-[11px] font-medium uppercase tracking-wider text-white/55">{label}</p>
+    <div className={`rounded-card border ${toneClass} p-4 transition hover:bg-canvas-50`}>
+      <p className="text-[11px] font-medium uppercase tracking-wider text-ink-500">{label}</p>
       <p className="mt-1.5 text-2xl font-semibold tabular-nums">{value}</p>
-      {hint && <p className="mt-1 text-xs text-white/55">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-ink-500">{hint}</p>}
     </div>
   );
 

@@ -16,6 +16,12 @@ const Env = z.object({
 
   TELEGRAM_BOT_TOKEN: emptyToUndef(z.string().optional()),
   TELEGRAM_OPERATOR_CHAT_ID: emptyToUndef(z.string().optional()),
+
+  // Phase 9 — base URL of the deployed web app. The `develop` cron job
+  // calls `POST <WEB_APP_URL>/api/signal/<id>/develop` to enrich stale
+  // developing signals, because the live corroboration fan-out's env
+  // vars (Firecrawl / Brave / Bluesky) live in the web app, not here.
+  WEB_APP_URL: emptyToUndef(z.string().url().optional()),
 });
 
 let cached: z.infer<typeof Env> | null = null;

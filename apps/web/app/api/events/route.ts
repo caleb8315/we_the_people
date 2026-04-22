@@ -23,6 +23,10 @@ const EventBody = z.object({
     'mobile_nav_used',
     'feed_scrolled_depth',
     'saved_view_applied',
+    'verify_submitted',
+    'verify_result_viewed',
+    'verify_shared',
+    'signal_feedback_sent',
   ]),
   event_props: z.record(z.unknown()).optional(),
 });

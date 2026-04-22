@@ -36,9 +36,9 @@ function pinColor(severity: number): string {
 }
 
 function badgeTone(status: SignalGeoPoint['verification_status']) {
-  if (status === 'verified') return 'border-brand-500/40 text-brand-200';
-  if (status === 'developing') return 'border-warn-500/40 text-warn-400';
-  return 'border-white/20 text-white/70';
+  if (status === 'verified') return 'border-brand-200 text-brand-700';
+  if (status === 'developing') return 'border-amber-200 text-amber-700';
+  return 'border-ink-200 text-ink-600';
 }
 
 function markerIcon(L: typeof Leaflet, color: string) {
@@ -169,20 +169,20 @@ export function SignalsMapClient({
         popupRoot.innerHTML = `
           <div class="flex flex-wrap items-center gap-1">
             <span class="rounded-full border px-2 py-0.5 text-[11px] ${badgeTone(point.verification_status)}">${escapeHtml(statusLabel(point.verification_status))}</span>
-            <span class="rounded-full border border-white/20 px-2 py-0.5 text-[11px] text-white/75">severity ${point.severity}</span>
+            <span class="rounded-full border border-ink-200 px-2 py-0.5 text-[11px] text-ink-600">severity ${point.severity}</span>
             ${
               point.isApproximate
-                ? '<span class="rounded-full border border-white/20 px-2 py-0.5 text-[11px] text-white/60">approx</span>'
+                ? '<span class="rounded-full border border-ink-200 px-2 py-0.5 text-[11px] text-ink-500">approx</span>'
                 : ''
             }
           </div>
           <p class="font-medium leading-snug">${escapeHtml(point.title)}</p>
-          <p class="text-xs text-white/60">${escapeHtml(point.topic ?? 'other')}${point.country_code ? ` · ${escapeHtml(point.country_code)}` : ''}</p>
+          <p class="text-xs text-ink-500">${escapeHtml(point.topic ?? 'other')}${point.country_code ? ` · ${escapeHtml(point.country_code)}` : ''}</p>
         `;
         const link = document.createElement('a');
         link.href = `/signal/${point.id}?from=map&context=${context}`;
         link.className =
-          'inline-block rounded-full border border-white/20 px-3 py-1 text-xs hover:bg-white/10';
+          'inline-block rounded-full border border-ink-200 px-3 py-1 text-xs hover:bg-ink-100';
         link.textContent = 'Open signal';
         link.addEventListener('click', () => {
           void fireEvent('signal_opened_from_map', {
@@ -217,7 +217,7 @@ export function SignalsMapClient({
     <div className="relative h-full w-full">
       <div ref={mapElementRef} className="h-full w-full" aria-busy={!leafletReady} />
       {!leafletReady && !loadError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-white/65">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-ink-600">
           <span className="inline-flex items-center gap-2">
             <span
               aria-hidden="true"
@@ -228,9 +228,9 @@ export function SignalsMapClient({
         </div>
       )}
       {loadError && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/40 p-4 text-center text-xs text-white/75">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/40 p-4 text-center text-xs text-ink-600">
           <span>Map couldn&apos;t load.</span>
-          <span className="text-white/55">{loadError}</span>
+          <span className="text-ink-500">{loadError}</span>
           <button
             type="button"
             onClick={() => {
@@ -241,7 +241,7 @@ export function SignalsMapClient({
               // component — the simplest reliable path is a full reload.
               if (typeof window !== 'undefined') window.location.reload();
             }}
-            className="rounded-full border border-white/25 px-3 py-1 text-[11px] hover:bg-white/10"
+            className="rounded-full border border-ink-200 px-3 py-1 text-[11px] hover:bg-ink-100"
           >
             Retry
           </button>

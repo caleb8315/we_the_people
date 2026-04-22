@@ -14,7 +14,14 @@ export type ProductEventName =
   | 'signal_opened_from_map'
   | 'mobile_nav_used'
   | 'feed_scrolled_depth'
-  | 'saved_view_applied';
+  | 'saved_view_applied'
+  // Phase 5 — verify-flow telemetry for KPI tracking (helpful % / D7 uplift).
+  | 'verify_submitted'
+  | 'verify_result_viewed'
+  | 'verify_shared'
+  | 'signal_feedback_sent'
+  // Phase 9 — live story-development enrichment (same pipeline as /verify).
+  | 'signal_developed';
 
 export async function logProductEvent(
   sb: SupabaseClient,
