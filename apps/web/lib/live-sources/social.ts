@@ -15,8 +15,13 @@
 import { extractDomain, type EvidenceItem } from '@osint/core';
 import type { SourceQuery, SourceResult, SourceSearcher } from './types';
 
-const UA = 'Crosscheck-Verify/1.0 (+https://crosscheck.app)';
+const GENERIC_UA = 'Crosscheck-Verify/1.0 (+https://crosscheck.app)';
 const TIMEOUT_MS = 4_500;
+
+function redditUA(): string {
+  const appId = process.env.REDDIT_CLIENT_ID ?? 'crosscheck';
+  return `web:${appId}:v1.0 (by Crosscheck)`;
+}
 
 export const searchReddit: SourceSearcher = async (q) => {
   const query = pickQuery(q);
@@ -24,28 +29,26 @@ export const searchReddit: SourceSearcher = async (q) => {
     return { id: 'reddit', name: 'Reddit', status: 'skipped', hits: 0, note: 'No query text.', evidence: [] };
   }
   try {
-    // Reddit started aggressively blocking anonymous datacenter IPs (including
-    // Vercel) in 2024/2025 — we nearly always 403 from serverless. If a
-    // REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET pair is configured (free app at
-    // https://www.reddit.com/prefs/apps — choose "script" type, no user login
-    // required) we use the authenticated oauth.reddit.com host. Otherwise we
-    // attempt the anonymous endpoint but treat the inevitable 403 as
-    // `unavailable` with actionable setup instructions, not a generic error.
     const oauthToken = await getRedditAccessToken().catch(() => null);
-    const endpoint = oauthToken
-      ? 'https://oauth.reddit.com/search.json'
-      : 'https://www.reddit.com/search.json';
 
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-    const url = new URL(endpoint);
+
+    // With OAuth we MUST use oauth.reddit.com; without it, try the public
+    // endpoint (will 403 from Vercel but we handle that gracefully).
+    const url = new URL(
+      oauthToken
+        ? 'https://oauth.reddit.com/search'
+        : 'https://www.reddit.com/search.json',
+    );
     url.searchParams.set('q', query.slice(0, 200));
     url.searchParams.set('limit', '10');
     url.searchParams.set('sort', 'relevance');
     url.searchParams.set('t', 'month');
     url.searchParams.set('raw_json', '1');
 
-    const headers: Record<string, string> = { 'user-agent': UA, accept: 'application/json' };
+    const ua = oauthToken ? redditUA() : GENERIC_UA;
+    const headers: Record<string, string> = { 'user-agent': ua, accept: 'application/json' };
     if (oauthToken) headers.authorization = `Bearer ${oauthToken}`;
 
     const res = await fetch(url.toString(), {
@@ -55,25 +58,28 @@ export const searchReddit: SourceSearcher = async (q) => {
     }).catch(() => null);
     clearTimeout(timer);
     if (!res) {
-      return err('reddit', 'Reddit', 'Reddit request timed out.');
+      return unavailable('reddit', 'Reddit', 'Reddit request timed out.');
     }
-    // 403/401/429 from anonymous search is the expected norm on cloud
-    // hosts. Degrade to `unavailable` with actionable setup copy rather
-    // than pretending Crosscheck is broken.
-    if ((res.status === 401 || res.status === 403 || res.status === 429) && !oauthToken) {
-      return {
-        id: 'reddit',
-        name: 'Reddit',
-        status: 'unavailable',
-        hits: 0,
-        note:
-          `Reddit blocked our anonymous request (HTTP ${res.status}) — this is standard for cloud hosts. ` +
-          'Create a free Reddit "script" app at https://www.reddit.com/prefs/apps and set REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET in your Vercel env to enable Reddit corroboration.',
-        evidence: [],
-      };
+    // Both anonymous and authenticated 403s from Reddit are "unavailable"
+    // from the user's perspective. Provide different actionable copy for each
+    // so the user knows what to do next.
+    if (res.status === 401 || res.status === 403 || res.status === 429) {
+      if (!oauthToken) {
+        return unavailable(
+          'reddit',
+          'Reddit',
+          `Reddit blocked anonymous search (HTTP ${res.status}). ` +
+          'Create a free Reddit app at https://www.reddit.com/prefs/apps (type: "web app") and set REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET in Vercel env.',
+        );
+      }
+      return unavailable(
+        'reddit',
+        'Reddit',
+        `Reddit returned HTTP ${res.status} on the authenticated endpoint. This usually means the app type is wrong — go to https://www.reddit.com/prefs/apps, delete the existing app, and create a new one with type "web app" (not "script"). Then update REDDIT_CLIENT_ID/SECRET in Vercel env.`,
+      );
     }
     if (!res.ok) {
-      return err('reddit', 'Reddit', `Reddit returned HTTP ${res.status}.`);
+      return unavailable('reddit', 'Reddit', `Reddit returned HTTP ${res.status}.`);
     }
     const body = (await res.json().catch(() => null)) as RedditSearchResponse | null;
     const children = body?.data?.children ?? [];
@@ -148,15 +154,24 @@ export const searchBluesky: SourceSearcher = async (q) => {
       }
     }
 
+    // When authenticated, route through bsky.social (the PDS) which
+    // proxies the search to the AppView. The public.api.bsky.app host
+    // rejects authenticated requests with 403 from many cloud hosts.
+    // Without auth, try the public AppView — it'll 403 too from Vercel
+    // but we handle that gracefully below.
+    const searchHost = authToken
+      ? 'https://bsky.social/xrpc/app.bsky.feed.searchPosts'
+      : 'https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts';
+
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-    const url = new URL('https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts');
+    const url = new URL(searchHost);
     url.searchParams.set('q', query.slice(0, 200));
     url.searchParams.set('limit', '10');
     url.searchParams.set('sort', 'top');
 
     const headers: Record<string, string> = {
-      'user-agent': UA,
+      'user-agent': GENERIC_UA,
       accept: 'application/json',
     };
     if (authToken) headers.authorization = `Bearer ${authToken}`;
@@ -168,25 +183,28 @@ export const searchBluesky: SourceSearcher = async (q) => {
     }).catch(() => null);
     clearTimeout(timer);
     if (!res) {
-      return err('bluesky', 'Bluesky', 'Bluesky request failed (timeout or network).');
+      return unavailable('bluesky', 'Bluesky', 'Bluesky request timed out.');
     }
-    // Auth required by Bluesky for search in many regions. Distinguish
-    // "env vars missing" from "auth succeeded but search still refused"
-    // (e.g. account suspended / rate-limited) so the user can actually fix it.
     if (res.status === 401 || res.status === 403) {
-      return {
-        id: 'bluesky',
-        name: 'Bluesky',
-        status: 'unavailable',
-        hits: 0,
-        note: credsConfigured
-          ? `Bluesky accepted our login but refused the search (HTTP ${res.status}). Account may be rate-limited or flagged — try a different Bluesky account.`
-          : 'Bluesky search requires auth. Set BLUESKY_IDENTIFIER (e.g. you.bsky.social) and BLUESKY_APP_PASSWORD (app password from bsky.app/settings/app-passwords) in your env.',
-        evidence: [],
-      };
+      if (!credsConfigured) {
+        return unavailable(
+          'bluesky',
+          'Bluesky',
+          'Bluesky search requires auth. Set BLUESKY_IDENTIFIER (e.g. you.bsky.social) and BLUESKY_APP_PASSWORD (app password from bsky.app/settings/app-passwords) in your env.',
+        );
+      }
+      // Auth was configured and login succeeded, but search still 403'd.
+      // This can happen if: the account is new / suspended / rate-limited,
+      // or the PDS endpoint is also blocking. Surface actionable next steps.
+      return unavailable(
+        'bluesky',
+        'Bluesky',
+        `Bluesky search returned HTTP ${res.status} even with valid credentials. ` +
+        'This can happen with new or inactive accounts. Try posting something on Bluesky first (activates search permissions), or generate a fresh app password. If it persists, try a different Bluesky account.',
+      );
     }
     if (!res.ok) {
-      return err('bluesky', 'Bluesky', `Bluesky returned HTTP ${res.status}.`);
+      return unavailable('bluesky', 'Bluesky', `Bluesky returned HTTP ${res.status}.`);
     }
     const body = (await res.json().catch(() => null)) as BlueskySearchResponse | null;
     const posts = body?.posts ?? [];
@@ -229,34 +247,59 @@ export const searchBluesky: SourceSearcher = async (q) => {
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 /**
- * Reddit OAuth via the client-credentials flow. Requires a "script" app
- * (free, no user login) at https://www.reddit.com/prefs/apps — Reddit gives
- * you a client_id + client_secret pair. Tokens are valid for ~1 hour; we
- * cache and refresh with a small margin.
+ * Reddit app-only OAuth. Supports two app types:
+ *
+ *   • "web app" (confidential client) → `client_credentials` grant.
+ *   • "installed app" (public client, no secret) → `installed_client` grant
+ *     with a device_id (we use a fixed string — Reddit only uses it for
+ *     anonymous rate limiting, not user tracking).
+ *
+ * "script" type apps need a Reddit username + password which we don't want
+ * to ask for. If the user creates a "web app", both ID and secret are set.
+ * If they create an "installed app", only the ID is set and the secret is
+ * empty/missing. We handle both.
+ *
+ * Tokens are valid for ~1 hour; we cache with a margin.
  */
 let cachedRedditToken: { token: string; expiresAt: number } | null = null;
 
 async function getRedditAccessToken(): Promise<string | null> {
-  const clientId = process.env.REDDIT_CLIENT_ID;
-  const clientSecret = process.env.REDDIT_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
+  const clientId = (process.env.REDDIT_CLIENT_ID ?? '').trim();
+  const clientSecret = (process.env.REDDIT_CLIENT_SECRET ?? '').trim();
+  if (!clientId) return null;
 
   const now = Date.now();
   if (cachedRedditToken && cachedRedditToken.expiresAt > now) {
     return cachedRedditToken.token;
   }
 
+  const ua = redditUA();
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 3_000);
-  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+  const timer = setTimeout(() => ctrl.abort(), 4_000);
+
+  let grantBody: string;
+  let authHeader: string;
+  if (clientSecret) {
+    // Confidential client ("web app") — use Basic auth with id:secret.
+    const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    authHeader = `Basic ${basic}`;
+    grantBody = 'grant_type=client_credentials';
+  } else {
+    // Public client ("installed app") — no secret, send id in Basic with
+    // empty password and use the installed_client grant with a device_id.
+    const basic = Buffer.from(`${clientId}:`).toString('base64');
+    authHeader = `Basic ${basic}`;
+    grantBody = 'grant_type=https%3A%2F%2Foauth.reddit.com%2Fgrants%2Finstalled_client&device_id=DO_NOT_TRACK_THIS_DEVICE';
+  }
+
   const res = await fetch('https://www.reddit.com/api/v1/access_token', {
     method: 'POST',
     headers: {
-      authorization: `Basic ${basic}`,
-      'user-agent': UA,
+      authorization: authHeader,
+      'user-agent': ua,
       'content-type': 'application/x-www-form-urlencoded',
     },
-    body: 'grant_type=client_credentials',
+    body: grantBody,
     signal: ctrl.signal,
   }).catch(() => null);
   clearTimeout(timer);
@@ -331,7 +374,7 @@ async function getBlueskyAccessJwt(): Promise<BlueskyAuthResult> {
   const timer = setTimeout(() => ctrl.abort(), 3_000);
   const res = await fetch('https://bsky.social/xrpc/com.atproto.server.createSession', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'user-agent': UA },
+    headers: { 'content-type': 'application/json', 'user-agent': GENERIC_UA },
     body: JSON.stringify({ identifier, password }),
     signal: ctrl.signal,
   }).catch(() => null);
@@ -375,6 +418,14 @@ function err(
   note: string,
 ): SourceResult {
   return { id, name, status: 'error', hits: 0, note, evidence: [] };
+}
+
+function unavailable(
+  id: 'reddit' | 'bluesky',
+  name: string,
+  note: string,
+): SourceResult {
+  return { id, name, status: 'unavailable', hits: 0, note, evidence: [] };
 }
 
 // ─── upstream response shapes ──────────────────────────────────────────────

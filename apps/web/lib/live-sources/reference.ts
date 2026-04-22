@@ -134,16 +134,17 @@ export const searchGdelt: SourceSearcher = async (q) => {
     }).catch(() => null);
     clearTimeout(timer);
     if (!res) {
-      // Distinguish "we gave up waiting" from a real upstream failure. GDELT
-      // being slow is the norm, not an error — the UI should say so.
+      // Both timeout and network failure are "unavailable" from the user's
+      // perspective — GDELT is flaky from cloud hosts and that's not a
+      // Crosscheck bug. Never show "error" (red) for GDELT transience.
       return {
         id: 'gdelt',
         name: 'GDELT global news',
-        status: aborted ? 'skipped' : 'error',
+        status: 'unavailable',
         hits: 0,
         note: aborted
           ? `GDELT didn\u2019t respond within ${GDELT_TIMEOUT_MS / 1000}s. Their free tier can be slow during peak hours — try again later for global news coverage.`
-          : 'GDELT request failed before we got any response.',
+          : 'GDELT didn\u2019t respond from this server region. Their free API is inconsistent from cloud hosts — try again in a minute.',
         evidence: [],
       };
     }
