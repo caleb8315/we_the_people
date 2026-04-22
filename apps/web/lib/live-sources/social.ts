@@ -24,21 +24,56 @@ export const searchReddit: SourceSearcher = async (q) => {
     return { id: 'reddit', name: 'Reddit', status: 'skipped', hits: 0, note: 'No query text.', evidence: [] };
   }
   try {
+    // Reddit started aggressively blocking anonymous datacenter IPs (including
+    // Vercel) in 2024/2025 — we nearly always 403 from serverless. If a
+    // REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET pair is configured (free app at
+    // https://www.reddit.com/prefs/apps — choose "script" type, no user login
+    // required) we use the authenticated oauth.reddit.com host. Otherwise we
+    // attempt the anonymous endpoint but treat the inevitable 403 as
+    // `unavailable` with actionable setup instructions, not a generic error.
+    const oauthToken = await getRedditAccessToken().catch(() => null);
+    const endpoint = oauthToken
+      ? 'https://oauth.reddit.com/search.json'
+      : 'https://www.reddit.com/search.json';
+
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-    const url = new URL('https://www.reddit.com/search.json');
+    const url = new URL(endpoint);
     url.searchParams.set('q', query.slice(0, 200));
     url.searchParams.set('limit', '10');
     url.searchParams.set('sort', 'relevance');
     url.searchParams.set('t', 'month');
+    url.searchParams.set('raw_json', '1');
+
+    const headers: Record<string, string> = { 'user-agent': UA, accept: 'application/json' };
+    if (oauthToken) headers.authorization = `Bearer ${oauthToken}`;
+
     const res = await fetch(url.toString(), {
       method: 'GET',
-      headers: { 'user-agent': UA, accept: 'application/json' },
+      headers,
       signal: ctrl.signal,
     }).catch(() => null);
     clearTimeout(timer);
-    if (!res || !res.ok) {
-      return err('reddit', 'Reddit', `Reddit returned ${res?.status ?? 'no response'}.`);
+    if (!res) {
+      return err('reddit', 'Reddit', 'Reddit request timed out.');
+    }
+    // 403/401/429 from anonymous search is the expected norm on cloud
+    // hosts. Degrade to `unavailable` with actionable setup copy rather
+    // than pretending Crosscheck is broken.
+    if ((res.status === 401 || res.status === 403 || res.status === 429) && !oauthToken) {
+      return {
+        id: 'reddit',
+        name: 'Reddit',
+        status: 'unavailable',
+        hits: 0,
+        note:
+          `Reddit blocked our anonymous request (HTTP ${res.status}) — this is standard for cloud hosts. ` +
+          'Create a free Reddit "script" app at https://www.reddit.com/prefs/apps and set REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET in your Vercel env to enable Reddit corroboration.',
+        evidence: [],
+      };
+    }
+    if (!res.ok) {
+      return err('reddit', 'Reddit', `Reddit returned HTTP ${res.status}.`);
     }
     const body = (await res.json().catch(() => null)) as RedditSearchResponse | null;
     const children = body?.data?.children ?? [];
@@ -192,6 +227,48 @@ export const searchBluesky: SourceSearcher = async (q) => {
 };
 
 // ─── helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Reddit OAuth via the client-credentials flow. Requires a "script" app
+ * (free, no user login) at https://www.reddit.com/prefs/apps — Reddit gives
+ * you a client_id + client_secret pair. Tokens are valid for ~1 hour; we
+ * cache and refresh with a small margin.
+ */
+let cachedRedditToken: { token: string; expiresAt: number } | null = null;
+
+async function getRedditAccessToken(): Promise<string | null> {
+  const clientId = process.env.REDDIT_CLIENT_ID;
+  const clientSecret = process.env.REDDIT_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return null;
+
+  const now = Date.now();
+  if (cachedRedditToken && cachedRedditToken.expiresAt > now) {
+    return cachedRedditToken.token;
+  }
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 3_000);
+  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+  const res = await fetch('https://www.reddit.com/api/v1/access_token', {
+    method: 'POST',
+    headers: {
+      authorization: `Basic ${basic}`,
+      'user-agent': UA,
+      'content-type': 'application/x-www-form-urlencoded',
+    },
+    body: 'grant_type=client_credentials',
+    signal: ctrl.signal,
+  }).catch(() => null);
+  clearTimeout(timer);
+  if (!res || !res.ok) return null;
+  const body = (await res.json().catch(() => null)) as
+    | { access_token?: string; expires_in?: number }
+    | null;
+  if (!body?.access_token) return null;
+  const ttlMs = Math.max(60_000, ((body.expires_in ?? 3600) - 60) * 1000);
+  cachedRedditToken = { token: body.access_token, expiresAt: now + ttlMs };
+  return body.access_token;
+}
 
 /**
  * Create a Bluesky session via the com.atproto.server.createSession XRPC

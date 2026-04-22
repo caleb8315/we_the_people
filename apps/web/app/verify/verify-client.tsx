@@ -557,11 +557,14 @@ function CoverageStrip({
 }) {
   if (!systems || systems.length === 0) return null;
   // Callouts surface the real reason a system didn't return evidence.
-  // Without these, users see "· not configured" for everything that went
-  // wrong and have no way to self-diagnose.
+  // We treat `unavailable` and `error` as actionable — either a misconfig
+  // (env var missing) or a transient upstream failure. `skipped` is
+  // by-design (sensor networks skip non-physical claims, etc.) so we
+  // don't auto-expose it; users can still hover the badge for the note.
   const issues = systems.filter(
-    (s) => (s.status === 'unavailable' || s.status === 'error' || s.status === 'skipped') && s.note,
+    (s) => (s.status === 'unavailable' || s.status === 'error') && s.note,
   );
+  const skippedSystems = systems.filter((s) => s.status === 'skipped' && s.note);
   return (
     <div className="rounded-xl border border-ink-100 bg-canvas-50 p-3">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-400">
@@ -594,12 +597,27 @@ function CoverageStrip({
         ))}
       </ul>
       {issues.length > 0 && (
-        <details className="mt-2 text-[11px] text-ink-600">
-          <summary className="cursor-pointer select-none text-ink-500 hover:text-ink-700">
+        <details className="mt-2 text-[11px] text-ink-600" open>
+          <summary className="cursor-pointer select-none font-medium text-ink-700 hover:text-ink-900">
             Why some systems didn&rsquo;t return results ({issues.length})
           </summary>
           <ul className="mt-1.5 space-y-1 border-t border-ink-100 pt-1.5">
             {issues.map((s) => (
+              <li key={s.id} className="leading-snug">
+                <span className="font-medium text-ink-700">{s.name}:</span>{' '}
+                <span className="text-ink-600">{s.note}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {skippedSystems.length > 0 && (
+        <details className="mt-1.5 text-[11px] text-ink-500">
+          <summary className="cursor-pointer select-none hover:text-ink-700">
+            Why {skippedSystems.length} system{skippedSystems.length === 1 ? ' was' : 's were'} skipped
+          </summary>
+          <ul className="mt-1.5 space-y-1 border-t border-ink-100 pt-1.5">
+            {skippedSystems.map((s) => (
               <li key={s.id} className="leading-snug">
                 <span className="font-medium text-ink-700">{s.name}:</span>{' '}
                 <span className="text-ink-600">{s.note}</span>

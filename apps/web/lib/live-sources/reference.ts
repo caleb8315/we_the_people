@@ -163,9 +163,43 @@ export const searchGdelt: SourceSearcher = async (q) => {
           evidence: [],
         };
       }
-      return err('gdelt', 'GDELT global news', `GDELT returned HTTP ${res.status}.`);
+      // Any other non-200 is still transient from the user's perspective —
+      // we don't want to cry wolf with "upstream error" because GDELT is
+      // famously inconsistent. Surface the status but mark unavailable.
+      return {
+        id: 'gdelt',
+        name: 'GDELT global news',
+        status: 'unavailable',
+        hits: 0,
+        note: `GDELT returned HTTP ${res.status}. Their free tier is inconsistent from cloud hosts — we'll try again on the next verify.`,
+        evidence: [],
+      };
+    }
+    // GDELT sometimes returns a 200 with an HTML error page (e.g. under
+    // load, or when the query text trips their query parser). Guard against
+    // that so we don't throw a parse error and report "upstream error".
+    const contentType = res.headers.get('content-type') ?? '';
+    if (!contentType.includes('json')) {
+      return {
+        id: 'gdelt',
+        name: 'GDELT global news',
+        status: 'unavailable',
+        hits: 0,
+        note: 'GDELT returned a non-JSON response (their free tier does this under load or when a query trips their parser). Try again in a minute.',
+        evidence: [],
+      };
     }
     const body = (await res.json().catch(() => null)) as GdeltArticleResponse | null;
+    if (!body) {
+      return {
+        id: 'gdelt',
+        name: 'GDELT global news',
+        status: 'unavailable',
+        hits: 0,
+        note: 'GDELT returned a malformed response. Try again in a minute.',
+        evidence: [],
+      };
+    }
     const articles = body?.articles ?? [];
     const evidence: EvidenceItem[] = [];
     const seenDomains = new Set<string>();
@@ -199,7 +233,16 @@ export const searchGdelt: SourceSearcher = async (q) => {
       evidence,
     };
   } catch {
-    return err('gdelt', 'GDELT global news', 'GDELT query failed.');
+    // Network-level failure (DNS, TLS, socket reset). Still transient from
+    // the user's perspective, not a bug in Crosscheck.
+    return {
+      id: 'gdelt',
+      name: 'GDELT global news',
+      status: 'unavailable',
+      hits: 0,
+      note: 'GDELT request failed at the network level. Their free tier is flaky from cloud hosts — try again in a minute.',
+      evidence: [],
+    };
   }
 };
 
