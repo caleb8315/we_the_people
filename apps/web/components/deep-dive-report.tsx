@@ -86,12 +86,10 @@ export function DeepDiveReport({ signalId, showRequestButton = true }: { signalI
 
   if (loading) {
     return (
-      <section className="rounded-card border border-white/10 bg-white/[0.03] px-4 py-3">
-        <div className="flex items-center gap-2 text-sm text-white/40">
-          <span className="inline-block h-3 w-3 animate-pulse rounded-full bg-white/20" />
-          Loading research report...
-        </div>
-      </section>
+      <div className="flex items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/40 px-5 py-4">
+        <span className="inline-block h-3 w-3 animate-pulse rounded-full bg-brand-500/40" />
+        <span className="text-sm text-zinc-500">Loading research report...</span>
+      </div>
     );
   }
 
@@ -103,12 +101,12 @@ export function DeepDiveReport({ signalId, showRequestButton = true }: { signalI
   // API error — the deep dive service itself had an issue
   if (error) {
     return (
-      <section className="rounded-card border border-white/10 bg-white/[0.03] px-4 py-3">
-        <p className="text-sm text-white/60">
-          Deep dive research is temporarily unavailable. Cross-source analysis,
-          reliability scoring, and source disagreement detection remain fully operational above.
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 px-5 py-4">
+        <p className="text-sm text-zinc-500">
+          Research is temporarily unavailable. Cross-source analysis and
+          disagreement detection above remain fully operational.
         </p>
-      </section>
+      </div>
     );
   }
 

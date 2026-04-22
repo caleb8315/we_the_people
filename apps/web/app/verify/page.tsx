@@ -4,32 +4,43 @@ export const metadata = { title: 'Verify · Crosscheck' };
 
 export default function VerifyPage() {
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <header>
-        <h1 className="text-3xl font-semibold tracking-tight">Verify an article</h1>
-        <p className="mt-2 text-white/70">
-          Paste any news article URL. Crosscheck will extract the key claims, search for
-          corroborating and contradicting evidence across public sources, check physical
-          sensor networks, and show you what it finds.
-        </p>
-      </header>
+    <div className="flex min-h-[60vh] flex-col items-center justify-center">
+      <div className="mx-auto w-full max-w-2xl space-y-8 text-center">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+            Verify anything.
+          </h1>
+          <p className="mx-auto mt-3 max-w-md text-zinc-400">
+            Paste any news article URL. We&apos;ll extract the claims, search for evidence,
+            check sensor networks, and show you everything we find.
+          </p>
+        </div>
 
-      <VerifyForm />
+        <VerifyForm />
 
-      <section className="rounded-card border border-white/10 bg-white/[0.03] px-5 py-4 text-sm text-white/60">
-        <h2 className="mb-2 font-semibold text-white/80">How it works</h2>
-        <ol className="list-inside list-decimal space-y-1.5">
-          <li>The article is fetched and its key factual claims are extracted.</li>
-          <li>For each claim, targeted searches are run across public web sources.</li>
-          <li>Where relevant, physical sensor data (seismic, thermal satellite) is queried.</li>
-          <li>Findings are synthesized into a per-claim assessment: supported, disputed, or unverified.</li>
-          <li>The full research trail is shown — every search, every source, every sensor reading.</li>
-        </ol>
-        <p className="mt-3 text-white/45">
-          Crosscheck does not tell you what is true. It shows you what public sources and
-          sensor networks report, so you can decide for yourself.
+        <div className="grid grid-cols-4 gap-4 pt-4 text-center">
+          <Step num="1" label="Extract claims" />
+          <Step num="2" label="Search the web" />
+          <Step num="3" label="Check sensors" />
+          <Step num="4" label="Show evidence" />
+        </div>
+
+        <p className="text-xs text-zinc-600">
+          Crosscheck does not tell you what is true. It shows you what sources report,
+          so you can decide for yourself.
         </p>
-      </section>
+      </div>
+    </div>
+  );
+}
+
+function Step({ num, label }: { num: string; label: string }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-brand-500/15 text-xs font-bold text-brand-400">
+        {num}
+      </div>
+      <p className="text-[11px] text-zinc-500">{label}</p>
     </div>
   );
 }

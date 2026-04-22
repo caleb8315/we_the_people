@@ -1,84 +1,62 @@
+import Link from 'next/link';
+
 export const metadata = { title: 'About · Crosscheck' };
 
 export default function AboutPage() {
   return (
-    <article className="prose-osint max-w-3xl space-y-6 text-white/80">
-      <header>
-        <h1 className="text-3xl font-semibold tracking-tight">About Crosscheck</h1>
-        <p className="mt-2 text-white/70">
+    <div className="mx-auto max-w-2xl space-y-12 py-8">
+      <header className="space-y-3">
+        <h1 className="text-4xl font-bold tracking-tight">About Crosscheck</h1>
+        <p className="text-lg text-zinc-400">
           See where reporting agrees, conflicts, and lacks evidence.
         </p>
       </header>
 
-      <section>
-        <h2>What Crosscheck does</h2>
+      <Section title="What it does">
         <p>
           Crosscheck reads public reporting and open sensor networks — seismic (USGS), satellite
-          (NASA EONET), weather (NOAA), market, and cyber feeds — and clusters them by event.
+          (NASA EONET, FIRMS), weather (NOAA), market, and cyber feeds — and clusters them by event.
           For each event it shows three things:
         </p>
-        <ul>
-          <li>
-            <strong>Agreement.</strong> How many independent credible sources describe the event
-            the same way.
-          </li>
-          <li>
-            <strong>Conflicts.</strong> The specific points where sources disagree — numbers,
-            cause, or presence — with a one-line summary and both underlying citations.
-          </li>
-          <li>
-            <strong>Evidence gaps.</strong> Whether sensor networks confirm, partially support,
-            or have not detected physical evidence, alongside the coverage limitations that
-            apply (e.g. satellite revisit cadence, cloud cover, sub-magnitude-4 seismic
-            sensitivity).
-          </li>
+        <ul className="mt-3 space-y-2">
+          <li><strong className="text-zinc-200">Agreement.</strong> How many independent credible sources describe the event the same way.</li>
+          <li><strong className="text-zinc-200">Conflicts.</strong> The specific points where sources disagree — numbers, cause, or presence — with both sides cited.</li>
+          <li><strong className="text-zinc-200">Evidence.</strong> Whether sensor networks confirm, partially support, or have not detected physical evidence for the report.</li>
         </ul>
-      </section>
+      </Section>
 
-      <section>
-        <h2>What Crosscheck is not</h2>
-        <ul>
-          <li>
-            <strong>Not an OSINT investigation tool.</strong> It does not geolocate imagery,
-            build dossiers on people, or attribute responsibility. It describes the shape of
-            public reporting about events that have already been reported.
-          </li>
-          <li>
-            <strong>Not a news app.</strong> It does not write stories, rank outlets, or pick
-            winners. It shows you which sources say which things about the same event.
-          </li>
-          <li>
-            <strong>Not a factual adjudicator.</strong> It never tells you which source is
-            correct. When reports disagree, both sides are shown with citations and the reader
-            is trusted to weigh them.
-          </li>
+      <Section title="What it is not">
+        <ul className="space-y-2">
+          <li><strong className="text-zinc-200">Not an investigation tool.</strong> It does not geolocate imagery, build dossiers, or attribute responsibility.</li>
+          <li><strong className="text-zinc-200">Not a news app.</strong> It does not write stories, rank outlets, or pick winners.</li>
+          <li><strong className="text-zinc-200">Not a fact-checker.</strong> It never says which source is correct. Both sides are shown with citations.</li>
         </ul>
-      </section>
+      </Section>
 
-      <section>
-        <h2>Principles</h2>
-        <ul>
-          <li>Public data only. No classified information. No scraping behind paywalls.</li>
-          <li>
-            Every signal links to its sources and includes a reliability label, confidence
-            band, and — when relevant — a physical-evidence record with explicit limitations.
-          </li>
-          <li>Privacy-first. Minimal data retention. User-owned preferences and analysis state.</li>
-          <li>You control the feed. Mute sources, focus topics, set alert thresholds.</li>
-        </ul>
-      </section>
-
-      <section>
-        <h2>Why it&apos;s useful</h2>
+      <Section title="Why it exists">
         <p>
-          Most news tools summarise. Most OSINT tools investigate. Very few show, at a glance,
+          Most tools summarize. Most OSINT tools investigate. Very few show, at a glance,
           whether a reported event is corroborated across independent sources and whether
-          physical sensor networks support the claim. Crosscheck fills that gap — a system for
-          spotting when the shape of reality across sources doesn&apos;t line up, so readers
-          can look into the parts that don&apos;t before making decisions about what to
-          believe.
+          sensor networks support the claim. Crosscheck fills that gap — a system for
+          spotting when the shape of reality across sources doesn&apos;t line up, so you
+          can look into the parts that don&apos;t.
         </p>
-      </section>
-    </article>
+      </Section>
+
+      <div className="border-t border-zinc-800 pt-8">
+        <Link href="/trust" className="text-sm text-brand-400 hover:underline">
+          Read the full methodology →
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <h2 className="text-xl font-semibold text-zinc-200">{title}</h2>
+      <div className="text-sm leading-relaxed text-zinc-400">{children}</div>
+    </section>
   );
 }
