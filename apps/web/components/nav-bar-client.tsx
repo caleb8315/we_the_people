@@ -20,7 +20,7 @@ export function NavBarClient({ signedIn }: { signedIn: boolean }) {
       ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-base-900/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 bg-base-900/80 backdrop-blur-2xl backdrop-saturate-150">
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 sm:px-5">
         <Link href={signedIn ? '/feed' : '/'} className="flex items-center gap-2 text-sm font-semibold tracking-tight">
           <span

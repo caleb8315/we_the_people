@@ -57,13 +57,13 @@ export function VerifyInline() {
         value={url}
         onChange={e => { setUrl(e.target.value); setError(''); }}
         placeholder="Paste any article URL to verify..."
-        className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3.5 pr-24 text-sm text-white placeholder-white/30 outline-none transition focus:border-brand-500/40 focus:bg-white/[0.06]"
+        className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 px-5 py-4 pr-28 text-sm text-white placeholder-zinc-600 outline-none backdrop-blur-sm transition focus:border-brand-500/50 focus:shadow-glow"
         disabled={submitting}
       />
       <button
         type="submit"
         disabled={submitting || !url.trim()}
-        className="absolute right-1.5 top-1.5 rounded-lg bg-brand-500 px-4 py-2 text-xs font-semibold text-black transition hover:bg-brand-400 disabled:opacity-40"
+        className="absolute right-2 top-2 rounded-xl bg-brand-500 px-5 py-2.5 text-xs font-semibold text-black transition hover:bg-brand-400 hover:shadow-glow disabled:opacity-30"
       >
         {submitting ? 'Checking...' : 'Verify'}
       </button>

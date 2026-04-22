@@ -113,6 +113,28 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * Clean up LLM response text for display. Strips markdown tables,
+ * excessive formatting, and citation artifacts that look messy in the UI.
+ */
+function cleanResponseText(text: string): string {
+  return text
+    // Remove markdown tables (pipes + dashes)
+    .replace(/\|[^\n]+\|/g, '')
+    .replace(/[-|:]{3,}/g, '')
+    // Remove markdown headers
+    .replace(/^#{1,4}\s+/gm, '')
+    // Remove bold/italic markers
+    .replace(/\*{1,2}([^*]+)\*{1,2}/g, '$1')
+    // Remove numbered citation brackets like [1], [2]
+    .replace(/\[\d+\]/g, '')
+    // Collapse multiple newlines
+    .replace(/\n{3,}/g, '\n\n')
+    // Collapse multiple spaces
+    .replace(/  +/g, ' ')
+    .trim();
+}
+
 // ── Live Sensor Queries ─────────────────────────────────────────────────
 
 async function queryUSGS(title: string): Promise<SensorReading | null> {
@@ -373,20 +395,31 @@ export async function runDeepDive(
     const claim = claims.find(c => c.id === claimId);
     if (!claim) continue;
 
-    const combinedQuery = `I need to verify this claim: "${claim.statement}"
+    // Try compound first for web search, fall back to regular llama
+    const compoundQuery = `Verify this claim by searching the web: "${claim.statement}"
 
-Search for evidence using these queries and report what you find. For each source, provide the URL, title, and a brief excerpt of the relevant information. State whether the evidence supports or contradicts the claim.
+Search these queries and write a short paragraph summarizing what you found. Do NOT use tables, lists, or markdown formatting. Just write plain text describing what sources say about this claim and whether they support or contradict it.
 
-Queries to search:
-${claimQueries.map((q, i) => `${i + 1}. ${q}`).join('\n')}`;
+Queries: ${claimQueries.join(', ')}`;
 
-    const result = await groqCompound(combinedQuery);
+    let result = await groqCompound(compoundQuery);
+
+    // If compound fails, fall back to regular llama with the claim context
+    if (!result.ok) {
+      const fallbackPrompt = `Based on your knowledge, what is known about this claim? Write 2-3 sentences assessing whether this claim is consistent with established reporting. Do NOT use markdown, tables, or bullet points.
+
+Claim: "${claim.statement}"`;
+      result = await groqChat('llama-3.1-8b-instant', [
+        { role: 'user', content: fallbackPrompt },
+      ]);
+    }
+
     if (result.ok) {
       research.push({
         claim_id: claimId,
         query: claimQueries.join(' | '),
         sources: [],
-        summary: result.text.slice(0, 1500),
+        summary: cleanResponseText(result.text).slice(0, 1200),
         supports_claim: null,
       });
     } else {
@@ -395,7 +428,7 @@ ${claimQueries.map((q, i) => `${i + 1}. ${q}`).join('\n')}`;
         claim_id: claimId,
         query: claimQueries.join(' | '),
         sources: [],
-        summary: `Web research for this claim could not be completed. The claim "${claim.statement}" requires manual verification through the source links provided in the evidence section above.`,
+        summary: 'Research for this claim is pending. Check back after the next research cycle.',
         supports_claim: null,
       });
     }

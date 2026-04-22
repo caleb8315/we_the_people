@@ -38,17 +38,16 @@ export function SignalCard({ s }: { s: SignalRow }) {
   const isCorroborated = s.verification_status === 'verified';
   const hasResearch = s.has_deep_dive;
 
-  // Visual emphasis: corroborated + researched signals get a subtle glow
   const borderClass = hasResearch
-    ? 'border-brand-500/20 hover:border-brand-500/35'
+    ? 'border-brand-500/20 hover:border-brand-500/40 shadow-glow'
     : isCorroborated
       ? 'border-emerald-500/15 hover:border-emerald-500/30'
-      : 'border-white/[0.06] hover:border-white/15';
+      : 'border-zinc-800 hover:border-zinc-700';
 
   return (
     <Link
       href={`/signal/${s.id}`}
-      className={`group flex h-full flex-col rounded-xl border bg-white/[0.02] p-4 transition hover:bg-white/[0.05] ${borderClass}`}
+      className={`group flex h-full flex-col rounded-2xl border bg-zinc-900/50 p-4 backdrop-blur-sm transition-all duration-200 hover:bg-zinc-900/80 hover:-translate-y-0.5 ${borderClass}`}
     >
       {/* Top row: topic + meta */}
       <div className="flex items-center gap-2 text-[11px]">

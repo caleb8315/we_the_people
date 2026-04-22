@@ -43,7 +43,7 @@ export default async function SignalPage({ params }: PageProps) {
   const physicalEvidence = extractPhysicalEvidence(signal.raw_data ?? null);
 
   return (
-    <article className="mx-auto max-w-3xl space-y-5">
+    <article className="mx-auto max-w-3xl space-y-6">
       {/* ── Header ─────────────────────────────────────────────────── */}
       <header className="space-y-3">
         <div className="flex flex-wrap items-center gap-1.5">
@@ -76,7 +76,7 @@ export default async function SignalPage({ params }: PageProps) {
         </div>
 
         {reliabilitySummary && (
-          <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/70">
+          <p className="rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 py-3 text-sm text-zinc-300 backdrop-blur-sm">
             {reliabilitySummary}
           </p>
         )}
@@ -132,7 +132,7 @@ export default async function SignalPage({ params }: PageProps) {
                 href={e.url}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-start gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 transition hover:border-white/15 hover:bg-white/[0.04]"
+                className="flex items-start gap-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 transition-all duration-200 hover:border-zinc-700 hover:bg-zinc-900/70 hover:-translate-y-px"
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-white/90">

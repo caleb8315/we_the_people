@@ -69,7 +69,7 @@ export default async function FeedPage({
       {heroSignal && (
         <Link
           href={`/signal/${heroSignal.id}`}
-          className="group block overflow-hidden rounded-2xl border border-brand-500/20 bg-gradient-to-br from-brand-500/[0.08] to-transparent p-5 transition hover:border-brand-500/40 sm:p-6"
+          className="group block overflow-hidden rounded-2xl border border-brand-500/25 bg-gradient-to-br from-brand-500/10 via-zinc-900/80 to-zinc-900/50 p-5 shadow-glow backdrop-blur-sm transition-all duration-300 hover:border-brand-500/50 hover:from-brand-500/15 hover:-translate-y-0.5 sm:p-7"
         >
           <div className="flex items-center gap-2 text-xs">
             <span className="rounded-full bg-brand-500/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-400">
@@ -103,10 +103,10 @@ export default async function FeedPage({
           <a
             key={t}
             href={qp(t)}
-            className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm transition ${
+            className={`shrink-0 rounded-full px-4 py-2 text-sm transition-all duration-200 ${
               t === topic
-                ? 'bg-white text-black font-medium'
-                : 'text-white/55 hover:bg-white/10 hover:text-white'
+                ? 'bg-brand-500 text-black font-semibold shadow-glow'
+                : 'bg-zinc-900/60 text-zinc-400 hover:bg-zinc-800 hover:text-white'
             }`}
           >
             {t === 'all' ? 'All' : t.charAt(0).toUpperCase() + t.slice(1)}
