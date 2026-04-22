@@ -1,18 +1,21 @@
-name: Ingest
+name: Deep Dive
 
 on:
   schedule:
-    - cron: '17 * * * *'   # hourly, offset from briefing
+    # 3x daily: morning, afternoon, evening (UTC)
+    - cron: '45 7 * * *'    # 07:45 UTC
+    - cron: '45 15 * * *'   # 15:45 UTC
+    - cron: '45 22 * * *'   # 22:45 UTC
   workflow_dispatch:
 
 concurrency:
-  group: ingest
+  group: deep-dive
   cancel-in-progress: false
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
     env:
@@ -20,10 +23,6 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      MAX_DAILY_LLM_CALLS: ${{ vars.MAX_DAILY_LLM_CALLS || '200' }}
-      MAX_DAILY_LLM_CALLS_SIGNALS: ${{ vars.MAX_DAILY_LLM_CALLS_SIGNALS || '150' }}
-      MAX_DAILY_LLM_CALLS_BRIEFING: ${{ vars.MAX_DAILY_LLM_CALLS_BRIEFING || '20' }}
-      MAX_DAILY_LLM_CALLS_CONTRADICTION: ${{ vars.MAX_DAILY_LLM_CALLS_CONTRADICTION || '30' }}
       FIRMS_MAP_KEY: ${{ secrets.FIRMS_MAP_KEY }}
     steps:
       - uses: actions/checkout@v4
@@ -32,4 +31,4 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run ingest
+      - run: npm run deep-dive --workspace apps/worker

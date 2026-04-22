@@ -23,19 +23,9 @@ const [cmd, arg] = args;
 
 async function main() {
   switch (cmd) {
-    case 'ingest': {
-      const result = await runIngest();
-      // Auto deep-dive the top signals from this ingest run
-      if (result.signals > 0 && process.env.GROQ_API_KEY && process.env.GEMINI_API_KEY) {
-        try {
-          const dived = await autoDeepDive(3);
-          if (dived > 0) console.log(`[worker] auto deep-dived ${dived} signals`);
-        } catch (err) {
-          console.warn(`[worker] auto deep-dive failed: ${(err as Error).message}`);
-        }
-      }
+    case 'ingest':
+      await runIngest();
       return;
-    }
     case 'brief':
       await runBriefing(arg === 'weekly' ? 'weekly' : 'daily');
       return;
