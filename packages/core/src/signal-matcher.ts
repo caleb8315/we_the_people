@@ -39,7 +39,7 @@ interface PreparedSignal {
   topicGroup: string;
 }
 
-const CROSS_RUN_THRESHOLD = 0.22;
+const CROSS_RUN_THRESHOLD = 0.15;
 const MAX_DAY_DISTANCE = 2;
 
 /**
@@ -82,8 +82,12 @@ export function findMatchingSignal(
   let bestMatch: { dedupe_key: string; similarity: number } | null = null;
 
   for (const p of prepared) {
-    // Topic group filter
-    if (p.topicGroup !== newGroup) continue;
+    // Topic group filter — 'other' on either side allows cross-group matching
+    // since 'other' just means the classifier couldn't categorize the headline.
+    const groupMatch = newGroup === p.topicGroup
+      || newGroup === 'other'
+      || p.topicGroup === 'other';
+    if (!groupMatch) continue;
 
     // Day distance filter
     if (publishedDay && p.day) {

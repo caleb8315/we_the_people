@@ -28,7 +28,7 @@
 import { porterStem } from './stemmer';
 import { extractEntities, entityTokens } from './entities';
 import { canonicalSynonym } from './synonyms';
-import { topicGroup } from './topic-groups';
+import { topicGroupsForClustering } from './topic-groups';
 
 // ── Stop words ──────────────────────────────────────────────────────────
 const STOP_WORDS = new Set([
@@ -87,19 +87,22 @@ export function clusterItems<T extends Clusterable>(items: T[]): number[] {
   if (items.length === 0) return [];
 
   // 1. Partition by (topic-group, day-window).
+  // 'other' articles go into ALL groups so they can match classified items.
   const bucketMap = new Map<string, number[]>();
   for (let i = 0; i < items.length; i++) {
     const item = items[i]!;
-    const group = topicGroup(item.topic);
+    const groups = topicGroupsForClustering(item.topic);
     const windows = dayWindows(item.published_day);
-    for (const w of windows) {
-      const key = `${group}|${w}`;
-      let arr = bucketMap.get(key);
-      if (!arr) {
-        arr = [];
-        bucketMap.set(key, arr);
+    for (const g of groups) {
+      for (const w of windows) {
+        const key = `${g}|${w}`;
+        let arr = bucketMap.get(key);
+        if (!arr) {
+          arr = [];
+          bucketMap.set(key, arr);
+        }
+        arr.push(i);
       }
-      arr.push(i);
     }
   }
 

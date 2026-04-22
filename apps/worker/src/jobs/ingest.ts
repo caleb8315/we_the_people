@@ -68,50 +68,37 @@ export async function runIngest(): Promise<{
   }
 
   // ── Phase 1: Load recent signals for cross-run matching ───────────────
+  // Use first_seen_at OR occurred_at to catch signals where occurred_at is
+  // NULL (many RSS items lack a publication date). The previous query used
+  // .gte('occurred_at', cutoff) which silently dropped all NULL rows —
+  // meaning those signals were invisible to the cross-run matcher.
   const recentCutoff = new Date(Date.now() - RECENT_SIGNAL_HOURS * 3600 * 1000).toISOString();
   const { data: recentSignals } = await supabase()
     .from('signals')
-    .select('dedupe_key, title, topic, occurred_at')
-    .gte('occurred_at', recentCutoff)
-    .order('occurred_at', { ascending: false })
-    .limit(500);
+    .select('dedupe_key, title, topic, occurred_at, first_seen_at')
+    .or(`occurred_at.gte.${recentCutoff},first_seen_at.gte.${recentCutoff}`)
+    .order('first_seen_at', { ascending: false })
+    .limit(1000);
 
   const preparedSignals = prepareExistingSignals(recentSignals ?? []);
   console.log(`[ingest] loaded ${preparedSignals.length} recent signals for cross-run matching`);
 
-  // ── Fetch URL dedup: skip articles we've already seen ─────────────────
-  const existingUrls = new Set<string>();
-  if (recentSignals && recentSignals.length > 0) {
-    const { data: existingEvidence } = await supabase()
-      .from('evidence')
-      .select('url')
-      .gte('published_at', recentCutoff)
-      .limit(5000);
-    if (existingEvidence) {
-      for (const row of existingEvidence) {
-        if (row.url) existingUrls.add(row.url);
-      }
-    }
-  }
-  console.log(`[ingest] loaded ${existingUrls.size} existing evidence URLs for dedup`);
-
-  // Parallel fetch.
+  // Parallel fetch — NO URL dedup before clustering. The previous approach
+  // skipped articles whose URLs already existed in evidence, but this
+  // prevented NEW outlets covering the SAME story from ever entering the
+  // pipeline. Each outlet has a unique URL, so URL dedup was only blocking
+  // re-processing of the same feed item — which the upsert already handles
+  // via dedupe_key. Removing this layer ensures all fresh articles get a
+  // chance to cluster and cross-run match.
   const results = await Promise.allSettled(adapters.map(a => a.fetch()));
   const items: RawItem[] = [];
   let fetched = 0;
   results.forEach((r, i) => {
     const a = adapters[i]!;
     if (r.status === 'fulfilled') {
+      items.push(...r.value);
       fetched += r.value.length;
-      let skipped = 0;
-      for (const item of r.value) {
-        if (existingUrls.has(item.url)) {
-          skipped++;
-          continue;
-        }
-        items.push(item);
-      }
-      console.log(`[ingest] ${a.id}: ${r.value.length}${skipped > 0 ? ` (${skipped} skipped as seen)` : ''}`);
+      console.log(`[ingest] ${a.id}: ${r.value.length}`);
     } else {
       const msg = `${a.id}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`;
       console.warn('[ingest] fetch failed — ' + msg);
@@ -211,6 +198,11 @@ export async function runIngest(): Promise<{
   // the existing signal instead of creating a duplicate.
   const remapping = matchClustersToExisting(clusterMeta, preparedSignals);
   let crossRunMatches = 0;
+
+  // Diagnostic: log when cross-run matching finds nothing
+  if (preparedSignals.length > 0 && clusterMeta.length > 0 && remapping.size === 0) {
+    console.log(`[ingest] cross-run: 0 matches from ${clusterMeta.length} clusters against ${preparedSignals.length} existing signals`);
+  }
   // Track which final dedupe_keys are cross-run targets (for additive evidence)
   const crossRunTargets = new Set<string>();
 
@@ -295,11 +287,10 @@ export async function runIngest(): Promise<{
 
       const decision = decideVerification(primary.title, primary.summary ?? '', combinedEvidence);
 
-      // Override source counts with wire-aware independent counts when
-      // wire detection found syndicated content. This prevents 5 outlets
-      // all running the same AP story from counting as 5 independent sources.
-      if (independence.independent < decision.source_count && Object.keys(independence.wire_groups).length > 0) {
-        decision.source_count = Math.max(independence.independent, 1);
+      // Log wire provenance data for the UI, but do NOT override source_count.
+      // Users need to see the full source count to understand multi-source coverage.
+      // The independence data is preserved in raw_data for the detail page.
+      if (Object.keys(independence.wire_groups).length > 0) {
         decision.decision_log.push(
           `wire_provenance: ${independence.total} total domains, ${independence.independent} independent (wire: ${JSON.stringify(independence.wire_groups)})`,
         );
@@ -512,7 +503,7 @@ export async function runIngest(): Promise<{
       evidence: evidenceInserts,
       contradictions: contradictionInserts,
       crossRunMatches,
-      urlDedupSkipped: fetched - items.length,
+      lshMerges: lshMerges.size,
       credibilityUpdates,
     },
   });
