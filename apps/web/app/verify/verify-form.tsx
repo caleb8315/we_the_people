@@ -95,10 +95,10 @@ export function VerifyForm() {
           </p>
           {diveId && (
             <a
-              href={signalId ? `/signal/${signalId}` : '#'}
+              href={signalId ? `/signal/${signalId}` : `/verify/${diveId}`}
               className="mt-2 inline-block text-xs text-brand-400 hover:underline"
             >
-              {signalId ? 'View signal →' : `Research ID: ${diveId.slice(0, 8)}...`}
+              {signalId ? 'View signal →' : 'View report when ready →'}
             </a>
           )}
         </div>

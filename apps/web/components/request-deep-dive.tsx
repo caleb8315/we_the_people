@@ -1,12 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 type Status = 'idle' | 'requesting' | 'queued' | 'exists' | 'error';
 
 export function RequestDeepDive({ signalId }: { signalId: string }) {
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState('');
+  const [polling, setPolling] = useState(false);
+
+  // Poll for completion after request is queued
+  useEffect(() => {
+    if (!polling) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/deep-dive/${signalId}`);
+        if (res.ok) {
+          setPolling(false);
+          window.location.reload();
+        }
+      } catch { /* keep polling */ }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [polling, signalId]);
 
   async function handleRequest() {
     setStatus('requesting');
@@ -26,10 +42,12 @@ export function RequestDeepDive({ signalId }: { signalId: string }) {
 
       if (data.status === 'complete') {
         setStatus('exists');
-        setMessage('Research is available. Reload this page to view the report.');
+        setMessage('Research is available.');
+        window.location.reload();
       } else {
         setStatus('queued');
-        setMessage(data.message || 'Research has been queued.');
+        setMessage('Research has been queued. This page will update when results are ready.');
+        setPolling(true);
       }
     } catch {
       setStatus('error');
@@ -40,15 +58,10 @@ export function RequestDeepDive({ signalId }: { signalId: string }) {
   if (status === 'queued') {
     return (
       <div className="rounded-card border border-brand-500/20 bg-brand-500/5 px-4 py-3">
-        <p className="text-sm text-brand-400">{message}</p>
-      </div>
-    );
-  }
-
-  if (status === 'exists') {
-    return (
-      <div className="rounded-card border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
-        <p className="text-sm text-emerald-400">{message}</p>
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-brand-500" />
+          <p className="text-sm text-brand-400">{message}</p>
+        </div>
       </div>
     );
   }

@@ -11,7 +11,6 @@ import {
   buildArticleText,
 } from '@osint/core/deep-dive';
 import { supabase } from '../lib/supabase';
-import { env } from '../lib/env';
 
 // ── LLM Clients (with retry + fallback) ─────────────────────────────────
 
@@ -541,41 +540,69 @@ function buildFallbackSynthesisSummary(
   return parts.join(' ');
 }
 
+const VALID_VERDICTS = new Set(['corroborated', 'mixed', 'disputed', 'unverified']);
+
 async function saveResult(sb: any, diveId: string, result: DeepDiveResult): Promise<void> {
-  await sb.from('deep_dives').update({
+  // Validate overall_verdict against the DB CHECK constraint
+  const safeVerdict = VALID_VERDICTS.has(result.overall_verdict)
+    ? result.overall_verdict
+    : 'unverified';
+
+  const { error } = await sb.from('deep_dives').update({
     status: 'complete',
     claims: result.claims,
     research: result.research,
     sensor_data: result.sensor_data,
     synthesis: { verdicts: result.verdicts },
     summary: result.summary,
-    overall_verdict: result.overall_verdict,
+    overall_verdict: safeVerdict,
     completed_at: new Date().toISOString(),
     raw_data: { research_duration_ms: result.research_duration_ms },
   }).eq('id', diveId);
+
+  if (error) {
+    console.error(`[deep-dive] saveResult failed for ${diveId}: ${error.message}`);
+    // Mark as failed so the row doesn't stay stuck at 'running'
+    await sb.from('deep_dives').update({
+      status: 'failed',
+      raw_data: { error: error.message, research_duration_ms: result.research_duration_ms },
+    }).eq('id', diveId);
+  }
 }
 
 /**
- * Auto-dive: pick the top N signals from this ingest run and deep-dive them.
+ * Auto-dive: pick the top N signals and process any pending user requests.
  */
-export async function autoDeepDive(limit: number = 3): Promise<number> {
+export async function autoDeepDive(limit: number = 5): Promise<number> {
   const sb = supabase();
 
+  // Unstick any dives that have been 'running' for over 10 minutes
+  // (crashed worker, timeout, etc.)
+  await sb.from('deep_dives')
+    .update({ status: 'failed', raw_data: { error: 'timed_out' } })
+    .eq('status', 'running')
+    .lt('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString());
+
+  // Find recent signals worth diving — severity >= 20 (lowered from 40
+  // so more signals get researched), look back 12 hours (extended from 6)
   const { data: candidates } = await sb
     .from('signals')
     .select('id, title, summary, topic, source_count, severity')
-    .gte('first_seen_at', new Date(Date.now() - 6 * 3600 * 1000).toISOString())
-    .gte('severity', 40)
+    .gte('first_seen_at', new Date(Date.now() - 12 * 3600 * 1000).toISOString())
+    .gte('severity', 20)
     .gte('source_count', 1)
     .order('severity', { ascending: false })
-    .limit(limit * 2);
+    .limit(limit * 3);
 
   if (!candidates || candidates.length === 0) return 0;
 
+  // Only skip signals that already have a COMPLETED dive
+  // (failed/running-stuck dives should be retryable)
   const { data: existingDives } = await sb
     .from('deep_dives')
     .select('signal_id')
-    .in('signal_id', candidates.map(c => c.id));
+    .in('signal_id', candidates.map(c => c.id))
+    .eq('status', 'complete');
 
   const alreadyDived = new Set((existingDives ?? []).map((d: any) => d.signal_id));
   const toDive = candidates.filter(c => !alreadyDived.has(c.id)).slice(0, limit);
@@ -644,13 +671,12 @@ export async function autoDeepDive(limit: number = 3): Promise<number> {
         await runDeepDive(pending.id, signal.title, signal.summary, excerpts, signal.topic);
         completed++;
       } else if (pending.source_url) {
-        // For URL-only dives, fetch the page title and use it as input
-        const pageTitle = await fetchPageTitle(pending.source_url);
+        const page = await fetchPageContent(pending.source_url);
         await runDeepDive(
           pending.id,
-          pageTitle || pending.source_url,
-          null,
-          [],
+          page?.title || pending.source_url,
+          page?.summary || null,
+          page?.summary ? [page.summary] : [],
           'other',
         );
         completed++;
@@ -663,7 +689,7 @@ export async function autoDeepDive(limit: number = 3): Promise<number> {
   return completed;
 }
 
-async function fetchPageTitle(url: string): Promise<string | null> {
+async function fetchPageContent(url: string): Promise<{ title: string; summary: string } | null> {
   try {
     const res = await fetch(url, {
       headers: { 'user-agent': 'Crosscheck-Bot/1.0' },
@@ -671,8 +697,23 @@ async function fetchPageTitle(url: string): Promise<string | null> {
     });
     if (!res.ok) return null;
     const html = await res.text();
-    const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    return match?.[1]?.trim() || null;
+
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const title = titleMatch?.[1]?.trim() || url;
+
+    // Extract meta description or og:description
+    const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i);
+    const description = descMatch?.[1]?.trim() || '';
+
+    // Extract first paragraph as fallback
+    let summary = description;
+    if (!summary) {
+      const pMatch = html.match(/<p[^>]*>([^<]{40,500})<\/p>/i);
+      summary = pMatch?.[1]?.trim() || '';
+    }
+
+    return { title, summary: summary.slice(0, 1000) };
   } catch {
     return null;
   }

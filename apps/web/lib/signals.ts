@@ -55,6 +55,7 @@ export interface DecoratedSignal extends SignalRowRaw {
    */
   has_usgs_confirmation: boolean;
   has_satellite_confirmation: boolean;
+  has_deep_dive: boolean;
 }
 
 const INLINE_CONTRADICTIONS_PER_SIGNAL = 3;
@@ -113,6 +114,14 @@ export async function decorateSignals(
     .in('signal_id', ids)
     .order('created_at', { ascending: true });
 
+  // Check which signals have completed deep dives
+  const { data: diveRows } = await sb
+    .from('deep_dives')
+    .select('signal_id')
+    .in('signal_id', ids)
+    .eq('status', 'complete');
+  const divedSignals = new Set((diveRows ?? []).map((d: any) => d.signal_id as string));
+
   const counts = new Map<string, number>();
   const inline = new Map<string, ContradictionInline[]>();
   for (const row of contradictionRows ?? []) {
@@ -149,6 +158,7 @@ export async function decorateSignals(
       physical_evidence: readPhysicalEvidence(s.raw_data ?? null),
       has_usgs_confirmation: readBoolFlag(s.raw_data ?? null, 'usgs_match'),
       has_satellite_confirmation: readBoolFlag(s.raw_data ?? null, 'eonet_match'),
+      has_deep_dive: divedSignals.has(s.id),
     };
   });
 }

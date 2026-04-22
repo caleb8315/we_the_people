@@ -41,6 +41,7 @@ export interface SignalRow {
   physical_evidence?: PhysicalEvidence | null;
   has_usgs_confirmation?: boolean;
   has_satellite_confirmation?: boolean;
+  has_deep_dive?: boolean;
 }
 
 /**
@@ -132,6 +133,15 @@ export function SignalCard({ s }: { s: SignalRow }) {
             title={`Too many sources for inline disagreement detection (limit ${s.source_count} > 20). Open the signal to review evidence directly.`}
           >
             Complex signal
+          </Badge>
+        )}
+        {s.has_deep_dive && (
+          <Badge
+            variant="verified"
+            withIcon={false}
+            title="This signal has been independently researched with claim verification and sensor checks."
+          >
+            Researched
           </Badge>
         )}
       </div>

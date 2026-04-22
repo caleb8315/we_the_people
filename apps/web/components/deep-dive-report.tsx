@@ -84,7 +84,16 @@ export function DeepDiveReport({ signalId, showRequestButton = true }: { signalI
       .catch(() => { setError(true); setLoading(false); });
   }, [signalId]);
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <section className="rounded-card border border-white/10 bg-white/[0.03] px-4 py-3">
+        <div className="flex items-center gap-2 text-sm text-white/40">
+          <span className="inline-block h-3 w-3 animate-pulse rounded-full bg-white/20" />
+          Loading research report...
+        </div>
+      </section>
+    );
+  }
 
   // No deep dive exists yet — show the request button
   if (!data && !error) {
