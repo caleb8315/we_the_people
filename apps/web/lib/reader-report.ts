@@ -167,7 +167,7 @@ function pickOneLiner(
   corroboration: ReaderReportInput['corroboration'],
 ): string {
   if (corroboration.matched_signal) {
-    return `This is part of an event we\u2019re already tracking: \u201C${corroboration.matched_signal.title}.\u201D`;
+    return `We checked this against our existing coverage and other sources.`;
   }
   if (ctx.kind === 'image') {
     return ctx.host
@@ -239,7 +239,7 @@ function buildFindings(
     }
     out.push({
       tone: 'good',
-      text: `We\u2019re already tracking this as part of a bigger story. ${body}`,
+      text: body,
     });
     outletsStated = true;
   }
@@ -416,7 +416,7 @@ function buildBottomLine(
       return 'Sources don\u2019t agree on the key details. The underlying event may still be real, but the specifics are contested — hold off on sharing them until it settles.';
     case 'medium':
       if (corroboration.matched_signal) {
-        return 'We\u2019re already tracking this event. Broad strokes are corroborated; specific details are still firming up, so be careful with the particulars.';
+        return 'The broad strokes of this story are corroborated, but specific details are still firming up. Be careful with the particulars until more sources confirm them.';
       }
       if (mix.established_outlets === 0 && mix.total >= 5) {
         return `${mix.total} independent sources are reporting this, but none are on our trusted-source list yet. Read them yourself — real reporting often breaks outside the major outlets.`;

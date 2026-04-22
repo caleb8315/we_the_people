@@ -367,6 +367,22 @@ function VerifyResult({ data }: { data: VerifyResponse }) {
         </p>
       </div>
 
+      {/* 2b. Subtle tracked-event link — just context, not the headline. */}
+      {corroboration.matched_signal && (
+        <div className="flex items-center gap-2 rounded-lg border border-ink-100 bg-canvas-50 px-3 py-2 text-xs text-ink-500">
+          <span className="shrink-0 text-amber-500" aria-hidden="true">●</span>
+          <span>
+            Related to a story we&rsquo;re tracking ({corroboration.matched_signal.source_count} sources on file)
+          </span>
+          <a
+            href={`/signal/${corroboration.matched_signal.id}`}
+            className="ml-auto shrink-0 font-medium text-amber-700 hover:text-amber-900"
+          >
+            View full story →
+          </a>
+        </div>
+      )}
+
       {/* 3. The supporting detail — findings + caveats combined into one
          "Here's why" block. Default open on the result page (users came
          for the answer; detail is secondary but reassuring). */}
@@ -678,24 +694,16 @@ function CorroborationBanner({
 
   if (matched_signal) {
     return (
-      <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900">
-        <p className="font-semibold uppercase tracking-[0.18em] text-amber-700 text-[11px]">
-          Matched to a tracked event
-        </p>
-        <p className="mt-1 text-sm font-medium leading-snug text-ink">
-          {matched_signal.title}
-        </p>
-        <p className="mt-1 text-ink-600">
-          We already cluster this event in our pipeline ({matched_by === 'url' ? 'URL match' : 'headline match'}):
-          {' '}{matched_signal.credible_source_count} credible of {matched_signal.source_count} sources
-          already on file, plus whatever live searches turned up above.
-        </p>
+      <div className="flex items-center gap-2 rounded-lg border border-ink-100 bg-canvas-50 px-3 py-2 text-xs text-ink-600">
+        <span className="shrink-0 text-amber-500" aria-hidden="true">●</span>
+        <span>
+          Related to a story we&rsquo;re tracking ({matched_signal.source_count} sources on file)
+        </span>
         <a
           href={`/signal/${matched_signal.id}`}
-          className="mt-2 inline-flex items-center gap-1 text-amber-700 hover:text-amber-900"
+          className="ml-auto shrink-0 font-medium text-amber-700 hover:text-amber-900"
         >
-          See full event with source trace
-          <span aria-hidden="true">→</span>
+          View full story →
         </a>
       </div>
     );
