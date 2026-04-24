@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 
 const Body = z.object({
   display_name: z.string().min(2).max(40),
-  topics: z.array(z.enum(['war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'other'])).min(1).max(6),
+  topics: z.array(z.enum(['war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'tech', 'finance', 'other'])).min(1).max(8),
   feed_mode_preference: z.enum(['personalized', 'global', 'hybrid']).optional(),
   briefing_frequency_preference: z.enum(['daily', 'weekly', 'both', 'off']).optional(),
   alert_intensity_preference: z.enum(['critical_only', 'important_and_up', 'all']).optional(),

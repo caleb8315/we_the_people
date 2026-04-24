@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { SettingsForm } from '@/components/settings-form';
@@ -21,6 +22,28 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6">
+      <nav className="flex items-center gap-1 overflow-x-auto rounded-full border border-ink-100 bg-paper/70 p-1 shadow-sm">
+        {[
+          { href: '/dashboard', label: 'Dashboard' },
+          { href: '/feed', label: 'Feed' },
+          { href: '/verify', label: 'Verify' },
+          { href: '/briefings', label: 'Briefings' },
+          { href: '/settings', label: 'Settings', active: true },
+        ].map((l) => (
+          <Link
+            key={l.href}
+            href={l.href}
+            className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm transition ${
+              l.active
+                ? 'bg-ink-900 text-white shadow-sm'
+                : 'text-ink-500 hover:bg-ink-100 hover:text-ink'
+            }`}
+          >
+            {l.label}
+          </Link>
+        ))}
+      </nav>
+
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-sm text-ink-500">

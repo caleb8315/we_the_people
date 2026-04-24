@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Segmented } from './ui/segmented';
 
-const TOPICS = ['war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'other'] as const;
+const TOPICS = ['war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'tech', 'finance', 'other'] as const;
 type Topic = (typeof TOPICS)[number];
 
 export interface PrefsInitial {

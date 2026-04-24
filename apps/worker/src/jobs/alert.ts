@@ -62,7 +62,10 @@ export async function runAlerts(): Promise<{ sent: number }> {
     if (!email) continue;
     const localDailyCap = Math.max(1, Math.min(5, Number(pref.max_alerts_per_day_preference ?? 3)));
     const intensity = String(pref.alert_intensity_preference ?? 'critical_only');
-    let localSent = await countSentAlertsToday(sb, pref.user_id);
+
+    const deliveryCount = await countSentAlertsToday(sb, pref.user_id);
+    const usageCount = await countUsageToday(sb, pref.user_id);
+    let localSent = Math.max(deliveryCount, usageCount);
 
     for (const signal of candidates) {
       if (localSent >= localDailyCap) break;
@@ -97,16 +100,16 @@ export async function runAlerts(): Promise<{ sent: number }> {
         .maybeSingle();
       if (delivered) continue;
 
-      const cap = await consumeUserDailyLimit(sb, pref.user_id, 'priority_alert');
+      const cap = await consumeUserDailyLimit(sb, pref.user_id, 'priority_alert', localDailyCap);
       if (!cap.ok) {
         await sb.from('alert_deliveries').insert({
           signal_id: signal.id,
           user_id: pref.user_id,
           email,
           status: 'skipped',
-          error: `priority alert cap reached (${cap.limit})`,
+          error: `daily alert cap reached (${cap.limit}/day)`,
         });
-        continue;
+        break;
       }
 
       const ok = await sendUserAlertEmail({
@@ -284,6 +287,17 @@ async function countSentAlertsToday(sb: ReturnType<typeof supabase>, userId: str
     .eq('status', 'sent')
     .gte('sent_at', since.toISOString());
   return data?.length ?? 0;
+}
+
+async function countUsageToday(sb: ReturnType<typeof supabase>, userId: string) {
+  const day = new Date().toISOString().slice(0, 10);
+  const { data } = await sb
+    .from('user_daily_usage')
+    .select('calls')
+    .eq('user_id', userId)
+    .eq('day', day)
+    .eq('bucket', 'priority_alert');
+  return (data ?? []).reduce((sum, r) => sum + Number(r.calls ?? 0), 0);
 }
 
 function effectiveSeverityThreshold(base: number, intensity: string) {

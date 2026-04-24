@@ -13,7 +13,7 @@ import { signalGeoPoint, type SignalGeoPoint } from '@/lib/signal-geo';
 export const metadata = { title: 'Feed · Crosscheck' };
 export const revalidate = 60;
 
-const TOPICS = ['all', 'war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster'] as const;
+const TOPICS = ['all', 'war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'tech', 'finance'] as const;
 const MODES = ['personalized', 'global'] as const;
 const VIEWS = ['list', 'map'] as const;
 type FeedMode = (typeof MODES)[number];

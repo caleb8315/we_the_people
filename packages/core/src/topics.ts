@@ -27,6 +27,12 @@ const RULES: Record<Topic, RegExp[]> = {
   disaster: [
     /\b(earthquake|magnitude\s*\d|tsunami|hurricane|typhoon|cyclone|eruption|volcano|landslide)\b/i,
   ],
+  tech: [
+    /\b(artificial intelligence|machine learning|AI\b|startup|silicon valley|big tech|semiconductor|chip shortage|GPU|autonomous|self[- ]driving|robotics|quantum computing|cloud computing|5G|blockchain|open[- ]source|tech giant|apple|google|microsoft|meta|amazon|nvidia|openai|spacex)\b/i,
+  ],
+  finance: [
+    /\b(banking|bank run|wall street|hedge fund|private equity|venture capital|IPO|SEC|federal reserve|treasury|yield curve|credit|debt ceiling|default|bailout|cryptocurrency|bitcoin|ethereum|forex|derivatives|mortgage|housing market|financial crisis)\b/i,
+  ],
   other: [],
 };
 

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { getServerSupabase } from '@/lib/supabase-server';
 
 export const metadata = {
@@ -12,6 +13,8 @@ const TOPIC_TILES: Array<{ label: string; slug: string; tile: string; kicker: st
   { label: 'Cyber', slug: 'cyber', tile: 'tile-cyber', kicker: 'Incidents' },
   { label: 'Disaster', slug: 'disaster', tile: 'tile-disaster', kicker: 'Realtime' },
   { label: 'Civil', slug: 'civil', tile: 'tile-civil', kicker: 'Society' },
+  { label: 'Tech', slug: 'tech', tile: 'tile-tech', kicker: 'Innovation' },
+  { label: 'Finance', slug: 'finance', tile: 'tile-finance', kicker: 'Banking' },
 ];
 
 export default async function LandingPage() {
@@ -23,6 +26,8 @@ export default async function LandingPage() {
   } catch {
     // Anonymous fallback when env/auth isn't available.
   }
+
+  if (signedIn) redirect('/dashboard');
 
   return (
     <div className="space-y-10 sm:space-y-14">

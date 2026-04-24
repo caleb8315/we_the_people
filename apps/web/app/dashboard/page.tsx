@@ -94,6 +94,16 @@ export default async function DashboardPage() {
             <p className="mt-2 max-w-xl text-sm text-ink-500">
               Your consistency-check workspace. Fresh signals, how sources agree, and what to watch next.
             </p>
+            <Link
+              href="/verify"
+              className="mt-4 inline-flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2.5 text-sm font-medium text-white shadow-[0_8px_20px_-6px_rgba(245,158,11,0.55)] transition hover:bg-amber-600"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3 4 6v6c0 4.5 3.3 8.3 8 9 4.7-.7 8-4.5 8-9V6l-8-3z" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+              Verify a claim
+            </Link>
           </div>
           <dl className="grid grid-cols-3 gap-3 text-center sm:shrink-0 sm:text-right">
             <HeroStat label="Corroborated" value={newCorroboratedCount} tone="accent" />

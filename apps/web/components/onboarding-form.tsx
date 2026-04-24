@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Segmented } from './ui/segmented';
 
-const TOPICS = ['war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'other'] as const;
+const TOPICS = ['war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'tech', 'finance', 'other'] as const;
 type Topic = (typeof TOPICS)[number];
 
 type FeedMode = 'personalized' | 'global' | 'hybrid';

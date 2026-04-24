@@ -7,7 +7,7 @@ import { logProductEvent } from '@/lib/product-events';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const TopicEnum = z.enum(['war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'other']);
+const TopicEnum = z.enum(['war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'tech', 'finance', 'other']);
 
 const PrefBody = z.object({
   topics: z.array(TopicEnum).max(16).optional(),

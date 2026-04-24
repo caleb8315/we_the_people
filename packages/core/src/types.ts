@@ -11,6 +11,8 @@ export type Topic =
   | 'civil'
   | 'cyber'
   | 'disaster'
+  | 'tech'
+  | 'finance'
   | 'other';
 
 export const TOPICS: Topic[] = [
@@ -21,6 +23,8 @@ export const TOPICS: Topic[] = [
   'civil',
   'cyber',
   'disaster',
+  'tech',
+  'finance',
   'other',
 ];
 
