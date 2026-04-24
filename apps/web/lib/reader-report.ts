@@ -167,23 +167,27 @@ function pickOneLiner(
   corroboration: ReaderReportInput['corroboration'],
 ): string {
   if (corroboration.matched_signal) {
-    return `We checked this against our existing coverage and other sources.`;
+    const ms = corroboration.matched_signal;
+    if (ms.source_count >= 3) {
+      return `This event is already on our radar — ${ms.source_count} sources are covering it. Here\u2019s what we know about how well it\u2019s backed up.`;
+    }
+    return `We\u2019re already tracking this event. Here\u2019s how the reporting holds up across independent sources.`;
   }
   if (ctx.kind === 'image') {
     return ctx.host
-      ? `You submitted an image URL from ${ctx.host}. Images alone give us very little to verify.`
-      : 'You submitted an image. Images alone give us very little to verify — ideally share the post or article around the image too.';
+      ? `We looked into this image from ${prettyOutletName(ctx.host)}. Without the article or post it came from, there\u2019s limited context to verify \u2014 sharing that link next time gives us much more to work with.`
+      : 'We looked into this image, but without the post or article it came from, there\u2019s limited context. Sharing the original link next time gives us much more to work with.';
   }
   if (ctx.kind === 'text') {
-    return 'You submitted a pasted claim. With no source link, we can only check whether similar wording appears anywhere.';
+    return 'We searched for this claim across news outlets, social feeds, and sensor networks. Without a source link, we\u2019re matching on the wording alone.';
   }
   if (ctx.is_social) {
-    return `You submitted a ${ctx.social_platform_label ?? 'social'} post. Social posts don\u2019t count as reporting on their own.`;
+    return `This came from a ${ctx.social_platform_label ?? 'social media'} post. Social posts aren\u2019t news reporting on their own, so we looked for independent sources covering the same thing.`;
   }
   if (ctx.host) {
-    return `You submitted an article from ${prettyOutletName(ctx.host)}. We checked other outlets, social feeds, and sensor networks to see what matches.`;
+    return `We checked whether other outlets, social feeds, and sensor networks independently back up this reporting from ${prettyOutletName(ctx.host)}.`;
   }
-  return 'We checked a range of independent systems for this submission.';
+  return 'We searched news outlets, social feeds, and sensor networks to see how well this holds up.';
 }
 
 function buildSourceMix(
@@ -216,9 +220,6 @@ function buildFindings(
 ): ReaderBullet[] {
   const out: ReaderBullet[] = [];
 
-  // Prefer the richest single statement about who's carrying the story. If
-  // we have a tracked event with a richer count, use that and skip the
-  // per-card outlet bullet below.
   let outletsStated = false;
   if (corroboration.matched_signal) {
     const ms = corroboration.matched_signal;
@@ -226,21 +227,18 @@ function buildFindings(
     let body: string;
     if (ms.credible_source_count >= 2) {
       body = others > 0
-        ? `${ms.source_count} sources are carrying it — ${ms.credible_source_count} on our trusted-source list plus ${others} we haven\u2019t rated.`
-        : `${ms.credible_source_count} outlets on our trusted-source list are carrying it.`;
+        ? `${ms.credible_source_count} established news outlets are independently covering this event, plus ${others} additional source${others === 1 ? '' : 's'}. That level of independent coverage is a strong sign the core event is real.`
+        : `${ms.credible_source_count} established news outlets are independently covering this event. When multiple reputable outlets report the same thing, the basic facts are usually solid.`;
     } else if (ms.credible_source_count === 1) {
       body = others > 0
-        ? `${ms.source_count} sources are carrying it — one on our trusted-source list, ${others === 1 ? 'another' : `${others} others`} unrated.`
-        : 'One outlet on our trusted-source list is carrying it.';
+        ? `One established outlet is reporting this, along with ${others === 1 ? 'one other source' : `${others} other sources`} we haven\u2019t vetted. A single confirmed outlet is a start, but watch for more to pick it up.`
+        : 'One established outlet is reporting this so far. We\u2019re watching for others to independently confirm.';
     } else if (ms.source_count >= 2) {
-      body = `${ms.source_count} sources are carrying it — none rated against our trusted-source list yet.`;
+      body = `${ms.source_count} sources are covering this, though none are outlets we\u2019ve vetted yet. The coverage exists, but check each source\u2019s credibility yourself.`;
     } else {
-      body = `${ms.source_count} source${ms.source_count === 1 ? ' is' : 's are'} carrying it.`;
+      body = `${ms.source_count} source${ms.source_count === 1 ? ' is' : 's are'} covering this event.`;
     }
-    out.push({
-      tone: 'good',
-      text: body,
-    });
+    out.push({ tone: ms.credible_source_count >= 2 ? 'good' : 'info', text: body });
     outletsStated = true;
   }
 
@@ -249,28 +247,26 @@ function buildFindings(
     if (mix.established_outlets >= 2) {
       out.push({
         tone: 'good',
-        text:
-          others > 0
-            ? `${mix.total} sources are reporting this — ${mix.established_outlets} are on our trusted-source list, plus ${others} we haven\u2019t rated.`
-            : `${mix.established_outlets} outlets on our trusted-source list are reporting the same event.`,
+        text: others > 0
+          ? `${mix.established_outlets} established outlets are reporting this independently, plus ${others} other source${others === 1 ? '' : 's'}. Multiple reputable outlets covering the same event is a strong trust signal.`
+          : `${mix.established_outlets} established outlets are independently reporting the same event. That kind of agreement across newsrooms makes the core facts much more trustworthy.`,
       });
     } else if (mix.established_outlets === 1) {
       out.push({
         tone: 'info',
-        text:
-          others > 0
-            ? `${mix.total} sources are carrying this — one is on our trusted-source list, the others we haven\u2019t rated. Check each yourself.`
-            : 'One outlet on our trusted-source list is carrying this — watching for independent confirmation.',
+        text: others > 0
+          ? `One established outlet is reporting this, plus ${others} unvetted source${others === 1 ? '' : 's'}. Not enough for full confidence yet \u2014 check each source yourself.`
+          : 'One established outlet has this so far. Promising, but we\u2019re waiting to see if others independently confirm.',
       });
     } else if (mix.total >= 5) {
       out.push({
         tone: 'info',
-        text: `${mix.total} independent sources are reporting this. None are on our trusted-source list yet — read them yourself before trusting specifics. Curated lists miss plenty of real reporting.`,
+        text: `${mix.total} sources are covering this, but none are outlets we\u2019ve vetted. That doesn\u2019t automatically mean they\u2019re wrong \u2014 many real stories break outside major outlets \u2014 but read each source carefully.`,
       });
     } else if (mix.total >= 2) {
       out.push({
         tone: 'info',
-        text: `${mix.total} sources are reporting this. We haven\u2019t matched them to our trusted-source list yet, so judge each on its own merits.`,
+        text: `${mix.total} sources mention this. We haven\u2019t vetted any of them yet, so judge each on its own merits before drawing conclusions.`,
       });
     }
   }
@@ -280,7 +276,7 @@ function buildFindings(
   if (gdelt && gdelt.status === 'hit') {
     out.push({
       tone: 'good',
-      text: `Wider news coverage: ${gdelt.evidence_count} outlets worldwide have covered this in the last few days (GDELT archive).`,
+      text: `This is getting international attention \u2014 ${gdelt.evidence_count} outlets worldwide have covered it in the last few days, according to the GDELT global news archive.`,
     });
   }
 
@@ -288,7 +284,7 @@ function buildFindings(
     const plural = mix.social_posts === 1 ? 'post' : 'posts';
     out.push({
       tone: 'info',
-      text: `People are talking about it: ${mix.social_posts} Reddit or Bluesky ${plural} match.`,
+      text: `There\u2019s public discussion happening \u2014 ${mix.social_posts} matching ${plural} on Reddit or Bluesky. Social chatter shows awareness but isn\u2019t evidence on its own.`,
     });
   }
 
@@ -296,7 +292,7 @@ function buildFindings(
   if (wiki && wiki.status === 'hit' && wiki.evidence_count > 0) {
     out.push({
       tone: 'info',
-      text: 'Wikipedia has background on this topic — helpful for context, not proof.',
+      text: 'There\u2019s relevant Wikipedia background on this topic. Useful for understanding context, though Wikipedia itself isn\u2019t a primary news source.',
     });
   }
 
@@ -304,12 +300,10 @@ function buildFindings(
     const plural = mix.sensor_events === 1 ? 'event' : 'events';
     out.push({
       tone: 'good',
-      text: `Open sensor networks picked up ${mix.sensor_events} ${plural} that line up with this — that\u2019s physical evidence, not just reporting.`,
+      text: `Physical sensor networks detected ${mix.sensor_events} ${plural} that align with this story. Sensor data is objective measurement, not reporting \u2014 it\u2019s some of the strongest evidence available.`,
     });
   }
 
-  // Contradictions are always worth calling out as a "finding" — it's an
-  // important positive signal that we actually detected disagreement.
   const contradictionBullet = confidence.explanation_bullets.find((b) =>
     /disagree/i.test(b),
   );
@@ -320,7 +314,7 @@ function buildFindings(
   if (out.length === 0) {
     out.push({
       tone: 'info',
-      text: 'Nothing corroborating turned up. Either it\u2019s too new to have spread, it\u2019s very niche, or the claim doesn\u2019t match anything else we can see.',
+      text: 'We couldn\u2019t find any corroborating coverage anywhere. This could mean it\u2019s too new to have spread, it\u2019s very niche, or the claim doesn\u2019t match anything we can verify. Treat it as unconfirmed for now.',
     });
   }
   return out.slice(0, 5);
@@ -338,19 +332,19 @@ function buildUnclear(
   if (ctx.kind === 'image') {
     out.push({
       tone: 'warn',
-      text: 'You only shared an image. Without the post or article around it, we\u2019re guessing at the context.',
+      text: 'This is an image-only submission. Without the original post or article for context, our ability to verify is very limited. Next time, share the full link if you can.',
     });
   }
   if (ctx.kind === 'text') {
     out.push({
       tone: 'warn',
-      text: 'No link attached, so we\u2019re matching on the wording alone. A URL would let us check the source directly.',
+      text: 'There\u2019s no source link attached, so we can only match on the wording. Including a URL to the original source would let us check credibility directly.',
     });
   }
   if (ctx.is_social && !corroboration.matched_signal) {
     out.push({
       tone: 'warn',
-      text: 'Social posts alone aren\u2019t reporting. We\u2019ll look for other sources independently covering the same story before calling it confirmed.',
+      text: 'This is from social media, which isn\u2019t the same as professional reporting. We looked for news outlets independently covering the same event but haven\u2019t found a match yet.',
     });
   }
 
@@ -358,7 +352,7 @@ function buildUnclear(
   if (web && web.status === 'unavailable') {
     out.push({
       tone: 'info',
-      text: 'Broad web search is off right now — we only checked news archives, social, and sensors.',
+      text: 'Our broad web search capability is temporarily offline. We still checked news archives, social feeds, and sensors, but may have missed some coverage.',
     });
   }
 
@@ -366,14 +360,11 @@ function buildUnclear(
   if (sensors && sensors.status === 'miss') {
     out.push({
       tone: 'info',
-      text: 'No earthquakes, fires, or weather events in open sensor data that match — so whatever this is, it\u2019s not showing up as a physical event.',
+      text: 'Open sensor networks (earthquakes, fires, severe weather) don\u2019t show anything matching this event. If this were a physical disaster, sensors would usually detect it.',
     });
   }
 
-  // Fold provenance-layer limits (image/link/social) in as "unclear" bullets.
-  // Dedupe against bullets we've already added AND against bullets that say
-  // essentially the same thing (the engine often duplicates "no source").
-  const saidNoSource = out.some((o) => /no link attached|no source/i.test(o.text));
+  const saidNoSource = out.some((o) => /no source link|no source/i.test(o.text));
   for (const l of provenance_limits) {
     if (!l) continue;
     if (out.some((o) => o.text === l)) continue;
@@ -381,11 +372,7 @@ function buildUnclear(
     out.push({ tone: 'warn', text: l });
   }
 
-  // Engine-generated bullets we haven't already rephrased positively.
-  // Skip any that we already surfaced as "findings" or that duplicate the
-  // "no source / wording alone" message.
   for (const b of confidence.explanation_bullets) {
-    // Source-count framing is already covered in `buildFindings`.
     if (/sources? (is|are) reporting|outlets? on our trusted-source list|independent sources are reporting|Only one source is reporting/i.test(b)) continue;
     if (/disagree/i.test(b)) continue;
     if (/sensor networks/i.test(b)) continue;
@@ -403,36 +390,33 @@ function buildBottomLine(
   mix: SourceMix,
   corroboration: ReaderReportInput['corroboration'],
 ): string {
-  // Guiding principle: we describe what we found — we don't pass judgement
-  // on whether non-"trusted-list" sources are real reporting. A curated
-  // credibility list is useful shorthand, not the only signal that matters.
   switch (band) {
     case 'high':
       if (mix.sensor_events > 0) {
-        return 'Multiple trusted-list outlets are reporting this and sensor data backs it up — the basic shape of the story is well-supported.';
+        return 'This event is well-supported. Multiple established news outlets are independently reporting the same thing, and physical sensor data lines up with the claims. You can share this with reasonable confidence in the basic facts.';
       }
-      return 'Multiple trusted-list outlets are independently reporting this — the basic shape of the story is well-supported.';
+      return 'This event is well-supported. Multiple established news outlets are independently reporting the same thing. The core facts are likely accurate, though specific details may still evolve as coverage continues.';
     case 'contested':
-      return 'Sources don\u2019t agree on the key details. The underlying event may still be real, but the specifics are contested — hold off on sharing them until it settles.';
+      return 'Sources are contradicting each other on key details. The event itself may be real, but the specifics are in dispute. We\u2019d recommend waiting before sharing \u2014 the picture should become clearer as reporting settles.';
     case 'medium':
       if (corroboration.matched_signal) {
-        return 'The broad strokes of this story are corroborated, but specific details are still firming up. Be careful with the particulars until more sources confirm them.';
+        return 'The event appears to be real, but the full picture is still coming together. The broad strokes are backed up, though some details aren\u2019t independently confirmed yet. Worth following, but be cautious about specifics.';
       }
       if (mix.established_outlets === 0 && mix.total >= 5) {
-        return `${mix.total} independent sources are reporting this, but none are on our trusted-source list yet. Read them yourself — real reporting often breaks outside the major outlets.`;
+        return `Multiple sources are covering this, but none are major outlets we\u2019ve vetted. That doesn\u2019t mean it\u2019s wrong \u2014 stories often break outside the mainstream \u2014 but read the sources yourself before taking specifics at face value.`;
       }
       if (mix.established_outlets === 1) {
-        return 'One trusted-list outlet has this plus some unrated sources. Promising, but check the other reporters yourself before trusting specifics.';
+        return 'One major outlet has picked this up, along with some other sources. That\u2019s a promising sign, but we\u2019d want to see more independent confirmation before considering the details reliable.';
       }
-      return 'This is developing. The general shape looks real, but no individual claim has enough independent backing yet to be fully confident about.';
+      return 'This appears to be a developing story. The general shape looks plausible, but no single claim has enough independent backing yet to be confident about. Keep watching for updates.';
     case 'low':
       if (mix.total === 0) {
-        return 'We couldn\u2019t find any reporting on this. Could be brand new, could be niche, could be wrong — treat it as unconfirmed until more surfaces.';
+        return 'We couldn\u2019t find any independent reporting on this anywhere. It could be too new to have spread, very niche, or inaccurate. Treat it as unverified and check back later.';
       }
       if (mix.total === 1) {
-        return 'We\u2019ve only found one source so far. Read it directly, check who wrote it, and watch for others picking it up.';
+        return 'Only one source is reporting this so far. That\u2019s not enough to judge reliability. Check who published it, look at their track record, and wait for other outlets to pick it up before trusting the details.';
       }
-      return `${mix.total} sources are reporting this, but we haven\u2019t been able to rate any of them against our trusted-source list yet. Read them yourself — don\u2019t take their word as confirmed.`;
+      return `A few sources mention this, but we haven\u2019t been able to confirm any of them are established outlets. Read each one carefully and form your own judgement \u2014 don\u2019t treat this as confirmed.`;
   }
 }
 

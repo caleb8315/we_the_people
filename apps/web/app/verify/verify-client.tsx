@@ -335,7 +335,7 @@ function VerifyResult({ data }: { data: VerifyResponse }) {
   const bandTone = bandToneClasses(reader.band);
   return (
     <section className="space-y-5 rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
-      {/* 1. Header — small kind chip + the thing you submitted + plain one-liner. */}
+      {/* 1. Header — what was submitted, presented conversationally. */}
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-400">
           {reader.kind_label}
@@ -343,116 +343,134 @@ function VerifyResult({ data }: { data: VerifyResponse }) {
         <h2 className="mt-1 text-xl font-semibold leading-snug text-ink sm:text-[24px]">
           {reader.headline}
         </h2>
-        <p className="mt-1.5 text-sm text-ink-500">{reader.one_liner}</p>
+        <p className="mt-2 text-[15px] leading-relaxed text-ink-600">{reader.one_liner}</p>
       </div>
 
-      {/* 2. THE VERDICT — big, conversational, at the top. Users came for this.
-         Band label sits inside the same box so there's no separate "Mixed
-         evidence · N sources" row duplicating information below. */}
-      <div className={`rounded-2xl border p-4 sm:p-5 ${bandTone.wrap}`}>
-        <div className="flex items-center gap-2">
+      {/* 2. THE VERDICT — the main answer: is this trustworthy? */}
+      <div className={`rounded-2xl border p-5 sm:p-6 ${bandTone.wrap}`}>
+        <div className="flex items-center gap-2.5">
           <span
             aria-hidden="true"
-            className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${bandDotClass(reader.band)}`}
+            className={`inline-block h-3 w-3 shrink-0 rounded-full ${bandDotClass(reader.band)}`}
           />
-          <p className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${bandTone.label}`}>
-            {reader.band_label}
+          <p className={`text-sm font-semibold ${bandTone.label}`}>
+            {friendlyBandLabel(reader.band)}
           </p>
-          <span className="ml-auto text-[11px] text-ink-500">
-            {summarizeMix(reader.source_mix)}
-          </span>
         </div>
-        <p className="mt-2.5 text-[15px] leading-relaxed text-ink sm:text-base">
+        <p className="mt-3 text-[15px] leading-relaxed text-ink sm:text-base">
           {reader.bottom_line}
+        </p>
+        <p className="mt-2 text-xs text-ink-500">
+          Based on {summarizeMixNatural(reader.source_mix)}
         </p>
       </div>
 
-      {/* 2b. Subtle tracked-event link — just context, not the headline. */}
+      {/* 2b. Tracked-event match — with event context, not just a data link. */}
       {corroboration.matched_signal && (
-        <div className="flex items-center gap-2 rounded-lg border border-ink-100 bg-canvas-50 px-3 py-2 text-xs text-ink-500">
-          <span className="shrink-0 text-amber-500" aria-hidden="true">●</span>
-          <span>
-            Related to a story we&rsquo;re tracking ({corroboration.matched_signal.source_count} sources on file)
-          </span>
-          <a
-            href={`/signal/${corroboration.matched_signal.id}`}
-            className="ml-auto shrink-0 font-medium text-amber-700 hover:text-amber-900"
-          >
-            View full story →
-          </a>
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 shrink-0 text-amber-500" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-ink-700">
+                We&rsquo;re already tracking this event
+              </p>
+              <p className="mt-0.5 text-sm text-ink-600">
+                &ldquo;{corroboration.matched_signal.title}&rdquo;
+                {corroboration.matched_signal.source_count > 0 && (
+                  <span className="text-ink-500">
+                    {' '}&mdash; {corroboration.matched_signal.source_count} source{corroboration.matched_signal.source_count === 1 ? '' : 's'} on file
+                    {corroboration.matched_signal.credible_source_count > 0 && (
+                      <>, {corroboration.matched_signal.credible_source_count} established</>
+                    )}
+                  </span>
+                )}
+              </p>
+              <a
+                href={`/signal/${corroboration.matched_signal.id}`}
+                className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 hover:text-amber-900"
+              >
+                See full event coverage
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M5 12h14" /><path d="m13 5 7 7-7 7" />
+                </svg>
+              </a>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* 3. The supporting detail — findings + caveats combined into one
-         "Here's why" block. Default open on the result page (users came
-         for the answer; detail is secondary but reassuring). */}
+      {/* 3. Supporting detail — always open, because this IS the content. */}
       {(reader.what_we_found.length > 0 || reader.what_is_unclear.length > 0) && (
+        <div className="space-y-4">
+          {reader.what_we_found.length > 0 && (
+            <ReaderBlock title="What the evidence says" bullets={reader.what_we_found} />
+          )}
+          {reader.what_is_unclear.length > 0 && (
+            <ReaderBlock title="Limitations to keep in mind" bullets={reader.what_is_unclear} />
+          )}
+        </div>
+      )}
+
+      {/* 4. Sources — show who reported what, not just system names. */}
+      {reader.source_trace_friendly.length > 0 && (
         <details open className="group">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl border border-ink-100 bg-canvas-50 px-4 py-2.5 text-[12px] font-semibold uppercase tracking-[0.16em] text-ink-500 hover:bg-canvas-100">
-            <span>Here&rsquo;s why we&rsquo;re saying that</span>
-            <span className="text-ink-400 transition-transform group-open:rotate-180" aria-hidden="true">⌄</span>
+            <span>Sources behind this assessment</span>
+            <span className="text-ink-400 transition-transform group-open:rotate-180" aria-hidden="true">&#8964;</span>
           </summary>
-          <div className="mt-3 space-y-4 px-1">
-            {reader.what_we_found.length > 0 && (
-              <ReaderBlock title="What the evidence says" bullets={reader.what_we_found} />
-            )}
-            {reader.what_is_unclear.length > 0 && (
-              <ReaderBlock title="What&rsquo;s still unclear" bullets={reader.what_is_unclear} />
-            )}
+          <div className="mt-3 rounded-xl border border-ink-100 bg-canvas-50 p-4">
+            <ul className="space-y-2.5">
+              {reader.source_trace_friendly.map((t, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-sm">
+                  <span
+                    className={`mt-0.5 inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[10px] font-semibold uppercase tracking-wider ${roleChipClass(t.role_label)}`}
+                  >
+                    {t.role_label}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <a
+                      href={t.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-ink-700 hover:text-amber-600"
+                    >
+                      {t.outlet_label}
+                    </a>
+                    {t.title && (
+                      <p className="mt-0.5 truncate text-xs text-ink-500">{t.title}</p>
+                    )}
+                    <p className="text-xs text-ink-400">
+                      {t.domain}
+                      {t.is_credible && <span className="ml-1.5 text-emerald-600">&#10003; Established outlet</span>}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         </details>
       )}
 
-      {/* 4. Transparency: which systems we actually hit. Collapsed by default
-         — this is reassurance, not primary content. */}
+      {/* 5. Transparency: which systems we searched — collapsed, for the curious. */}
       <details className="group">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl border border-ink-100 bg-canvas-50 px-4 py-2.5 text-[12px] font-semibold uppercase tracking-[0.16em] text-ink-500 hover:bg-canvas-100">
           <span>Where we looked</span>
-          <span className="text-ink-400 transition-transform group-open:rotate-180" aria-hidden="true">⌄</span>
+          <span className="text-ink-400 transition-transform group-open:rotate-180" aria-hidden="true">&#8964;</span>
         </summary>
         <div className="mt-3">
           <CoverageStrip systems={corroboration.systems} />
         </div>
       </details>
 
-      {/* 5. Friendly source trace. */}
-      {reader.source_trace_friendly.length > 0 && (
-        <div className="rounded-xl border border-ink-100 bg-canvas-50 p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-400">
-            Sources we used
-          </p>
-          <ul className="mt-2 space-y-1.5">
-            {reader.source_trace_friendly.map((t, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm">
-                <span
-                  className={`inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[10px] font-semibold uppercase tracking-wider ${roleChipClass(t.role_label)}`}
-                >
-                  {t.role_label}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <a
-                    href={t.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="truncate font-medium text-ink-700 hover:text-amber-600"
-                  >
-                    {t.outlet_label}
-                  </a>
-                  <p className="truncate text-xs text-ink-400">
-                    {t.domain}
-                    {t.is_credible && <span className="ml-1.5 text-amber-600">· trusted list</span>}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       {data.verification_id && (
         <p className="text-[11px] text-ink-400">
-          Saved to your history as{' '}
-          <span className="font-mono text-ink-600">{data.verification_id}</span>.
+          Saved to your history &middot;{' '}
+          <span className="font-mono text-ink-500">{data.verification_id.slice(0, 8)}</span>
         </p>
       )}
     </section>
@@ -521,28 +539,43 @@ function toneDotClass(tone: 'info' | 'good' | 'warn'): string {
   }
 }
 
-/** Plain-English one-liner for the top-of-result "source mix" chip row. */
-function summarizeMix(mix: {
+function friendlyBandLabel(band: string): string {
+  switch (band) {
+    case 'high':
+      return 'Well-supported';
+    case 'contested':
+      return 'Sources disagree';
+    case 'medium':
+      return 'Developing \u2014 some support';
+    case 'low':
+    default:
+      return 'Not enough to judge yet';
+  }
+}
+
+function summarizeMixNatural(mix: {
   total: number;
   established_outlets: number;
   social_posts: number;
   sensor_events: number;
   reference_hits: number;
 }): string {
-  if (mix.total === 0) return 'No sources collected yet';
+  if (mix.total === 0) return 'no sources found yet';
   const parts: string[] = [];
   if (mix.established_outlets > 0) {
     parts.push(
-      `${mix.established_outlets} trusted-list outlet${mix.established_outlets === 1 ? '' : 's'}`,
+      `${mix.established_outlets} established outlet${mix.established_outlets === 1 ? '' : 's'}`,
     );
   }
   const unrated = Math.max(0, mix.total - mix.established_outlets - mix.social_posts - mix.sensor_events - mix.reference_hits);
-  if (unrated > 0) parts.push(`${unrated} unrated source${unrated === 1 ? '' : 's'}`);
-  if (mix.social_posts > 0) parts.push(`${mix.social_posts} social posts`);
-  if (mix.sensor_events > 0) parts.push(`${mix.sensor_events} sensor hits`);
-  if (mix.reference_hits > 0) parts.push(`${mix.reference_hits} reference`);
-  if (parts.length === 0) return `${mix.total} source${mix.total === 1 ? '' : 's'} total`;
-  return parts.join(' · ');
+  if (unrated > 0) parts.push(`${unrated} other source${unrated === 1 ? '' : 's'}`);
+  if (mix.social_posts > 0) parts.push(`${mix.social_posts} social post${mix.social_posts === 1 ? '' : 's'}`);
+  if (mix.sensor_events > 0) parts.push(`${mix.sensor_events} sensor reading${mix.sensor_events === 1 ? '' : 's'}`);
+  if (mix.reference_hits > 0) parts.push(`${mix.reference_hits} reference source${mix.reference_hits === 1 ? '' : 's'}`);
+  if (parts.length === 0) return `${mix.total} source${mix.total === 1 ? '' : 's'} checked`;
+  if (parts.length === 1) return parts[0]!;
+  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
+  return `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;
 }
 
 function roleChipClass(label: string): string {

@@ -110,6 +110,14 @@ export function extractKeywords(text: string): string[] {
     'today', 'just', 'more', 'will', 'would', 'could', 'should', 'may',
     'might', 'can', 'has', 'have', 'had', 'not', 'one', 'two', 'us', 'uk',
     'story', 'video', 'photo', 'opinion', 'analysis', 'cnn', 'bbc', 'reuters',
+    'after', 'before', 'still', 'back', 'here', 'there', 'what', 'when',
+    'where', 'which', 'while', 'show', 'shows', 'shown', 'many', 'much',
+    'like', 'also', 'been', 'than', 'them', 'then', 'they', 'does', 'done',
+    'gets', 'going', 'gone', 'good', 'know', 'look', 'make', 'made',
+    'need', 'part', 'take', 'tell', 'told', 'very', 'want', 'well',
+    'come', 'came', 'some', 'such', 'time', 'year', 'years', 'first',
+    'last', 'long', 'great', 'high', 'people', 'state', 'says', 'report',
+    'reports', 'reported', 'according', 'official', 'officials',
   ]);
   const tokens = text
     .toLowerCase()

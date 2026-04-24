@@ -140,10 +140,10 @@ async function findMatchingSignal(
     }
   }
 
-  if (q.keywords.length < 2) return { row: null, matched_by: null };
+  if (q.keywords.length < 3) return { row: null, matched_by: null };
 
   const sinceIso = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
-  const top = q.keywords.slice(0, 5);
+  const top = q.keywords.slice(0, 7);
   const orFilter = top
     .flatMap((k) => [
       `title.ilike.%${escapeIlike(k)}%`,
@@ -162,19 +162,25 @@ async function findMatchingSignal(
   if (!candidates || candidates.length === 0) return { row: null, matched_by: null };
 
   const scored = candidates
-    .map((c: SignalRow) => ({
-      row: c,
-      score: scoreOverlap(
-        `${c.title ?? ''} ${c.summary ?? ''}`.toLowerCase(),
-        q.keywords,
-      ),
-    }))
+    .map((c: SignalRow) => {
+      const haystack = `${c.title ?? ''} ${c.summary ?? ''}`.toLowerCase();
+      return {
+        row: c,
+        score: scoreOverlap(haystack, q.keywords),
+        ratio: scoreOverlap(haystack, q.keywords) / q.keywords.length,
+      };
+    })
     .sort((a, b) => b.score - a.score);
 
   const best = scored[0];
-  if (!best || best.score < 2) return { row: null, matched_by: null };
+  if (!best || best.score < MIN_KEYWORD_HITS || best.ratio < MIN_KEYWORD_RATIO) {
+    return { row: null, matched_by: null };
+  }
   return { row: best.row, matched_by: 'keyword' };
 }
+
+const MIN_KEYWORD_HITS = 3;
+const MIN_KEYWORD_RATIO = 0.4;
 
 function readPhysicalEvidence(raw: Record<string, unknown> | null): PhysicalEvidence | null {
   if (!raw) return null;
@@ -186,8 +192,11 @@ function readPhysicalEvidence(raw: Record<string, unknown> | null): PhysicalEvid
 }
 
 function scoreOverlap(haystack: string, needles: string[]): number {
+  const words = new Set(haystack.replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/));
   let score = 0;
-  for (const n of needles) if (haystack.includes(n)) score += 1;
+  for (const n of needles) {
+    if (words.has(n)) score += 1;
+  }
   return score;
 }
 
