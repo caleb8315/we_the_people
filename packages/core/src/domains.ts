@@ -83,6 +83,26 @@ export const CREDIBLE_DOMAINS: ReadonlySet<string> = new Set([
   'arstechnica.com',
   'therecord.media',
   'bleepingcomputer.com',
+  // Tech outlets
+  'techcrunch.com',
+  'theverge.com',
+  'wired.com',
+  'technologyreview.com',
+  'restofworld.org',
+  // Finance / markets
+  'bloomberg.com',
+  'ft.com',
+  'wsj.com',
+  'cnbc.com',
+  'marketwatch.com',
+  'coindesk.com',
+  // Finance — official / institutional
+  'federalreserve.gov',
+  'ecb.europa.eu',
+  'imf.org',
+  'worldbank.org',
+  'sec.gov',
+  'bls.gov',
 ]);
 
 /**

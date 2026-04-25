@@ -493,6 +493,31 @@ const OUTLET_NAMES: Record<string, string> = {
   'bsky.app': 'Bluesky',
   'wikipedia.org': 'Wikipedia',
   'en.wikipedia.org': 'Wikipedia',
+  // Tech
+  'techcrunch.com': 'TechCrunch',
+  'theverge.com': 'The Verge',
+  'arstechnica.com': 'Ars Technica',
+  'wired.com': 'Wired',
+  'engadget.com': 'Engadget',
+  'zdnet.com': 'ZDNet',
+  'technologyreview.com': 'MIT Technology Review',
+  'venturebeat.com': 'VentureBeat',
+  '9to5mac.com': '9to5Mac',
+  '9to5google.com': '9to5Google',
+  'restofworld.org': 'Rest of World',
+  'openai.com': 'OpenAI',
+  // Finance
+  'cnbc.com': 'CNBC',
+  'marketwatch.com': 'MarketWatch',
+  'seekingalpha.com': 'Seeking Alpha',
+  'coindesk.com': 'CoinDesk',
+  'theblock.co': 'The Block',
+  'federalreserve.gov': 'Federal Reserve',
+  'ecb.europa.eu': 'European Central Bank',
+  'imf.org': 'IMF',
+  'worldbank.org': 'World Bank',
+  'sec.gov': 'SEC',
+  'bls.gov': 'Bureau of Labor Statistics',
 };
 
 export function prettyOutletName(domain: string | null | undefined): string {
