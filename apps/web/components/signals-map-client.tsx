@@ -72,6 +72,17 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#039;');
 }
 
+function formatTimeAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 0) return 'just now';
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function SignalsMapClient({
@@ -165,25 +176,32 @@ export function SignalsMapClient({
         const icon = markerIcon(Lmod, pinColor(point.severity));
         const marker = Lmod.marker([point.lat, point.lon], { icon });
         const popupRoot = document.createElement('div');
-        popupRoot.className = 'min-w-[220px] space-y-2 text-sm';
+        popupRoot.className = 'min-w-[240px] max-w-[300px] space-y-2 text-sm';
+
+        const timeAgo = point.occurred_at ? formatTimeAgo(point.occurred_at) : null;
+        const sourceLine = point.source_count > 0
+          ? `${point.source_count} source${point.source_count === 1 ? '' : 's'}${point.credible_source_count > 0 ? ` (${point.credible_source_count} established)` : ''}`
+          : '';
+
         popupRoot.innerHTML = `
           <div class="flex flex-wrap items-center gap-1">
-            <span class="rounded-full border px-2 py-0.5 text-[11px] ${badgeTone(point.verification_status)}">${escapeHtml(statusLabel(point.verification_status))}</span>
-            <span class="rounded-full border border-ink-200 px-2 py-0.5 text-[11px] text-ink-600">severity ${point.severity}</span>
-            ${
-              point.isApproximate
-                ? '<span class="rounded-full border border-ink-200 px-2 py-0.5 text-[11px] text-ink-500">approx</span>'
-                : ''
-            }
+            <span class="rounded-full border px-2 py-0.5 text-[11px] font-medium ${badgeTone(point.verification_status)}">${escapeHtml(statusLabel(point.verification_status))}</span>
+            <span class="rounded-full border border-ink-200 px-2 py-0.5 text-[11px] text-ink-600">${point.severity}/100</span>
+            ${point.isApproximate ? '<span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700">approx location</span>' : ''}
           </div>
-          <p class="font-medium leading-snug">${escapeHtml(point.title)}</p>
-          <p class="text-xs text-ink-500">${escapeHtml(point.topic ?? 'other')}${point.country_code ? ` · ${escapeHtml(point.country_code)}` : ''}</p>
+          <p class="font-semibold leading-snug text-ink-900" style="line-height:1.35">${escapeHtml(point.title)}</p>
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-ink-500">
+            <span class="capitalize">${escapeHtml(point.topic ?? 'other')}</span>
+            ${point.country_code ? `<span>· ${escapeHtml(point.country_code)}</span>` : ''}
+            ${timeAgo ? `<span>· ${escapeHtml(timeAgo)}</span>` : ''}
+          </div>
+          ${sourceLine ? `<p class="text-xs text-ink-600">${escapeHtml(sourceLine)}</p>` : ''}
         `;
         const link = document.createElement('a');
         link.href = `/signal/${point.id}?from=map&context=${context}`;
         link.className =
-          'inline-block rounded-full border border-ink-200 px-3 py-1 text-xs hover:bg-ink-100';
-        link.textContent = 'Open signal';
+          'inline-flex items-center gap-1 rounded-full bg-ink-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-ink-700 transition';
+        link.textContent = 'View full event →';
         link.addEventListener('click', () => {
           void fireEvent('signal_opened_from_map', {
             signal_id: point.id,
@@ -193,7 +211,7 @@ export function SignalsMapClient({
           });
         });
         popupRoot.appendChild(link);
-        marker.bindPopup(popupRoot);
+        marker.bindPopup(popupRoot, { maxWidth: 320 });
         marker.addTo(layer);
         bounds.extend([point.lat, point.lon]);
       }

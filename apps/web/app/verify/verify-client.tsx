@@ -64,9 +64,60 @@ export function VerifyClient() {
   const [imageUrl, setImageUrl] = useState('');
   const [imageFilename, setImageFilename] = useState('');
   const [imageSha256, setImageSha256] = useState('');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageHashing, setImageHashing] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VerifyResponse | null>(null);
+
+  async function processImageFile(file: File) {
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file (PNG, JPG, GIF, WebP).');
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      setError('Image is too large (max 20 MB).');
+      return;
+    }
+    setError(null);
+    setImageFilename(file.name);
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreview(previewUrl);
+
+    setImageHashing(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+      setImageSha256(hex);
+    } catch {
+      setError('Could not compute file fingerprint. You can still verify without it.');
+    } finally {
+      setImageHashing(false);
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) void processImageFile(file);
+  }
+
+  function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) void processImageFile(file);
+  }
+
+  function clearImage() {
+    setImageUrl('');
+    setImageFilename('');
+    setImageSha256('');
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview(null);
+  }
 
   async function submit() {
     setError(null);
@@ -168,52 +219,90 @@ export function VerifyClient() {
             </label>
           )}
           {kind === 'image' && (
-            <div className="space-y-3">
-              <label className="block">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">
-                  Image URL
-                </span>
-                <input
-                  type="url"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="https://i.imgur.com/..."
-                  className="mt-1.5 block w-full rounded-full border border-ink-100 bg-paper px-4 py-3 text-sm text-ink placeholder:text-ink-400 shadow-card focus:border-amber-400 focus:outline-none"
-                />
-              </label>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="block">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">
-                    Filename (optional)
-                  </span>
-                  <input
-                    type="text"
-                    value={imageFilename}
-                    onChange={(e) => setImageFilename(e.target.value)}
-                    placeholder="screenshot-123.png"
-                    className="mt-1.5 block w-full rounded-full border border-ink-100 bg-paper px-4 py-3 text-sm text-ink placeholder:text-ink-400 shadow-card focus:border-amber-400 focus:outline-none"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">
-                    SHA-256 (optional)
-                  </span>
-                  <input
-                    type="text"
-                    value={imageSha256}
-                    onChange={(e) => setImageSha256(e.target.value)}
-                    placeholder="hex digest"
-                    className="mt-1.5 block w-full rounded-full border border-ink-100 bg-paper px-4 py-3 font-mono text-xs text-ink placeholder:text-ink-400 shadow-card focus:border-amber-400 focus:outline-none"
-                  />
-                </label>
-              </div>
-              <p className="text-[11px] text-ink-400">
-                We do not upload image bytes in v1. Provide a URL and optionally a hash so we can
-                deterministically check for duplicates.
-              </p>
-              <div className="flex justify-end">
-                <SubmitButton loading={loading} onClick={submit} />
-              </div>
+            <div className="space-y-4">
+              {!imagePreview ? (
+                <>
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={handleDrop}
+                    className={`relative flex flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed p-8 text-center transition ${
+                      dragOver
+                        ? 'border-amber-400 bg-amber-50/60'
+                        : 'border-ink-200 bg-canvas-50 hover:border-ink-300'
+                    }`}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-10 w-10 text-ink-300" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="3" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <path d="m21 15-5-5L5 21" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-medium text-ink-600">
+                        Drop an image here, or{' '}
+                        <label className="cursor-pointer font-semibold text-amber-600 hover:text-amber-700">
+                          browse
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileInput}
+                            className="sr-only"
+                          />
+                        </label>
+                      </p>
+                      <p className="mt-1 text-xs text-ink-400">PNG, JPG, GIF, or WebP up to 20 MB</p>
+                    </div>
+                  </div>
+
+                  <div className="relative flex items-center gap-3">
+                    <div className="h-px flex-1 bg-ink-100" />
+                    <span className="text-xs text-ink-400">or paste an image URL</span>
+                    <div className="h-px flex-1 bg-ink-100" />
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="url"
+                      value={imageUrl}
+                      onChange={(e) => setImageUrl(e.target.value)}
+                      placeholder="https://i.imgur.com/example.jpg"
+                      className="min-w-0 flex-1 rounded-full border border-ink-100 bg-paper px-4 py-3 text-sm text-ink placeholder:text-ink-400 shadow-card focus:border-amber-400 focus:outline-none"
+                    />
+                    <SubmitButton loading={loading} onClick={submit} />
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <div className="relative overflow-hidden rounded-2xl border border-ink-100 bg-canvas-50">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="mx-auto max-h-64 object-contain p-2"
+                    />
+                    <button
+                      type="button"
+                      onClick={clearImage}
+                      className="absolute right-2 top-2 rounded-full bg-ink-900/70 p-1.5 text-white hover:bg-ink-900"
+                      aria-label="Remove image"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-xl border border-ink-100 bg-paper px-4 py-3">
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <p className="truncate text-sm font-medium text-ink-700">{imageFilename}</p>
+                      {imageHashing ? (
+                        <p className="text-xs text-amber-600">Computing fingerprint...</p>
+                      ) : imageSha256 ? (
+                        <p className="truncate font-mono text-[11px] text-ink-400">SHA-256: {imageSha256.slice(0, 16)}...{imageSha256.slice(-8)}</p>
+                      ) : null}
+                    </div>
+                    <SubmitButton loading={loading || imageHashing} onClick={submit} />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

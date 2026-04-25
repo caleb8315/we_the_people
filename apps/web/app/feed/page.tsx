@@ -259,8 +259,8 @@ export default async function FeedPage({
               {minSeverity > 0 && <> · severity {minSeverity}+</>}
             </p>
           </div>
-          {userId && (
-            <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
+            {userId && (
               <Segmented
                 ariaLabel="Feed mode"
                 active={mode}
@@ -269,16 +269,16 @@ export default async function FeedPage({
                   { label: 'Global', value: 'global', href: qp('global', topic) },
                 ]}
               />
-              <Segmented
-                ariaLabel="Feed view"
-                active={view}
-                options={[
-                  { label: 'List', value: 'list', href: qp(mode, topic, 'list') },
-                  { label: `Map (${geoPoints.length})`, value: 'map', href: qp(mode, topic, 'map') },
-                ]}
-              />
-            </div>
-          )}
+            )}
+            <Segmented
+              ariaLabel="Feed view"
+              active={view}
+              options={[
+                { label: 'List', value: 'list', href: qp(mode, topic, 'list') },
+                { label: `Map (${geoPoints.length})`, value: 'map', href: qp(mode, topic, 'map') },
+              ]}
+            />
+          </div>
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2">

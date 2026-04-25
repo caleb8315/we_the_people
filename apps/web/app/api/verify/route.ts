@@ -314,7 +314,7 @@ export async function POST(req: Request) {
       .insert({
         user_id: userId,
         kind: body.kind,
-        input_url: body.kind === 'url' ? body.url ?? null : null,
+        input_url: body.kind === 'url' ? body.url ?? null : body.kind === 'image' ? body.image_url ?? null : null,
         input_text: body.kind === 'text' ? body.text ?? null : null,
         image_filename: body.image_filename ?? null,
         image_sha256: body.image_sha256 ?? null,
