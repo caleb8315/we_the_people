@@ -57,6 +57,8 @@ const TOPIC_TILE: Record<string, string> = {
   civil: 'tile-civil',
   cyber: 'tile-cyber',
   disaster: 'tile-disaster',
+  tech: 'tile-tech',
+  finance: 'tile-finance',
 };
 
 const TOPIC_GLYPH: Record<string, string> = {
@@ -67,6 +69,8 @@ const TOPIC_GLYPH: Record<string, string> = {
   civil: '☷',
   cyber: '⌬',
   disaster: '⚠',
+  tech: '◈',
+  finance: '◆',
 };
 
 export function SignalCard({ s }: { s: SignalRow }) {
@@ -107,7 +111,7 @@ export function SignalCard({ s }: { s: SignalRow }) {
           </h3>
           {s.summary && (
             <p className="mt-1.5 text-[14px] leading-relaxed text-ink-500 clamp-2 sm:text-[15px]">
-              {s.summary}
+              {cleanCardSummary(s.summary)}
             </p>
           )}
 
@@ -288,3 +292,14 @@ function PhysicalEvidenceBlock({ pe }: { pe: PhysicalEvidence }) {
   );
 }
 
+function cleanCardSummary(raw: string): string {
+  let text = raw;
+  text = text.replace(
+    /^(?:Country:\s*\S+\s*)?(?:Source:\s*[^.]+\.?\s*)?(?:Please refer to the attached file\.?\s*)?(?:Overview\s*)?(?:The following (?:overview|summary|report) (?:has been|was) (?:generated|compiled|prepared)[^.]*\.?\s*)?(?:It provides a synthesized summary[^.]*\.?\s*)?/i,
+    '',
+  );
+  text = text.replace(/^Summary\s+/i, '');
+  text = text.replace(/^(?:Key (?:Insights|Findings|Points|Takeaways):\s*)/i, '');
+  text = text.replace(/\s{2,}/g, ' ').trim();
+  return text || raw;
+}

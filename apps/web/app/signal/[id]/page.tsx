@@ -147,9 +147,11 @@ export default async function SignalPage({ params }: PageProps) {
           {signal.title}
         </h1>
         {signal.summary && (
-          <p className="mt-2 max-w-3xl text-[15px] leading-relaxed text-ink-600 sm:text-base">
-            {signal.summary}
-          </p>
+          <div className="mt-3 max-w-3xl space-y-2 text-[15px] leading-relaxed text-ink-600 sm:text-base">
+            {cleanSummary(signal.summary).map((paragraph, i) => (
+              <p key={i}>{paragraph}</p>
+            ))}
+          </div>
         )}
 
         {/* The verdict — big, band-tinted, conversational. Same pattern
@@ -669,6 +671,50 @@ function extractPhysicalEvidence(
     ? (candidate.limitations.filter((s) => typeof s === 'string') as string[])
     : [];
   return { status, confidence, sources, limitations };
+}
+
+/**
+ * Clean up raw RSS/adapter summary text into readable paragraphs.
+ *
+ * Ingested summaries are often messy: prefixed with "Country: X Source: Y
+ * Please refer to the attached file. Overview The following overview has
+ * been generated..." or full of inline metadata tags. This strips that
+ * cruft and splits into natural paragraphs.
+ */
+function cleanSummary(raw: string): string[] {
+  let text = raw;
+
+  text = text.replace(
+    /^(?:Country:\s*\S+\s*)?(?:Source:\s*[^.]+\.?\s*)?(?:Please refer to the attached file\.?\s*)?(?:Overview\s*)?(?:The following (?:overview|summary|report) (?:has been|was) (?:generated|compiled|prepared) (?:using |based on )?(?:the )?(?:information |data )?(?:available )?(?:up to|as of|through)?\s*[^.]*\.?\s*)?(?:It provides a synthesized summary and key insights[^.]*\.?\s*)?/i,
+    '',
+  );
+
+  text = text.replace(/^Summary\s+/i, '');
+  text = text.replace(/^(?:Key (?:Insights|Findings|Points|Takeaways):\s*)/i, '');
+
+  text = text.replace(/\s{2,}/g, ' ').trim();
+
+  if (!text) return [];
+
+  const sentences = text.match(/[^.!?]+[.!?]+(?:\s|$)/g) ?? [text];
+
+  const paragraphs: string[] = [];
+  let current = '';
+  const TARGET_LENGTH = 280;
+
+  for (const sentence of sentences) {
+    const trimmed = sentence.trim();
+    if (!trimmed) continue;
+    if (current.length + trimmed.length > TARGET_LENGTH && current.length > 0) {
+      paragraphs.push(current.trim());
+      current = trimmed;
+    } else {
+      current += (current ? ' ' : '') + trimmed;
+    }
+  }
+  if (current.trim()) paragraphs.push(current.trim());
+
+  return paragraphs.length > 0 ? paragraphs : [text];
 }
 
 function ScoreRow({
