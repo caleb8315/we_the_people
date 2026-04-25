@@ -39,9 +39,6 @@ async function postNavEvent(target: string, from: string) {
 export function MobileBottomNav({ signedIn }: { signedIn: boolean }) {
   const pathname = usePathname();
 
-  // Settings page has its own sticky save bar — hide pill to avoid overlap.
-  if (pathname.startsWith('/settings')) return null;
-
   const links = LINKS.filter((l) => {
     if ('authedOnly' in l && l.authedOnly && !signedIn) return false;
     if ('anonOnly' in l && l.anonOnly && signedIn) return false;

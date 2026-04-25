@@ -486,8 +486,8 @@ export function SettingsForm({
         </div>
       </Section>
 
-      {/* Sticky save bar */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-base-900/90 backdrop-blur">
+      {/* Sticky save bar — sits above the mobile bottom nav (bottom-[72px] on mobile, bottom-0 on desktop) */}
+      <div className="fixed inset-x-0 bottom-[72px] z-30 border-t border-ink-100 bg-base-900/90 backdrop-blur md:bottom-0">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3">
           <p className="text-xs text-ink-500">{status ?? 'Changes are saved to your account only.'}</p>
           <button
