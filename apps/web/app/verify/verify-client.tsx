@@ -9,6 +9,7 @@ import type {
   SocialProvenance,
 } from '@osint/core';
 import type { ReaderReport } from '@/lib/reader-report';
+import type { ForensicReport } from '@/lib/image-forensics';
 import { Segmented } from '@/components/ui/segmented';
 
 type Kind = 'url' | 'text' | 'image';
@@ -65,8 +66,12 @@ export function VerifyClient() {
   const [imageFilename, setImageFilename] = useState('');
   const [imageSha256, setImageSha256] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageHashing, setImageHashing] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [forensicReport, setForensicReport] = useState<ForensicReport | null>(null);
+  const [forensicAnalyzing, setForensicAnalyzing] = useState(false);
+  const [showEla, setShowEla] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VerifyResponse | null>(null);
@@ -81,7 +86,10 @@ export function VerifyClient() {
       return;
     }
     setError(null);
+    setForensicReport(null);
+    setResult(null);
     setImageFilename(file.name);
+    setImageFile(file);
     const previewUrl = URL.createObjectURL(file);
     setImagePreview(previewUrl);
 
@@ -93,9 +101,20 @@ export function VerifyClient() {
       const hex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
       setImageSha256(hex);
     } catch {
-      setError('Could not compute file fingerprint. You can still verify without it.');
+      // SHA-256 failed, continue without it
     } finally {
       setImageHashing(false);
+    }
+
+    setForensicAnalyzing(true);
+    try {
+      const { analyzeImage } = await import('@/lib/image-forensics');
+      const report = await analyzeImage(file);
+      setForensicReport(report);
+    } catch {
+      setError('Image analysis failed. Try a different image.');
+    } finally {
+      setForensicAnalyzing(false);
     }
   }
 
@@ -115,8 +134,11 @@ export function VerifyClient() {
     setImageUrl('');
     setImageFilename('');
     setImageSha256('');
+    setImageFile(null);
     if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImagePreview(null);
+    setForensicReport(null);
+    setShowEla(false);
   }
 
   async function submit() {
@@ -251,12 +273,15 @@ export function VerifyClient() {
                         </label>
                       </p>
                       <p className="mt-1 text-xs text-ink-400">PNG, JPG, GIF, or WebP up to 20 MB</p>
+                      <p className="mt-2 text-xs text-ink-400">
+                        We&rsquo;ll check for AI generation, photo manipulation, and metadata authenticity — all locally on your device.
+                      </p>
                     </div>
                   </div>
 
                   <div className="relative flex items-center gap-3">
                     <div className="h-px flex-1 bg-ink-100" />
-                    <span className="text-xs text-ink-400">or paste an image URL</span>
+                    <span className="text-xs text-ink-400">or paste an image URL to cross-check reporting</span>
                     <div className="h-px flex-1 bg-ink-100" />
                   </div>
 
@@ -265,42 +290,53 @@ export function VerifyClient() {
                       type="url"
                       value={imageUrl}
                       onChange={(e) => setImageUrl(e.target.value)}
-                      placeholder="https://i.imgur.com/example.jpg"
+                      placeholder="https://example.com/photo.jpg"
                       className="min-w-0 flex-1 rounded-full border border-ink-100 bg-paper px-4 py-3 text-sm text-ink placeholder:text-ink-400 shadow-card focus:border-amber-400 focus:outline-none"
                     />
                     <SubmitButton loading={loading} onClick={submit} />
                   </div>
                 </>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="relative overflow-hidden rounded-2xl border border-ink-100 bg-canvas-50">
-                    <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="mx-auto max-h-64 object-contain p-2"
-                    />
-                    <button
-                      type="button"
-                      onClick={clearImage}
-                      className="absolute right-2 top-2 rounded-full bg-ink-900/70 p-1.5 text-white hover:bg-ink-900"
-                      aria-label="Remove image"
-                    >
-                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M18 6 6 18" /><path d="m6 6 12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-3 rounded-xl border border-ink-100 bg-paper px-4 py-3">
-                    <div className="min-w-0 flex-1 space-y-0.5">
-                      <p className="truncate text-sm font-medium text-ink-700">{imageFilename}</p>
-                      {imageHashing ? (
-                        <p className="text-xs text-amber-600">Computing fingerprint...</p>
-                      ) : imageSha256 ? (
-                        <p className="truncate font-mono text-[11px] text-ink-400">SHA-256: {imageSha256.slice(0, 16)}...{imageSha256.slice(-8)}</p>
-                      ) : null}
+                    {showEla && forensicReport?.ela ? (
+                      <img src={forensicReport.ela.data_url} alt="Error Level Analysis" className="mx-auto max-h-72 object-contain p-2" />
+                    ) : (
+                      <img src={imagePreview} alt="Preview" className="mx-auto max-h-72 object-contain p-2" />
+                    )}
+                    <div className="absolute right-2 top-2 flex gap-1.5">
+                      {forensicReport?.ela && (
+                        <button
+                          type="button"
+                          onClick={() => setShowEla(!showEla)}
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-medium shadow transition ${showEla ? 'bg-amber-500 text-white' : 'bg-ink-900/70 text-white hover:bg-ink-900'}`}
+                        >
+                          {showEla ? 'Original' : 'ELA'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={clearImage}
+                        className="rounded-full bg-ink-900/70 p-1.5 text-white hover:bg-ink-900"
+                        aria-label="Remove image"
+                      >
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+                        </svg>
+                      </button>
                     </div>
-                    <SubmitButton loading={loading || imageHashing} onClick={submit} />
                   </div>
+
+                  {(forensicAnalyzing || imageHashing) && (
+                    <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
+                      <span className="inline-block h-4 w-4 shrink-0 rounded-full border-2 border-amber-200 border-t-amber-500 motion-safe:animate-spin" />
+                      <p className="text-sm text-amber-700">
+                        {imageHashing ? 'Computing fingerprint...' : 'Analyzing image for AI markers, manipulation, and metadata...'}
+                      </p>
+                    </div>
+                  )}
+
+                  {forensicReport && <ImageForensicResult report={forensicReport} filename={imageFilename} />}
                 </div>
               )}
             </div>
@@ -564,6 +600,96 @@ function VerifyResult({ data }: { data: VerifyResponse }) {
       )}
     </section>
   );
+}
+
+function ImageForensicResult({ report, filename }: { report: ForensicReport; filename: string }) {
+  const verdictTone = forensicVerdictTone(report.verdict);
+  return (
+    <section className="space-y-4 rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-400">
+          Image inspection
+        </p>
+        <h2 className="mt-1 text-xl font-semibold leading-snug text-ink sm:text-[24px]">
+          {filename}
+        </h2>
+        {report.metadata.dimensions && (
+          <p className="mt-1 text-xs text-ink-400">
+            {report.metadata.dimensions.width} &times; {report.metadata.dimensions.height}px
+            {report.metadata.camera_model ? ` · ${report.metadata.camera_make ?? ''} ${report.metadata.camera_model}`.trim() : ''}
+            {report.metadata.date_taken ? ` · ${new Date(report.metadata.date_taken).toLocaleDateString()}` : ''}
+          </p>
+        )}
+      </div>
+
+      <div className={`rounded-2xl border p-5 sm:p-6 ${verdictTone.wrap}`}>
+        <div className="flex items-center gap-2.5">
+          <span aria-hidden="true" className={`inline-block h-3 w-3 shrink-0 rounded-full ${verdictTone.dot}`} />
+          <p className={`text-sm font-semibold ${verdictTone.label}`}>
+            {report.verdict_label}
+          </p>
+        </div>
+        <p className="mt-3 text-[15px] leading-relaxed text-ink sm:text-base">
+          {report.verdict_explanation}
+        </p>
+        <p className="mt-2 text-xs text-ink-500">
+          {report.confidence_note}
+        </p>
+      </div>
+
+      {report.findings.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-400">
+            What we found
+          </p>
+          <ul className="space-y-2">
+            {report.findings.map((f, i) => (
+              <li key={i} className="flex gap-2.5 text-[14px] leading-relaxed text-ink-700">
+                <span
+                  aria-hidden="true"
+                  className={`mt-[8px] h-2 w-2 shrink-0 rounded-full ${findingSeverityDot(f.severity)}`}
+                />
+                <div>
+                  <span className="font-medium">{f.label}.</span>{' '}
+                  <span className="text-ink-600">{f.detail}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <p className="text-[11px] text-ink-400">
+        This analysis ran entirely on your device. No image data was uploaded to any server.
+      </p>
+    </section>
+  );
+}
+
+function forensicVerdictTone(verdict: ForensicReport['verdict']): { wrap: string; label: string; dot: string } {
+  switch (verdict) {
+    case 'likely_authentic':
+      return { wrap: 'border-emerald-200 bg-emerald-50/80', label: 'text-emerald-700', dot: 'bg-emerald-500' };
+    case 'possibly_edited':
+      return { wrap: 'border-amber-200 bg-amber-50/80', label: 'text-amber-700', dot: 'bg-amber-500' };
+    case 'likely_ai_generated':
+      return { wrap: 'border-danger-200 bg-danger-50/80', label: 'text-danger-700', dot: 'bg-danger-500' };
+    case 'suspicious':
+      return { wrap: 'border-danger-200 bg-danger-50/80', label: 'text-danger-700', dot: 'bg-danger-500' };
+    case 'inconclusive':
+    default:
+      return { wrap: 'border-ink-200 bg-canvas-50', label: 'text-ink-600', dot: 'bg-ink-300' };
+  }
+}
+
+function findingSeverityDot(severity: string): string {
+  switch (severity) {
+    case 'alert': return 'bg-danger-500';
+    case 'warning': return 'bg-amber-500';
+    case 'note': return 'bg-sky-500';
+    case 'info':
+    default: return 'bg-emerald-500';
+  }
 }
 
 /** Colours for the hero verdict box — keyed to the confidence band so the
