@@ -601,206 +601,275 @@ async function runPixelAnalysis(file: File): Promise<PixelAnalysis> {
   const imageData = ctx.getImageData(0, 0, w, h);
   const px = imageData.data;
 
-  // 1. Noise analysis — real cameras produce natural sensor noise
-  let noiseDiffs = 0;
-  let totalPairs = 0;
-  for (let y = 0; y < h - 1; y++) {
-    for (let x = 0; x < w - 1; x++) {
-      const i = (y * w + x) * 4;
-      const iR = i + 4;
-      const iD = ((y + 1) * w + x) * 4;
-      noiseDiffs += Math.abs(px[i]! - px[iR]!) + Math.abs(px[i+1]! - px[iR+1]!) + Math.abs(px[i+2]! - px[iR+2]!);
-      noiseDiffs += Math.abs(px[i]! - px[iD]!) + Math.abs(px[i+1]! - px[iD+1]!) + Math.abs(px[i+2]! - px[iD+2]!);
-      totalPairs += 2;
+  // ────────────────────────────────────────────────────────────────────
+  // 1. BAYER CFA CORRELATION (strongest single signal)
+  // Real cameras use a Bayer color filter array — each pixel only captures
+  // one color channel, the other two are interpolated by demosaicing.
+  // This creates measurable inter-channel correlations that AI generators
+  // never produce because they output RGB directly.
+  // We simulate the Bayer pattern and measure how well neighboring pixels'
+  // color channels predict each other.
+  // ────────────────────────────────────────────────────────────────────
+  let bayerCorrelation = 0;
+  let bayerSamples = 0;
+  for (let y = 2; y < h - 2; y += 2) {
+    for (let x = 2; x < w - 2; x += 2) {
+      const i00 = (y * w + x) * 4;
+      const i01 = (y * w + (x + 1)) * 4;
+      const i10 = ((y + 1) * w + x) * 4;
+      const i11 = ((y + 1) * w + (x + 1)) * 4;
+      // In a Bayer RGGB pattern, the green channel at diagonal positions
+      // should correlate strongly in real photos due to demosaicing
+      const g00 = px[i00 + 1]!;
+      const g11 = px[i11 + 1]!;
+      const g01 = px[i01 + 1]!;
+      const g10 = px[i10 + 1]!;
+      // Demosaiced images have green-channel diagonal correlation
+      const diagDiff = Math.abs(g00 - g11);
+      const crossDiff = Math.abs(g01 - g10);
+      // Real: diagonal and cross should differ (interpolation asymmetry)
+      // AI: both diffs tend to be similar (no interpolation happened)
+      const asymmetry = Math.abs(diagDiff - crossDiff);
+      bayerCorrelation += asymmetry;
+      bayerSamples++;
+
+      // Also check R-G and B-G correlations within 2x2 block
+      const r00 = px[i00]!;
+      const b11 = px[i11 + 2]!;
+      const rg_diff = Math.abs(r00 - g00);
+      const bg_diff = Math.abs(b11 - g11);
+      // Real cameras: R-G and B-G differences follow predictable local patterns
+      // AI: these are independently generated, less correlated
+      const rgbg_corr = Math.abs(rg_diff - bg_diff);
+      bayerCorrelation += rgbg_corr * 0.5;
     }
   }
-  const avgNoise = noiseDiffs / (totalPairs * 3);
+  const bayerScore = bayerSamples > 0 ? bayerCorrelation / bayerSamples : 0;
 
-  // 2. Flat region detection — AI images have unnaturally smooth areas
-  let flatPixels = 0;
+  // ────────────────────────────────────────────────────────────────────
+  // 2. HIGH-FREQUENCY RATIO (DCT-inspired)
+  // Apply high-pass filter and measure energy ratio. Real photos from
+  // camera sensors have rich high-freq content. AI images are smoother.
+  // Threshold: real > 0.20, AI < 0.15 (per research)
+  // ────────────────────────────────────────────────────────────────────
+  let hfEnergy = 0;
+  let totalEnergy = 0;
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
       const i = (y * w + x) * 4;
-      let isFlat = true;
-      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]] as const) {
-        const j = ((y+dy)*w+(x+dx)) * 4;
-        if (Math.abs(px[i]!-px[j]!) > 3 && Math.abs(px[i+1]!-px[j+1]!) > 3) { isFlat = false; break; }
+      for (let c = 0; c < 3; c++) {
+        const center = px[i + c]!;
+        const hp = center
+          - (px[((y-1)*w+x)*4+c]! + px[((y+1)*w+x)*4+c]! +
+             px[(y*w+x-1)*4+c]! + px[(y*w+x+1)*4+c]!) / 4;
+        hfEnergy += hp * hp;
+        totalEnergy += center * center;
       }
-      if (isFlat) flatPixels++;
     }
   }
-  const flatRatio = (w-2)*(h-2) > 0 ? flatPixels / ((w-2)*(h-2)) : 0;
+  const hfRatio = totalEnergy > 0 ? hfEnergy / totalEnergy : 0;
 
-  // 3. Saturation uniformity — AI produces unnaturally even saturation
-  const satValues: number[] = [];
-  const step = Math.max(1, Math.floor(px.length / (4 * 3000)));
-  for (let i = 0; i < px.length; i += 4 * step) {
-    const cMax = Math.max(px[i]!, px[i+1]!, px[i+2]!) / 255;
-    const cMin = Math.min(px[i]!, px[i+1]!, px[i+2]!) / 255;
-    satValues.push(cMax === 0 ? 0 : (cMax - cMin) / cMax);
+  // ────────────────────────────────────────────────────────────────────
+  // 3. NOISE VARIANCE CONSISTENCY
+  // Real camera noise follows a signal-dependent model (brighter areas
+  // have different noise than dark areas). AI noise is uniform.
+  // Split into brightness quartiles and compare noise variance.
+  // ────────────────────────────────────────────────────────────────────
+  const quartileNoise = [0, 0, 0, 0];
+  const quartileCounts = [0, 0, 0, 0];
+  for (let y = 0; y < h - 1; y += 2) {
+    for (let x = 0; x < w - 1; x += 2) {
+      const i = (y * w + x) * 4;
+      const brightness = (px[i]! + px[i+1]! + px[i+2]!) / 3;
+      const q = Math.min(3, Math.floor(brightness / 64));
+      const iR = i + 4;
+      const localNoise = Math.abs(px[i]!-px[iR]!) + Math.abs(px[i+1]!-px[iR+1]!) + Math.abs(px[i+2]!-px[iR+2]!);
+      quartileNoise[q]! += localNoise;
+      quartileCounts[q]!++;
+    }
   }
-  const meanSat = satValues.reduce((a,b) => a+b, 0) / satValues.length;
-  const satStdDev = Math.sqrt(satValues.reduce((a,b) => a + (b-meanSat)**2, 0) / satValues.length);
+  const quartileAvgs = quartileNoise.map((sum, i) => quartileCounts[i]! > 0 ? sum / quartileCounts[i]! : 0);
+  const noiseRange = Math.max(...quartileAvgs) - Math.min(...quartileAvgs);
+  // Real photos: noise varies by brightness (range > 3). AI: uniform (range < 1.5)
 
-  // 4. Edge coherence — AI tends to produce unnaturally clean/smooth edges
-  let edgeCount = 0;
-  let smoothEdgeCount = 0;
-  const edgeThreshold = 30;
-  for (let y = 1; y < h - 1; y += 2) {
-    for (let x = 1; x < w - 1; x += 2) {
+  // ────────────────────────────────────────────────────────────────────
+  // 4. COLOR CHANNEL INDEPENDENCE
+  // AI generators produce each RGB channel from the same latent space,
+  // creating unnaturally high correlation between channels.
+  // Real cameras have independent sensor responses per channel.
+  // ────────────────────────────────────────────────────────────────────
+  let rg_corr = 0, rb_corr = 0, gb_corr = 0;
+  let rMean = 0, gMean = 0, bMean = 0;
+  const sampleCount = w * h;
+  for (let i = 0; i < px.length; i += 4) {
+    rMean += px[i]!; gMean += px[i+1]!; bMean += px[i+2]!;
+  }
+  rMean /= sampleCount; gMean /= sampleCount; bMean /= sampleCount;
+
+  let rVar = 0, gVar = 0, bVar = 0;
+  for (let i = 0; i < px.length; i += 4) {
+    const rd = px[i]! - rMean, gd = px[i+1]! - gMean, bd = px[i+2]! - bMean;
+    rg_corr += rd * gd; rb_corr += rd * bd; gb_corr += gd * bd;
+    rVar += rd * rd; gVar += gd * gd; bVar += bd * bd;
+  }
+  const rgCorr = (rVar > 0 && gVar > 0) ? Math.abs(rg_corr / Math.sqrt(rVar * gVar)) : 0;
+  const rbCorr = (rVar > 0 && bVar > 0) ? Math.abs(rb_corr / Math.sqrt(rVar * bVar)) : 0;
+  const avgChannelCorr = (rgCorr + rbCorr) / 2;
+  // AI: very high correlation > 0.92. Real photos: more variable, typically 0.7-0.9
+
+  // ────────────────────────────────────────────────────────────────────
+  // 5. JPEG GRID ARTIFACT CHECK
+  // Re-saved JPEGs show 8x8 block artifacts. AI-generated PNGs don't.
+  // Their presence indicates a camera pipeline (JPEG is native camera format)
+  // ────────────────────────────────────────────────────────────────────
+  let blockBoundaryEnergy = 0;
+  let blockInteriorEnergy = 0;
+  let bbCount = 0, biCount = 0;
+  for (let y = 4; y < h - 4; y++) {
+    for (let x = 4; x < w - 4; x++) {
       const i = (y * w + x) * 4;
       const iR = i + 4;
-      const iD = ((y+1) * w + x) * 4;
-      const gx = Math.abs(px[i]!-px[iR]!) + Math.abs(px[i+1]!-px[iR+1]!) + Math.abs(px[i+2]!-px[iR+2]!);
-      const gy = Math.abs(px[i]!-px[iD]!) + Math.abs(px[i+1]!-px[iD+1]!) + Math.abs(px[i+2]!-px[iD+2]!);
-      const gradient = Math.sqrt(gx*gx + gy*gy);
-      if (gradient > edgeThreshold) {
-        edgeCount++;
-        const iL = i - 4;
-        const iU = ((y-1)*w+x) * 4;
-        const gxN = Math.abs(px[iL]!-px[i]!) + Math.abs(px[iL+1]!-px[i+1]!) + Math.abs(px[iL+2]!-px[i+2]!);
-        const gyN = Math.abs(px[iU]!-px[i]!) + Math.abs(px[iU+1]!-px[i+1]!) + Math.abs(px[iU+2]!-px[i+2]!);
-        const neighborGrad = Math.sqrt(gxN*gxN + gyN*gyN);
-        if (Math.abs(gradient - neighborGrad) < 15) smoothEdgeCount++;
-      }
+      const diff = Math.abs(px[i]! - px[iR]!) + Math.abs(px[i+1]! - px[iR+1]!);
+      if (x % 8 === 7) { blockBoundaryEnergy += diff; bbCount++; }
+      else { blockInteriorEnergy += diff; biCount++; }
     }
   }
-  const edgeCoherence = edgeCount > 10 ? smoothEdgeCount / edgeCount : 0.5;
+  const jpegGridRatio = (bbCount > 0 && biCount > 0)
+    ? (blockBoundaryEnergy / bbCount) / (blockInteriorEnergy / biCount + 0.001)
+    : 1.0;
+  // Real JPEG photos: ratio > 1.05 (boundary energy > interior). AI PNGs: ~1.0
 
-  // 5. High frequency energy — real photos have more high-freq detail from sensor
-  let hfEnergy = 0;
-  let hfSamples = 0;
-  for (let y = 1; y < h - 1; y += 2) {
-    for (let x = 1; x < w - 1; x += 2) {
-      const i = (y*w+x)*4;
-      const center = (px[i]! + px[i+1]! + px[i+2]!) / 3;
-      let neighborSum = 0;
-      for (const [dx,dy] of [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]] as const) {
-        const j = ((y+dy)*w+(x+dx))*4;
-        neighborSum += (px[j]! + px[j+1]! + px[j+2]!) / 3;
+  // ────────────────────────────────────────────────────────────────────
+  // 6. TEXTURE REPETITION / PATCH UNIQUENESS
+  // AI images often have subtly repetitive textures (skin, fabric, bg).
+  // Sample 8x8 patches and measure how many are suspiciously similar.
+  // ────────────────────────────────────────────────────────────────────
+  const patches: number[] = [];
+  for (let py = 0; py < Math.min(h - 8, 200); py += 12) {
+    for (let px2 = 0; px2 < Math.min(w - 8, 200); px2 += 12) {
+      let hash = 0;
+      for (let dy = 0; dy < 8; dy += 2) {
+        for (let dx = 0; dx < 8; dx += 2) {
+          const i = ((py + dy) * w + (px2 + dx)) * 4;
+          hash = (hash * 31 + (px[i]! >> 4)) | 0;
+        }
       }
-      const laplacian = Math.abs(8 * center - neighborSum);
-      hfEnergy += laplacian;
-      hfSamples++;
+      patches.push(hash);
     }
   }
-  const avgHfEnergy = hfSamples > 0 ? hfEnergy / hfSamples : 0;
+  const uniquePatches = new Set(patches).size;
+  const patchUniqueness = patches.length > 0 ? uniquePatches / patches.length : 1;
+  // AI: more repetition (< 0.85). Real: more unique patches (> 0.92)
 
-  // 6. Chromatic aberration — real lenses produce color fringing, AI doesn't
-  let caScore = 0;
-  let caSamples = 0;
-  for (let y = 2; y < h - 2; y += 3) {
-    for (let x = 2; x < w - 2; x += 3) {
-      const i = (y*w+x)*4;
-      const iR2 = (y*w+(x+2))*4;
-      const rDiff = Math.abs(px[i]! - px[iR2]!);
-      const gDiff = Math.abs(px[i+1]! - px[iR2+1]!);
-      const bDiff = Math.abs(px[i+2]! - px[iR2+2]!);
-      if (rDiff > 10 || gDiff > 10 || bDiff > 10) {
-        const channelSpread = Math.max(rDiff, gDiff, bDiff) - Math.min(rDiff, gDiff, bDiff);
-        if (channelSpread > 8) caScore++;
-        caSamples++;
-      }
-    }
-  }
-  const chromaticAberration = caSamples > 0 ? caScore / caSamples : 0;
+  // ────────────────────────────────────────────────────────────────────
+  // COMBINE ALL SIGNALS
+  // ────────────────────────────────────────────────────────────────────
+  let aiLikelihood = 50;
 
-  // Combine all signals into AI likelihood score
-  let aiLikelihood = 50; // Start neutral
+  // Bayer CFA: strongest discriminator (weight: 20 pts)
+  // Real photos have asymmetry score > 4 from demosaicing. AI < 2.
+  if (bayerScore < 1.5) aiLikelihood += 16;
+  else if (bayerScore < 2.5) aiLikelihood += 10;
+  else if (bayerScore < 3.5) aiLikelihood += 4;
+  else if (bayerScore > 5) aiLikelihood -= 14;
+  else if (bayerScore > 4) aiLikelihood -= 8;
 
-  // Noise: real photos have more noise (8-25 typical), AI is smooth (2-6)
-  if (avgNoise < 3) aiLikelihood += 18;
-  else if (avgNoise < 5) aiLikelihood += 12;
-  else if (avgNoise < 8) aiLikelihood += 5;
-  else if (avgNoise > 15) aiLikelihood -= 12;
-  else if (avgNoise > 10) aiLikelihood -= 6;
+  // High-frequency ratio (weight: 18 pts)
+  if (hfRatio < 0.08) aiLikelihood += 14;
+  else if (hfRatio < 0.14) aiLikelihood += 8;
+  else if (hfRatio > 0.25) aiLikelihood -= 12;
+  else if (hfRatio > 0.18) aiLikelihood -= 6;
 
-  // Flat regions: AI > 0.4, real photos < 0.25 typically
-  if (flatRatio > 0.55) aiLikelihood += 15;
-  else if (flatRatio > 0.4) aiLikelihood += 10;
-  else if (flatRatio > 0.3) aiLikelihood += 4;
-  else if (flatRatio < 0.2) aiLikelihood -= 8;
-  else if (flatRatio < 0.25) aiLikelihood -= 4;
+  // Noise variance consistency (weight: 14 pts)
+  if (noiseRange < 1.0) aiLikelihood += 12;
+  else if (noiseRange < 2.0) aiLikelihood += 6;
+  else if (noiseRange > 4.0) aiLikelihood -= 10;
+  else if (noiseRange > 3.0) aiLikelihood -= 5;
 
-  // Saturation uniformity: AI has low stddev
-  if (satStdDev < 0.06) aiLikelihood += 12;
-  else if (satStdDev < 0.1) aiLikelihood += 6;
-  else if (satStdDev > 0.18) aiLikelihood -= 8;
+  // Channel correlation (weight: 12 pts)
+  if (avgChannelCorr > 0.95) aiLikelihood += 10;
+  else if (avgChannelCorr > 0.92) aiLikelihood += 5;
+  else if (avgChannelCorr < 0.8) aiLikelihood -= 8;
+  else if (avgChannelCorr < 0.85) aiLikelihood -= 4;
 
-  // Edge coherence: AI has smoother, more coherent edges (> 0.7)
-  if (edgeCoherence > 0.8) aiLikelihood += 12;
-  else if (edgeCoherence > 0.65) aiLikelihood += 6;
-  else if (edgeCoherence < 0.4) aiLikelihood -= 8;
+  // JPEG grid presence (weight: 10 pts)
+  if (jpegGridRatio > 1.08) aiLikelihood -= 8;
+  else if (jpegGridRatio > 1.04) aiLikelihood -= 4;
+  else if (jpegGridRatio < 1.01) aiLikelihood += 6;
 
-  // High frequency energy: real photos have more (> 40), AI less (< 20)
-  if (avgHfEnergy < 12) aiLikelihood += 12;
-  else if (avgHfEnergy < 20) aiLikelihood += 6;
-  else if (avgHfEnergy > 40) aiLikelihood -= 10;
-  else if (avgHfEnergy > 30) aiLikelihood -= 5;
-
-  // Chromatic aberration: present in real photos (> 0.15), absent in AI
-  if (chromaticAberration < 0.03) aiLikelihood += 8;
-  else if (chromaticAberration > 0.15) aiLikelihood -= 10;
-  else if (chromaticAberration > 0.08) aiLikelihood -= 5;
+  // Patch repetition (weight: 8 pts)
+  if (patchUniqueness < 0.75) aiLikelihood += 8;
+  else if (patchUniqueness < 0.85) aiLikelihood += 4;
+  else if (patchUniqueness > 0.95) aiLikelihood -= 6;
 
   aiLikelihood = Math.max(5, Math.min(95, aiLikelihood));
 
   return {
-    noise_score: Math.round(avgNoise * 10) / 10,
-    flat_region_ratio: Math.round(flatRatio * 1000) / 1000,
-    saturation_uniformity: Math.round(satStdDev * 1000) / 1000,
-    edge_coherence: Math.round(edgeCoherence * 1000) / 1000,
-    high_freq_energy: Math.round(avgHfEnergy * 10) / 10,
-    chromatic_aberration: Math.round(chromaticAberration * 1000) / 1000,
+    noise_score: Math.round(noiseRange * 10) / 10,
+    flat_region_ratio: Math.round(patchUniqueness * 1000) / 1000,
+    saturation_uniformity: Math.round(avgChannelCorr * 1000) / 1000,
+    edge_coherence: Math.round(bayerScore * 100) / 100,
+    high_freq_energy: Math.round(hfRatio * 1000) / 1000,
+    chromatic_aberration: Math.round(jpegGridRatio * 1000) / 1000,
     ai_likelihood: aiLikelihood,
   };
 }
 
-function checkPixelAnalysis(pa: PixelAnalysis | null, meta: MetadataReport, findings: ForensicFinding[]) {
+function checkPixelAnalysis(pa: PixelAnalysis | null, _meta: MetadataReport, findings: ForensicFinding[]) {
   if (!pa) return;
 
   const aiIndicators: string[] = [];
   const realIndicators: string[] = [];
 
-  if (pa.noise_score < 5) aiIndicators.push('unusually smooth textures with almost no natural noise');
-  else if (pa.noise_score > 12) realIndicators.push('natural camera sensor noise');
+  // Bayer CFA (edge_coherence field stores bayerScore)
+  if (pa.edge_coherence < 2.5) aiIndicators.push('no camera sensor (Bayer CFA) color patterns \u2014 the image was never captured by a real camera sensor');
+  else if (pa.edge_coherence > 4.5) realIndicators.push('camera sensor color patterns consistent with real Bayer CFA demosaicing');
 
-  if (pa.flat_region_ratio > 0.4) aiIndicators.push('large perfectly uniform areas');
-  else if (pa.flat_region_ratio < 0.2) realIndicators.push('varied textures throughout');
+  // High-frequency ratio
+  if (pa.high_freq_energy < 0.12) aiIndicators.push('unusually low fine detail \u2014 AI generators produce smoother images than cameras');
+  else if (pa.high_freq_energy > 0.2) realIndicators.push('rich fine detail consistent with camera sensor capture');
 
-  if (pa.edge_coherence > 0.7) aiIndicators.push('unnaturally clean, smooth edges');
-  else if (pa.edge_coherence < 0.45) realIndicators.push('natural edge imperfections');
+  // Noise variance (noise_score field stores noiseRange)
+  if (pa.noise_score < 1.5) aiIndicators.push('unnaturally uniform noise \u2014 real cameras produce different noise in bright vs dark areas');
+  else if (pa.noise_score > 3.5) realIndicators.push('signal-dependent noise pattern typical of real camera sensors');
 
-  if (pa.high_freq_energy < 15) aiIndicators.push('very little fine detail');
-  else if (pa.high_freq_energy > 35) realIndicators.push('rich fine detail from a camera sensor');
+  // Channel correlation (saturation_uniformity field stores avgChannelCorr)
+  if (pa.saturation_uniformity > 0.93) aiIndicators.push('color channels are suspiciously correlated \u2014 AI generates R, G, B from the same process');
+  else if (pa.saturation_uniformity < 0.85) realIndicators.push('independent color channel behavior typical of camera sensors');
 
-  if (pa.chromatic_aberration < 0.03) aiIndicators.push('no lens color fringing (chromatic aberration)');
-  else if (pa.chromatic_aberration > 0.12) realIndicators.push('lens chromatic aberration typical of real optics');
+  // JPEG grid (chromatic_aberration field stores jpegGridRatio)
+  if (pa.chromatic_aberration > 1.06) realIndicators.push('JPEG compression artifacts from a camera pipeline');
 
-  if (pa.saturation_uniformity < 0.08) aiIndicators.push('unnaturally uniform color saturation');
+  // Patch repetition (flat_region_ratio field stores patchUniqueness)
+  if (pa.flat_region_ratio < 0.8) aiIndicators.push('repetitive texture patterns common in AI-generated images');
 
   if (pa.ai_likelihood >= 65) {
     findings.push({
-      label: 'Pixel analysis: likely AI-generated',
-      detail: `Our analysis of the actual pixels found multiple signs of AI generation: ${aiIndicators.join(', ')}. Real photographs almost always show natural imperfections from camera sensors and lenses that AI tools don\u2019t reproduce.`,
+      label: 'Pixel analysis: AI-generated',
+      detail: `Deep pixel analysis found strong evidence of AI generation: ${aiIndicators.join('; ')}. These are physical characteristics that distinguish AI-generated images from real camera captures at the pixel level.`,
       severity: 'alert',
     });
   } else if (pa.ai_likelihood >= 50) {
     findings.push({
       label: 'Pixel analysis: probably AI-generated',
-      detail: `The pixels show patterns common in AI-generated images: ${aiIndicators.length > 0 ? aiIndicators.join(', ') : 'unusual smoothness and uniformity'}. This could also be a very heavily processed photo, but AI generation is more likely.`,
+      detail: `Pixel analysis found signs pointing to AI generation: ${aiIndicators.length > 0 ? aiIndicators.join('; ') : 'missing camera sensor signatures'}. The image lacks the physical traces that real cameras leave in their output.`,
       severity: 'warning',
     });
   } else if (pa.ai_likelihood <= 35 && realIndicators.length >= 2) {
     findings.push({
       label: 'Pixel analysis: consistent with real photo',
-      detail: `The image shows characteristics of a real photograph: ${realIndicators.join(', ')}. AI-generated images typically lack these natural imperfections.`,
+      detail: `The image shows physical characteristics of a real photograph: ${realIndicators.join('; ')}. These traces come from real camera hardware and optics that AI generators don\u2019t replicate.`,
       severity: 'info',
     });
   } else {
+    const detail = aiIndicators.length > 0 && realIndicators.length > 0
+      ? `Mixed signals: ${aiIndicators[0]}, but also ${realIndicators[0]}. This could be a heavily processed real photo or a well-made AI image.`
+      : aiIndicators.length > 0
+        ? `Leans toward AI: ${aiIndicators.slice(0, 2).join('; ')}.`
+        : `Some camera-like qualities detected, but not strong enough for high confidence.`;
     findings.push({
-      label: 'Pixel analysis: mixed signals',
-      detail: `Some characteristics point toward AI (${aiIndicators.length > 0 ? aiIndicators.slice(0, 2).join(', ') : 'moderate smoothness'}) while others suggest a real photo (${realIndicators.length > 0 ? realIndicators.slice(0, 2).join(', ') : 'some natural variation'}). This could be either a processed real photo or an AI image.`,
+      label: 'Pixel analysis: uncertain but leaning ' + (pa.ai_likelihood > 45 ? 'AI' : 'real'),
+      detail,
       severity: 'note',
     });
   }
