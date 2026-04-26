@@ -550,39 +550,48 @@ function determineVerdict(
     };
   }
 
-  if (pixelAnalysis) {
-    if (pixelAnalysis.ai_likelihood >= 55) {
+  if (pixelAnalysis && (noMetadata || noCamera)) {
+    // No camera data + pixel analysis = lean on pixels heavily.
+    // Missing camera data itself is a signal — real photos almost always have it.
+    const boosted = pixelAnalysis.ai_likelihood + 10;
+    if (boosted >= 50) {
       return {
-        verdict: 'suspicious',
+        verdict: 'likely_ai_generated',
+        verdict_label: 'AI-generated',
+        verdict_explanation: 'This image has no camera metadata and our pixel analysis found patterns consistent with AI generation — missing camera sensor signatures, synthetic texture patterns, and absent physical lens artifacts. Real photos from cameras and phones carry metadata and sensor traces that this image lacks entirely.',
+        confidence_note: 'The combination of no camera data plus AI-like pixel patterns is a strong indicator. Very few real photos lack both camera metadata and sensor traces simultaneously.',
+      };
+    }
+    return {
+      verdict: 'likely_authentic',
+      verdict_label: 'Probably a real photo',
+      verdict_explanation: 'Despite missing camera metadata (common when shared on social media), our pixel analysis found characteristics typical of a real photograph — camera sensor patterns, natural noise variation, and physical lens traces that AI generators don\'t reproduce.',
+      confidence_note: 'Metadata stripping is normal on social media. The pixel-level evidence here leans toward a real camera capture.',
+    };
+  }
+
+  if (pixelAnalysis) {
+    if (pixelAnalysis.ai_likelihood >= 50) {
+      return {
+        verdict: 'likely_ai_generated',
         verdict_label: 'Probably AI-generated',
-        verdict_explanation: 'Our pixel analysis found patterns more consistent with AI generation than real photography — the image is smoother, more uniform, and has fewer of the natural imperfections cameras produce. Combined with the lack of strong camera data, this is most likely AI-generated.',
+        verdict_explanation: 'Our pixel analysis found patterns more consistent with AI generation than real photography — missing camera sensor signatures and synthetic texture characteristics that real cameras don\'t produce.',
         confidence_note: 'Pixel analysis is probabilistic. Heavily filtered or professionally retouched photos can sometimes look similar, but the overall pattern here favors AI.',
       };
     }
-    if (pixelAnalysis.ai_likelihood <= 40) {
-      return {
-        verdict: 'likely_authentic',
-        verdict_label: 'Probably a real photo',
-        verdict_explanation: 'Our pixel analysis found characteristics typical of real photographs — natural noise, texture variation, and subtle imperfections that come from real camera sensors and lenses. While we can\'t find camera metadata to confirm, the content itself looks authentic.',
-        confidence_note: 'The image lacks camera metadata (common when shared on social media), but the pixels themselves are consistent with a real photograph rather than AI generation.',
-      };
-    }
-  }
-
-  if (noMetadata || noCamera) {
     return {
-      verdict: 'suspicious',
-      verdict_label: 'Can\'t confirm — no camera data',
-      verdict_explanation: 'This image has no camera metadata and our pixel analysis didn\'t produce a strong lean either way. Without camera data or clear pixel indicators, we can\'t confidently determine if this is a real photo or AI-generated. Treat with caution.',
-      confidence_note: 'When metadata is stripped and pixels are ambiguous, the safest approach is to look for the original source or check if other outlets are using the same image.',
+      verdict: 'likely_authentic',
+      verdict_label: 'Probably a real photo',
+      verdict_explanation: 'Our pixel analysis found characteristics typical of real photographs — natural noise, texture variation, and sensor traces that come from real camera hardware.',
+      confidence_note: 'No automated analysis is 100% definitive. If you have doubts, try to trace the image back to its original source.',
     };
   }
 
   return {
-    verdict: 'likely_authentic',
-    verdict_label: 'Probably a real photo',
-    verdict_explanation: 'Based on available signals, this image is more consistent with a real photograph than AI generation. We didn\'t find AI markers, and the overall characteristics lean toward authentic content.',
-    confidence_note: 'No automated analysis is 100% definitive. If you have doubts, try to trace the image back to its original source.',
+    verdict: 'suspicious',
+    verdict_label: 'Can\'t verify — no data available',
+    verdict_explanation: 'We couldn\'t extract enough data from this image to analyze it. Try submitting the original file rather than a screenshot or heavily compressed version.',
+    confidence_note: 'This usually means the image file is corrupted, in an unsupported format, or too small to analyze.',
   };
 }
 
