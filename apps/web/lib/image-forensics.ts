@@ -38,6 +38,9 @@ export interface PixelAnalysis {
   noise_score: number;
   flat_region_ratio: number;
   saturation_uniformity: number;
+  edge_coherence: number;
+  high_freq_energy: number;
+  chromatic_aberration: number;
   ai_likelihood: number;
 }
 
@@ -440,12 +443,20 @@ function determineVerdict(
     };
   }
 
-  if (isScreenshot && !pixelAiMedium) {
+  if (isScreenshot && !pixelAiMedium && pixelAnalysis) {
+    if (pixelAnalysis.ai_likelihood > 40) {
+      return {
+        verdict: 'suspicious',
+        verdict_label: 'Screenshot — leans toward AI-generated',
+        verdict_explanation: 'This is a screenshot, so the original metadata is gone. Our pixel analysis found some AI-like characteristics (smooth textures, uniform patterns) but not enough for a definitive call. It\'s more likely AI-generated than a real photo, but we can\'t be certain from a screenshot alone.',
+        confidence_note: 'For a definitive answer, try to find and submit the original image file. Screenshots lose the metadata we need for confident analysis.',
+      };
+    }
     return {
-      verdict: 'inconclusive',
-      verdict_label: 'Screenshot — original source unknown',
-      verdict_explanation: 'This is a screenshot, so the original image\'s metadata has been replaced by the device\'s capture data. Our pixel analysis didn\'t find strong AI-generation indicators, but that doesn\'t prove authenticity either. The original image could be anything — a real photo, an AI image, or an edit.',
-      confidence_note: 'If you need to verify a screenshot, try to find and submit the original image from the source. Screenshots inherently lose the forensic data we need for confident analysis.',
+      verdict: 'likely_authentic',
+      verdict_label: 'Screenshot — content looks like a real photo',
+      verdict_explanation: 'This is a screenshot, so the original metadata is gone. However, our pixel analysis found characteristics consistent with a real photograph — natural noise patterns, texture variation, and lens imperfections that AI tools typically don\'t reproduce.',
+      confidence_note: 'Pixel analysis can\'t guarantee authenticity, but the content has the hallmarks of a real camera photo. For full confidence, submit the original image file instead of a screenshot.',
     };
   }
 
@@ -533,17 +544,45 @@ function determineVerdict(
   if (noMetadata && pixelAiMedium) {
     return {
       verdict: 'suspicious',
-      verdict_label: 'Suspicious — no metadata, some AI indicators',
-      verdict_explanation: 'This image has no metadata and our pixel analysis found some characteristics associated with AI-generated content. Without provenance data, we can\'t confirm the origin.',
-      confidence_note: 'Images shared on social media often have metadata stripped. The pixel indicators alone aren\'t enough for a definitive verdict.',
+      verdict_label: 'Probably AI-generated',
+      verdict_explanation: 'This image has no camera metadata and our pixel analysis found characteristics associated with AI-generated content. The combination of stripped metadata and AI-like pixel patterns makes AI generation the most likely explanation.',
+      confidence_note: 'If this was shared on social media, the platform may have stripped the metadata. But the pixel-level indicators still lean toward AI.',
+    };
+  }
+
+  if (pixelAnalysis) {
+    if (pixelAnalysis.ai_likelihood >= 55) {
+      return {
+        verdict: 'suspicious',
+        verdict_label: 'Probably AI-generated',
+        verdict_explanation: 'Our pixel analysis found patterns more consistent with AI generation than real photography — the image is smoother, more uniform, and has fewer of the natural imperfections cameras produce. Combined with the lack of strong camera data, this is most likely AI-generated.',
+        confidence_note: 'Pixel analysis is probabilistic. Heavily filtered or professionally retouched photos can sometimes look similar, but the overall pattern here favors AI.',
+      };
+    }
+    if (pixelAnalysis.ai_likelihood <= 40) {
+      return {
+        verdict: 'likely_authentic',
+        verdict_label: 'Probably a real photo',
+        verdict_explanation: 'Our pixel analysis found characteristics typical of real photographs — natural noise, texture variation, and subtle imperfections that come from real camera sensors and lenses. While we can\'t find camera metadata to confirm, the content itself looks authentic.',
+        confidence_note: 'The image lacks camera metadata (common when shared on social media), but the pixels themselves are consistent with a real photograph rather than AI generation.',
+      };
+    }
+  }
+
+  if (noMetadata || noCamera) {
+    return {
+      verdict: 'suspicious',
+      verdict_label: 'Can\'t confirm — no camera data',
+      verdict_explanation: 'This image has no camera metadata and our pixel analysis didn\'t produce a strong lean either way. Without camera data or clear pixel indicators, we can\'t confidently determine if this is a real photo or AI-generated. Treat with caution.',
+      confidence_note: 'When metadata is stripped and pixels are ambiguous, the safest approach is to look for the original source or check if other outlets are using the same image.',
     };
   }
 
   return {
-    verdict: 'inconclusive',
-    verdict_label: 'Inconclusive',
-    verdict_explanation: 'We couldn\'t find strong enough signals to make a determination either way. The image may be authentic, AI-generated, or edited — our automated checks aren\'t definitive here.',
-    confidence_note: 'Our analysis checks metadata, dimensions, pixel patterns, and error levels. It can\'t detect every type of manipulation, especially sophisticated edits or newer AI generators that don\'t leave markers.',
+    verdict: 'likely_authentic',
+    verdict_label: 'Probably a real photo',
+    verdict_explanation: 'Based on available signals, this image is more consistent with a real photograph than AI generation. We didn\'t find AI markers, and the overall characteristics lean toward authentic content.',
+    confidence_note: 'No automated analysis is 100% definitive. If you have doubts, try to trace the image back to its original source.',
   };
 }
 
@@ -560,84 +599,159 @@ async function runPixelAnalysis(file: File): Promise<PixelAnalysis> {
   const ctx = canvas.getContext('2d')!;
   ctx.drawImage(img, 0, 0, w, h);
   const imageData = ctx.getImageData(0, 0, w, h);
-  const pixels = imageData.data;
+  const px = imageData.data;
 
+  // 1. Noise analysis — real cameras produce natural sensor noise
   let noiseDiffs = 0;
   let totalPairs = 0;
   for (let y = 0; y < h - 1; y++) {
     for (let x = 0; x < w - 1; x++) {
       const i = (y * w + x) * 4;
-      const iRight = i + 4;
-      const iDown = ((y + 1) * w + x) * 4;
-      const dr1 = Math.abs(pixels[i]! - pixels[iRight]!);
-      const dg1 = Math.abs(pixels[i + 1]! - pixels[iRight + 1]!);
-      const db1 = Math.abs(pixels[i + 2]! - pixels[iRight + 2]!);
-      noiseDiffs += dr1 + dg1 + db1;
-      const dr2 = Math.abs(pixels[i]! - pixels[iDown]!);
-      const dg2 = Math.abs(pixels[i + 1]! - pixels[iDown + 1]!);
-      const db2 = Math.abs(pixels[i + 2]! - pixels[iDown + 2]!);
-      noiseDiffs += dr2 + dg2 + db2;
+      const iR = i + 4;
+      const iD = ((y + 1) * w + x) * 4;
+      noiseDiffs += Math.abs(px[i]! - px[iR]!) + Math.abs(px[i+1]! - px[iR+1]!) + Math.abs(px[i+2]! - px[iR+2]!);
+      noiseDiffs += Math.abs(px[i]! - px[iD]!) + Math.abs(px[i+1]! - px[iD+1]!) + Math.abs(px[i+2]! - px[iD+2]!);
       totalPairs += 2;
     }
   }
   const avgNoise = noiseDiffs / (totalPairs * 3);
 
+  // 2. Flat region detection — AI images have unnaturally smooth areas
   let flatPixels = 0;
-  const flatThreshold = 3;
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
       const i = (y * w + x) * 4;
       let isFlat = true;
-      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) {
-        const j = ((y + dy) * w + (x + dx)) * 4;
-        if (
-          Math.abs(pixels[i]! - pixels[j]!) > flatThreshold &&
-          Math.abs(pixels[i + 1]! - pixels[j + 1]!) > flatThreshold
-        ) {
-          isFlat = false;
-          break;
-        }
+      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]] as const) {
+        const j = ((y+dy)*w+(x+dx)) * 4;
+        if (Math.abs(px[i]!-px[j]!) > 3 && Math.abs(px[i+1]!-px[j+1]!) > 3) { isFlat = false; break; }
       }
       if (isFlat) flatPixels++;
     }
   }
-  const innerPixels = (w - 2) * (h - 2);
-  const flatRatio = innerPixels > 0 ? flatPixels / innerPixels : 0;
+  const flatRatio = (w-2)*(h-2) > 0 ? flatPixels / ((w-2)*(h-2)) : 0;
 
+  // 3. Saturation uniformity — AI produces unnaturally even saturation
   const satValues: number[] = [];
-  const sampleStep = Math.max(1, Math.floor(pixels.length / (4 * 2000)));
-  for (let i = 0; i < pixels.length; i += 4 * sampleStep) {
-    const r = pixels[i]! / 255;
-    const g = pixels[i + 1]! / 255;
-    const b = pixels[i + 2]! / 255;
-    const cMax = Math.max(r, g, b);
-    const cMin = Math.min(r, g, b);
-    const sat = cMax === 0 ? 0 : (cMax - cMin) / cMax;
-    satValues.push(sat);
+  const step = Math.max(1, Math.floor(px.length / (4 * 3000)));
+  for (let i = 0; i < px.length; i += 4 * step) {
+    const cMax = Math.max(px[i]!, px[i+1]!, px[i+2]!) / 255;
+    const cMin = Math.min(px[i]!, px[i+1]!, px[i+2]!) / 255;
+    satValues.push(cMax === 0 ? 0 : (cMax - cMin) / cMax);
   }
-  const meanSat = satValues.reduce((a, b) => a + b, 0) / satValues.length;
-  const satVariance = satValues.reduce((a, b) => a + (b - meanSat) ** 2, 0) / satValues.length;
-  const satStdDev = Math.sqrt(satVariance);
+  const meanSat = satValues.reduce((a,b) => a+b, 0) / satValues.length;
+  const satStdDev = Math.sqrt(satValues.reduce((a,b) => a + (b-meanSat)**2, 0) / satValues.length);
 
-  let aiLikelihood = 0;
+  // 4. Edge coherence — AI tends to produce unnaturally clean/smooth edges
+  let edgeCount = 0;
+  let smoothEdgeCount = 0;
+  const edgeThreshold = 30;
+  for (let y = 1; y < h - 1; y += 2) {
+    for (let x = 1; x < w - 1; x += 2) {
+      const i = (y * w + x) * 4;
+      const iR = i + 4;
+      const iD = ((y+1) * w + x) * 4;
+      const gx = Math.abs(px[i]!-px[iR]!) + Math.abs(px[i+1]!-px[iR+1]!) + Math.abs(px[i+2]!-px[iR+2]!);
+      const gy = Math.abs(px[i]!-px[iD]!) + Math.abs(px[i+1]!-px[iD+1]!) + Math.abs(px[i+2]!-px[iD+2]!);
+      const gradient = Math.sqrt(gx*gx + gy*gy);
+      if (gradient > edgeThreshold) {
+        edgeCount++;
+        const iL = i - 4;
+        const iU = ((y-1)*w+x) * 4;
+        const gxN = Math.abs(px[iL]!-px[i]!) + Math.abs(px[iL+1]!-px[i+1]!) + Math.abs(px[iL+2]!-px[i+2]!);
+        const gyN = Math.abs(px[iU]!-px[i]!) + Math.abs(px[iU+1]!-px[i+1]!) + Math.abs(px[iU+2]!-px[i+2]!);
+        const neighborGrad = Math.sqrt(gxN*gxN + gyN*gyN);
+        if (Math.abs(gradient - neighborGrad) < 15) smoothEdgeCount++;
+      }
+    }
+  }
+  const edgeCoherence = edgeCount > 10 ? smoothEdgeCount / edgeCount : 0.5;
 
-  if (avgNoise < 4) aiLikelihood += 30;
-  else if (avgNoise < 7) aiLikelihood += 15;
-  else if (avgNoise > 20) aiLikelihood -= 15;
+  // 5. High frequency energy — real photos have more high-freq detail from sensor
+  let hfEnergy = 0;
+  let hfSamples = 0;
+  for (let y = 1; y < h - 1; y += 2) {
+    for (let x = 1; x < w - 1; x += 2) {
+      const i = (y*w+x)*4;
+      const center = (px[i]! + px[i+1]! + px[i+2]!) / 3;
+      let neighborSum = 0;
+      for (const [dx,dy] of [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]] as const) {
+        const j = ((y+dy)*w+(x+dx))*4;
+        neighborSum += (px[j]! + px[j+1]! + px[j+2]!) / 3;
+      }
+      const laplacian = Math.abs(8 * center - neighborSum);
+      hfEnergy += laplacian;
+      hfSamples++;
+    }
+  }
+  const avgHfEnergy = hfSamples > 0 ? hfEnergy / hfSamples : 0;
 
-  if (flatRatio > 0.5) aiLikelihood += 25;
-  else if (flatRatio > 0.35) aiLikelihood += 12;
-  else if (flatRatio < 0.15) aiLikelihood -= 10;
+  // 6. Chromatic aberration — real lenses produce color fringing, AI doesn't
+  let caScore = 0;
+  let caSamples = 0;
+  for (let y = 2; y < h - 2; y += 3) {
+    for (let x = 2; x < w - 2; x += 3) {
+      const i = (y*w+x)*4;
+      const iR2 = (y*w+(x+2))*4;
+      const rDiff = Math.abs(px[i]! - px[iR2]!);
+      const gDiff = Math.abs(px[i+1]! - px[iR2+1]!);
+      const bDiff = Math.abs(px[i+2]! - px[iR2+2]!);
+      if (rDiff > 10 || gDiff > 10 || bDiff > 10) {
+        const channelSpread = Math.max(rDiff, gDiff, bDiff) - Math.min(rDiff, gDiff, bDiff);
+        if (channelSpread > 8) caScore++;
+        caSamples++;
+      }
+    }
+  }
+  const chromaticAberration = caSamples > 0 ? caScore / caSamples : 0;
 
-  if (satStdDev < 0.08) aiLikelihood += 20;
-  else if (satStdDev < 0.12) aiLikelihood += 8;
+  // Combine all signals into AI likelihood score
+  let aiLikelihood = 50; // Start neutral
 
-  aiLikelihood = Math.max(0, Math.min(100, aiLikelihood));
+  // Noise: real photos have more noise (8-25 typical), AI is smooth (2-6)
+  if (avgNoise < 3) aiLikelihood += 18;
+  else if (avgNoise < 5) aiLikelihood += 12;
+  else if (avgNoise < 8) aiLikelihood += 5;
+  else if (avgNoise > 15) aiLikelihood -= 12;
+  else if (avgNoise > 10) aiLikelihood -= 6;
+
+  // Flat regions: AI > 0.4, real photos < 0.25 typically
+  if (flatRatio > 0.55) aiLikelihood += 15;
+  else if (flatRatio > 0.4) aiLikelihood += 10;
+  else if (flatRatio > 0.3) aiLikelihood += 4;
+  else if (flatRatio < 0.2) aiLikelihood -= 8;
+  else if (flatRatio < 0.25) aiLikelihood -= 4;
+
+  // Saturation uniformity: AI has low stddev
+  if (satStdDev < 0.06) aiLikelihood += 12;
+  else if (satStdDev < 0.1) aiLikelihood += 6;
+  else if (satStdDev > 0.18) aiLikelihood -= 8;
+
+  // Edge coherence: AI has smoother, more coherent edges (> 0.7)
+  if (edgeCoherence > 0.8) aiLikelihood += 12;
+  else if (edgeCoherence > 0.65) aiLikelihood += 6;
+  else if (edgeCoherence < 0.4) aiLikelihood -= 8;
+
+  // High frequency energy: real photos have more (> 40), AI less (< 20)
+  if (avgHfEnergy < 12) aiLikelihood += 12;
+  else if (avgHfEnergy < 20) aiLikelihood += 6;
+  else if (avgHfEnergy > 40) aiLikelihood -= 10;
+  else if (avgHfEnergy > 30) aiLikelihood -= 5;
+
+  // Chromatic aberration: present in real photos (> 0.15), absent in AI
+  if (chromaticAberration < 0.03) aiLikelihood += 8;
+  else if (chromaticAberration > 0.15) aiLikelihood -= 10;
+  else if (chromaticAberration > 0.08) aiLikelihood -= 5;
+
+  aiLikelihood = Math.max(5, Math.min(95, aiLikelihood));
 
   return {
     noise_score: Math.round(avgNoise * 10) / 10,
     flat_region_ratio: Math.round(flatRatio * 1000) / 1000,
     saturation_uniformity: Math.round(satStdDev * 1000) / 1000,
+    edge_coherence: Math.round(edgeCoherence * 1000) / 1000,
+    high_freq_energy: Math.round(avgHfEnergy * 10) / 10,
+    chromatic_aberration: Math.round(chromaticAberration * 1000) / 1000,
     ai_likelihood: aiLikelihood,
   };
 }
@@ -645,23 +759,49 @@ async function runPixelAnalysis(file: File): Promise<PixelAnalysis> {
 function checkPixelAnalysis(pa: PixelAnalysis | null, meta: MetadataReport, findings: ForensicFinding[]) {
   if (!pa) return;
 
-  if (pa.ai_likelihood >= 50) {
+  const aiIndicators: string[] = [];
+  const realIndicators: string[] = [];
+
+  if (pa.noise_score < 5) aiIndicators.push('unusually smooth textures with almost no natural noise');
+  else if (pa.noise_score > 12) realIndicators.push('natural camera sensor noise');
+
+  if (pa.flat_region_ratio > 0.4) aiIndicators.push('large perfectly uniform areas');
+  else if (pa.flat_region_ratio < 0.2) realIndicators.push('varied textures throughout');
+
+  if (pa.edge_coherence > 0.7) aiIndicators.push('unnaturally clean, smooth edges');
+  else if (pa.edge_coherence < 0.45) realIndicators.push('natural edge imperfections');
+
+  if (pa.high_freq_energy < 15) aiIndicators.push('very little fine detail');
+  else if (pa.high_freq_energy > 35) realIndicators.push('rich fine detail from a camera sensor');
+
+  if (pa.chromatic_aberration < 0.03) aiIndicators.push('no lens color fringing (chromatic aberration)');
+  else if (pa.chromatic_aberration > 0.12) realIndicators.push('lens chromatic aberration typical of real optics');
+
+  if (pa.saturation_uniformity < 0.08) aiIndicators.push('unnaturally uniform color saturation');
+
+  if (pa.ai_likelihood >= 65) {
     findings.push({
-      label: 'Pixel patterns suggest AI generation',
-      detail: `The image shows characteristics common in AI-generated content: ${pa.noise_score < 5 ? 'unusually smooth textures with very little natural noise' : 'unusual noise patterns'}${pa.flat_region_ratio > 0.4 ? ', large unnaturally uniform areas' : ''}${pa.saturation_uniformity < 0.1 ? ', and very uniform color saturation across the image' : ''}. Real photographs from cameras almost always have more varied textures and natural sensor noise.`,
+      label: 'Pixel analysis: likely AI-generated',
+      detail: `Our analysis of the actual pixels found multiple signs of AI generation: ${aiIndicators.join(', ')}. Real photographs almost always show natural imperfections from camera sensors and lenses that AI tools don\u2019t reproduce.`,
+      severity: 'alert',
+    });
+  } else if (pa.ai_likelihood >= 50) {
+    findings.push({
+      label: 'Pixel analysis: probably AI-generated',
+      detail: `The pixels show patterns common in AI-generated images: ${aiIndicators.length > 0 ? aiIndicators.join(', ') : 'unusual smoothness and uniformity'}. This could also be a very heavily processed photo, but AI generation is more likely.`,
       severity: 'warning',
     });
-  } else if (pa.ai_likelihood >= 30) {
+  } else if (pa.ai_likelihood <= 35 && realIndicators.length >= 2) {
     findings.push({
-      label: 'Some AI-like pixel characteristics',
-      detail: `The image has some properties that can appear in AI-generated content (${pa.noise_score < 7 ? 'low noise levels' : 'unusual noise patterns'}${pa.flat_region_ratio > 0.3 ? ', smooth flat regions' : ''}), but these can also occur in heavily processed real photos or clean studio shots.`,
-      severity: 'note',
-    });
-  } else if (pa.noise_score > 12) {
-    findings.push({
-      label: 'Natural sensor noise detected',
-      detail: 'The image has noise patterns typical of a camera sensor. AI-generated images tend to be unnaturally smooth by comparison. This is a positive indicator for authenticity.',
+      label: 'Pixel analysis: consistent with real photo',
+      detail: `The image shows characteristics of a real photograph: ${realIndicators.join(', ')}. AI-generated images typically lack these natural imperfections.`,
       severity: 'info',
+    });
+  } else {
+    findings.push({
+      label: 'Pixel analysis: mixed signals',
+      detail: `Some characteristics point toward AI (${aiIndicators.length > 0 ? aiIndicators.slice(0, 2).join(', ') : 'moderate smoothness'}) while others suggest a real photo (${realIndicators.length > 0 ? realIndicators.slice(0, 2).join(', ') : 'some natural variation'}). This could be either a processed real photo or an AI image.`,
+      severity: 'note',
     });
   }
 }
