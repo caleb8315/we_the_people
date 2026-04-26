@@ -3,138 +3,90 @@ import { getClientKey, limit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-export const maxDuration = 30;
+export const maxDuration = 45;
 
-const HF_MODELS = [
-  'Organika/sdxl-detector',
-  'umm-maybe/AI-image-detector',
-];
+const HF_MODEL = 'umm-maybe/AI-image-detector';
+const MAX_SIZE = 10 * 1024 * 1024;
 
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
-
-/**
- * POST /api/image-forensics
- *
- * Accepts an image as binary body, sends it to HuggingFace's free
- * Inference API for AI detection using trained ViT models, and returns
- * the classification results.
- *
- * No HF token needed — the free tier works without auth for popular
- * models. If a token is configured it gets better rate limits.
- */
 export async function POST(req: Request) {
-  const rl = limit(getClientKey(req, 'img-forensics'), 30, 60_000);
+  const rl = limit(getClientKey(req, 'img-forensics'), 20, 60_000);
   if (!rl.ok) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
 
-  let contentType = req.headers.get('content-type') ?? '';
-  if (!contentType.startsWith('image/')) {
-    contentType = 'image/jpeg';
-  }
-
-  let body: ArrayBuffer;
+  let body: { image_base64: string } | null = null;
   try {
-    body = await req.arrayBuffer();
+    body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'could not read body' }, { status: 400 });
-  }
-  if (body.byteLength === 0) {
-    return NextResponse.json({ error: 'empty body' }, { status: 400 });
-  }
-  if (body.byteLength > MAX_IMAGE_SIZE) {
-    return NextResponse.json({ error: 'image too large (max 10MB)' }, { status: 400 });
+    return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
 
-  const imageBuffer = Buffer.from(body);
+  if (!body?.image_base64) {
+    return NextResponse.json({ error: 'missing image_base64' }, { status: 400 });
+  }
+
+  const imageBytes = Buffer.from(body.image_base64, 'base64');
+  if (imageBytes.length === 0) {
+    return NextResponse.json({ error: 'empty image' }, { status: 400 });
+  }
+  if (imageBytes.length > MAX_SIZE) {
+    return NextResponse.json({ error: 'image too large' }, { status: 400 });
+  }
+
   const hfToken = process.env.HF_API_TOKEN ?? process.env.HUGGINGFACE_API_TOKEN ?? null;
 
-  const results: Array<{
-    model: string;
-    labels: Array<{ label: string; score: number }>;
-    error: string | null;
-  }> = [];
+  const result = await callHuggingFace(HF_MODEL, imageBytes, hfToken);
 
-  await Promise.all(
-    HF_MODELS.map(async (model) => {
-      try {
-        const headers: Record<string, string> = {
-          'Content-Type': contentType,
-        };
-        if (hfToken) headers['Authorization'] = `Bearer ${hfToken}`;
+  return NextResponse.json(result);
+}
 
-        const res = await fetch(
-          `https://api-inference.huggingface.co/models/${model}`,
-          {
-            method: 'POST',
-            headers,
-            body: imageBuffer,
-          },
-        );
+async function callHuggingFace(
+  model: string,
+  imageBytes: Buffer,
+  token: string | null,
+  retries = 3,
+): Promise<{
+  ok: boolean;
+  labels: Array<{ label: string; score: number }>;
+  error: string | null;
+}> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        if (!res.ok) {
-          const errText = await res.text().catch(() => '');
-          results.push({ model, labels: [], error: `${res.status}: ${errText.slice(0, 200)}` });
-          return;
-        }
+      const res = await fetch(
+        `https://api-inference.huggingface.co/models/${model}`,
+        { method: 'POST', headers, body: new Uint8Array(imageBytes) },
+      );
 
-        const data = (await res.json()) as Array<{ label: string; score: number }>;
-        results.push({ model, labels: Array.isArray(data) ? data : [], error: null });
-      } catch (err) {
-        results.push({
-          model,
-          labels: [],
-          error: err instanceof Error ? err.message : 'unknown error',
-        });
+      if (res.status === 503) {
+        const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+        const wait = typeof body.estimated_time === 'number' ? Math.min(body.estimated_time, 30) : 10;
+        await sleep(wait * 1000);
+        continue;
       }
-    }),
-  );
 
-  let aiScore = 0;
-  let humanScore = 0;
-  let modelCount = 0;
-  let modelDetails: Array<{ model: string; ai: number; human: number }> = [];
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        return { ok: false, labels: [], error: `HF ${res.status}: ${text.slice(0, 200)}` };
+      }
 
-  for (const r of results) {
-    if (r.error || r.labels.length === 0) continue;
-    const aiLabel = r.labels.find(
-      (l) => /artificial|ai|fake|generated/i.test(l.label),
-    );
-    const humanLabel = r.labels.find(
-      (l) => /human|real|natural|authentic/i.test(l.label),
-    );
-    const ai = aiLabel?.score ?? 0;
-    const human = humanLabel?.score ?? 0;
-    aiScore += ai;
-    humanScore += human;
-    modelCount++;
-    modelDetails.push({
-      model: r.model.split('/').pop() ?? r.model,
-      ai: Math.round(ai * 1000) / 1000,
-      human: Math.round(human * 1000) / 1000,
-    });
+      const data = await res.json();
+      if (!Array.isArray(data)) {
+        return { ok: false, labels: [], error: 'unexpected response format' };
+      }
+
+      return { ok: true, labels: data as Array<{ label: string; score: number }>, error: null };
+    } catch (err) {
+      if (attempt === retries - 1) {
+        return { ok: false, labels: [], error: err instanceof Error ? err.message : 'unknown' };
+      }
+      await sleep(3000);
+    }
   }
 
-  if (modelCount > 0) {
-    aiScore /= modelCount;
-    humanScore /= modelCount;
-  }
+  return { ok: false, labels: [], error: 'max retries exceeded' };
+}
 
-  const verdict =
-    aiScore > 0.75
-      ? 'ai_generated'
-      : aiScore > 0.55
-        ? 'likely_ai'
-        : humanScore > 0.75
-          ? 'authentic'
-          : humanScore > 0.55
-            ? 'likely_authentic'
-            : 'uncertain';
-
-  return NextResponse.json({
-    verdict,
-    ai_score: Math.round(aiScore * 1000) / 1000,
-    human_score: Math.round(humanScore * 1000) / 1000,
-    model_count: modelCount,
-    model_details: modelDetails,
-    errors: results.filter((r) => r.error).map((r) => ({ model: r.model, error: r.error })),
-  });
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
 }

@@ -9,7 +9,7 @@ import type {
   SocialProvenance,
 } from '@osint/core';
 import type { ReaderReport } from '@/lib/reader-report';
-import type { ForensicReport } from '@/lib/image-forensics';
+import type { ForensicReport, ForensicFinding } from '@/lib/image-forensics';
 import { Segmented } from '@/components/ui/segmented';
 
 type Kind = 'url' | 'text' | 'image';
@@ -71,7 +71,6 @@ export function VerifyClient() {
   const [dragOver, setDragOver] = useState(false);
   const [forensicReport, setForensicReport] = useState<ForensicReport | null>(null);
   const [forensicAnalyzing, setForensicAnalyzing] = useState(false);
-  const [showEla, setShowEla] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VerifyResponse | null>(null);
@@ -138,7 +137,6 @@ export function VerifyClient() {
     if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImagePreview(null);
     setForensicReport(null);
-    setShowEla(false);
   }
 
   async function submit() {
@@ -299,21 +297,8 @@ export function VerifyClient() {
               ) : (
                 <div className="space-y-4">
                   <div className="relative overflow-hidden rounded-2xl border border-ink-100 bg-canvas-50">
-                    {showEla && forensicReport?.ela ? (
-                      <img src={forensicReport.ela.data_url} alt="Error Level Analysis" className="mx-auto max-h-72 object-contain p-2" />
-                    ) : (
-                      <img src={imagePreview} alt="Preview" className="mx-auto max-h-72 object-contain p-2" />
-                    )}
+                    <img src={imagePreview} alt="Preview" className="mx-auto max-h-72 object-contain p-2" />
                     <div className="absolute right-2 top-2 flex gap-1.5">
-                      {forensicReport?.ela && (
-                        <button
-                          type="button"
-                          onClick={() => setShowEla(!showEla)}
-                          className={`rounded-full px-2.5 py-1 text-[11px] font-medium shadow transition ${showEla ? 'bg-amber-500 text-white' : 'bg-ink-900/70 text-white hover:bg-ink-900'}`}
-                        >
-                          {showEla ? 'Original' : 'ELA'}
-                        </button>
-                      )}
                       <button
                         type="button"
                         onClick={clearImage}
@@ -603,7 +588,12 @@ function VerifyResult({ data }: { data: VerifyResponse }) {
 }
 
 function ImageForensicResult({ report, filename }: { report: ForensicReport; filename: string }) {
-  const verdictTone = forensicVerdictTone(report.verdict);
+  const tone = report.verdict === 'ai'
+    ? { wrap: 'border-danger-200 bg-danger-50/80', label: 'text-danger-700', dot: 'bg-danger-500' }
+    : report.verdict === 'real'
+      ? { wrap: 'border-emerald-200 bg-emerald-50/80', label: 'text-emerald-700', dot: 'bg-emerald-500' }
+      : { wrap: 'border-amber-200 bg-amber-50/80', label: 'text-amber-700', dot: 'bg-amber-500' };
+
   return (
     <section className="space-y-4 rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
       <div>
@@ -613,46 +603,39 @@ function ImageForensicResult({ report, filename }: { report: ForensicReport; fil
         <h2 className="mt-1 text-xl font-semibold leading-snug text-ink sm:text-[24px]">
           {filename}
         </h2>
-        {report.metadata.dimensions && (
-          <p className="mt-1 text-xs text-ink-400">
-            {report.metadata.dimensions.width} &times; {report.metadata.dimensions.height}px
-            {report.metadata.camera_model ? ` · ${report.metadata.camera_make ?? ''} ${report.metadata.camera_model}`.trim() : ''}
-            {report.metadata.date_taken ? ` · ${new Date(report.metadata.date_taken).toLocaleDateString()}` : ''}
-          </p>
+        {report.metadata.camera && (
+          <p className="mt-1 text-xs text-ink-400">{report.metadata.camera}{report.metadata.date ? ` · ${report.metadata.date}` : ''}</p>
         )}
       </div>
 
-      <div className={`rounded-2xl border p-5 sm:p-6 ${verdictTone.wrap}`}>
+      <div className={`rounded-2xl border p-5 sm:p-6 ${tone.wrap}`}>
         <div className="flex items-center gap-2.5">
-          <span aria-hidden="true" className={`inline-block h-3 w-3 shrink-0 rounded-full ${verdictTone.dot}`} />
-          <p className={`text-sm font-semibold ${verdictTone.label}`}>
+          <span aria-hidden="true" className={`inline-block h-3 w-3 shrink-0 rounded-full ${tone.dot}`} />
+          <p className={`text-sm font-semibold ${tone.label}`}>
             {report.verdict_label}
+            {report.confidence > 0 && <span className="ml-2 font-normal text-ink-500">({report.confidence}% confidence)</span>}
           </p>
         </div>
         <p className="mt-3 text-[15px] leading-relaxed text-ink sm:text-base">
-          {report.verdict_explanation}
-        </p>
-        <p className="mt-2 text-xs text-ink-500">
-          {report.confidence_note}
+          {report.explanation}
         </p>
       </div>
 
       {report.findings.length > 0 && (
         <div className="space-y-2">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-400">
-            What we found
+            Evidence
           </p>
-          <ul className="space-y-2">
+          <ul className="space-y-1.5">
             {report.findings.map((f, i) => (
               <li key={i} className="flex gap-2.5 text-[14px] leading-relaxed text-ink-700">
                 <span
                   aria-hidden="true"
-                  className={`mt-[8px] h-2 w-2 shrink-0 rounded-full ${findingSeverityDot(f.severity)}`}
+                  className={`mt-[8px] h-2 w-2 shrink-0 rounded-full ${
+                    f.type === 'good' ? 'bg-emerald-500' : f.type === 'bad' ? 'bg-danger-500' : 'bg-ink-300'
+                  }`}
                 />
-                <div>
-                  <span className="font-medium">{f.label}.</span>{' '}
-                  <span className="text-ink-600">{f.detail}</span>
-                </div>
+                <span>{f.text}</span>
               </li>
             ))}
           </ul>
@@ -660,36 +643,10 @@ function ImageForensicResult({ report, filename }: { report: ForensicReport; fil
       )}
 
       <p className="text-[11px] text-ink-400">
-        This analysis ran entirely on your device. No image data was uploaded to any server.
+        Powered by AI detection models trained on millions of images.
       </p>
     </section>
   );
-}
-
-function forensicVerdictTone(verdict: ForensicReport['verdict']): { wrap: string; label: string; dot: string } {
-  switch (verdict) {
-    case 'likely_authentic':
-      return { wrap: 'border-emerald-200 bg-emerald-50/80', label: 'text-emerald-700', dot: 'bg-emerald-500' };
-    case 'possibly_edited':
-      return { wrap: 'border-amber-200 bg-amber-50/80', label: 'text-amber-700', dot: 'bg-amber-500' };
-    case 'likely_ai_generated':
-      return { wrap: 'border-danger-200 bg-danger-50/80', label: 'text-danger-700', dot: 'bg-danger-500' };
-    case 'suspicious':
-      return { wrap: 'border-danger-200 bg-danger-50/80', label: 'text-danger-700', dot: 'bg-danger-500' };
-    case 'inconclusive':
-    default:
-      return { wrap: 'border-ink-200 bg-canvas-50', label: 'text-ink-600', dot: 'bg-ink-300' };
-  }
-}
-
-function findingSeverityDot(severity: string): string {
-  switch (severity) {
-    case 'alert': return 'bg-danger-500';
-    case 'warning': return 'bg-amber-500';
-    case 'note': return 'bg-sky-500';
-    case 'info':
-    default: return 'bg-emerald-500';
-  }
 }
 
 /** Colours for the hero verdict box — keyed to the confidence band so the
