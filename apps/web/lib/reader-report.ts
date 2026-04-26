@@ -518,6 +518,14 @@ const OUTLET_NAMES: Record<string, string> = {
   'worldbank.org': 'World Bank',
   'sec.gov': 'SEC',
   'bls.gov': 'Bureau of Labor Statistics',
+  'propublica.org': 'ProPublica',
+  'pbs.org': 'PBS NewsHour',
+  'axios.com': 'Axios',
+  'who.int': 'WHO',
+  'cdc.gov': 'CDC',
+  'statnews.com': 'STAT News',
+  'carbonbrief.org': 'Carbon Brief',
+  'news.google.com': 'Google News',
 };
 
 export function prettyOutletName(domain: string | null | undefined): string {

@@ -103,6 +103,18 @@ export const CREDIBLE_DOMAINS: ReadonlySet<string> = new Set([
   'worldbank.org',
   'sec.gov',
   'bls.gov',
+  // Investigative / policy
+  'propublica.org',
+  'pbs.org',
+  'axios.com',
+  'politico.com',
+  'thehill.com',
+  // Health — official / specialist
+  'who.int',
+  'cdc.gov',
+  'statnews.com',
+  // Climate / environment
+  'carbonbrief.org',
 ]);
 
 /**

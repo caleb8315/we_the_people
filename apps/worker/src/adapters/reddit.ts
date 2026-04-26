@@ -20,13 +20,18 @@ export class RedditAdapter implements Adapter {
   private readonly subreddits: string[];
 
   constructor(
-    subreddits: string[] = ['worldnews', 'news', 'breakingnews', 'OutOfTheLoop'],
+    subreddits: string[] = [
+      'worldnews', 'news', 'breakingnews', 'OutOfTheLoop',
+      'technology', 'science', 'economics', 'finance',
+      'geopolitics', 'UpliftingNews', 'environment',
+      'Futurology', 'cybersecurity',
+    ],
   ) {
     this.subreddits = subreddits;
   }
 
   async fetch(): Promise<RawItem[]> {
-    const url = `https://www.reddit.com/r/${this.subreddits.join('+')}/hot.json?limit=50`;
+    const url = `https://www.reddit.com/r/${this.subreddits.join('+')}/hot.json?limit=75`;
     const res = await fetch(url, {
       headers: {
         'user-agent': 'Crosscheck-Bot/1.0 (+https://crosscheck.local)',
