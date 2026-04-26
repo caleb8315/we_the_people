@@ -642,8 +642,41 @@ function ImageForensicResult({ report, filename }: { report: ForensicReport; fil
         </div>
       )}
 
+      {report.generator_scores && Object.values(report.generator_scores).some(s => s > 0.05) && (
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl border border-ink-100 bg-canvas-50 px-4 py-2.5 text-[12px] font-semibold uppercase tracking-[0.16em] text-ink-500 hover:bg-canvas-100">
+            <span>Generator breakdown</span>
+            <span className="text-ink-400 transition-transform group-open:rotate-180" aria-hidden="true">&#8964;</span>
+          </summary>
+          <div className="mt-2 space-y-1.5 px-1">
+            {Object.entries(report.generator_scores)
+              .filter(([, s]) => s > 0.01)
+              .sort(([, a], [, b]) => b - a)
+              .slice(0, 8)
+              .map(([gen, score]) => (
+                <div key={gen} className="flex items-center gap-3 text-sm">
+                  <span className="w-32 truncate text-xs text-ink-600 capitalize">{gen.replace(/_/g, ' ')}</span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-ink-100">
+                    <div
+                      className="h-full rounded-full bg-danger-400 transition-all"
+                      style={{ width: `${Math.round(score * 100)}%` }}
+                    />
+                  </div>
+                  <span className="w-10 text-right text-xs tabular-nums text-ink-500">{Math.round(score * 100)}%</span>
+                </div>
+              ))}
+          </div>
+        </details>
+      )}
+
       <p className="text-[11px] text-ink-400">
-        Powered by AI detection models trained on millions of images.
+        {report.source === 'sightengine'
+          ? 'Powered by SightEngine — professional AI detection used by newsrooms, platforms, and fact-checkers worldwide.'
+          : report.source === 'huggingface'
+            ? 'Powered by open-source AI detection models via HuggingFace.'
+            : report.source === 'metadata'
+              ? 'Detected via embedded file metadata.'
+              : 'Analysis based on available metadata.'}
       </p>
     </section>
   );
