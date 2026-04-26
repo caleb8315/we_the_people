@@ -102,16 +102,32 @@ const AI_DIMENSION_PATTERNS = [
 export async function analyzeImage(file: File): Promise<ForensicReport> {
   const findings: ForensicFinding[] = [];
 
-  const [metadata, ela, dimensions, pixelAnalysis, aiModel] = await Promise.all([
+  // Run all analyses in parallel. Each one catches its own errors
+  // so a failure in one never blocks the others.
+  const [metadata, ela, dimensions] = await Promise.all([
     extractMetadata(file),
     runEla(file).catch(() => null),
-    getImageDimensions(file),
-    runPixelAnalysis(file).catch(() => null),
-    runAiModelDetection(file).catch(() => null),
+    getImageDimensions(file).catch(() => null),
   ]);
 
   if (dimensions) {
     metadata.dimensions = dimensions;
+  }
+
+  // Pixel analysis and AI model run after we have the image loaded,
+  // with explicit error logging so failures are visible.
+  let pixelAnalysis: PixelAnalysis | null = null;
+  try {
+    pixelAnalysis = await runPixelAnalysis(file);
+  } catch (e) {
+    console.warn('[forensics] pixel analysis failed:', e);
+  }
+
+  let aiModel: AiModelResult | null = null;
+  try {
+    aiModel = await runAiModelDetection(file);
+  } catch (e) {
+    console.warn('[forensics] AI model call failed:', e);
   }
 
   detectScreenshot(metadata, findings);
@@ -139,15 +155,27 @@ export async function analyzeImage(file: File): Promise<ForensicReport> {
 
 async function runAiModelDetection(file: File): Promise<AiModelResult | null> {
   try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 25_000);
     const res = await fetch('/api/image-forensics', {
       method: 'POST',
       headers: { 'content-type': file.type || 'image/jpeg' },
       body: file,
+      signal: ctrl.signal,
     });
-    if (!res.ok) return null;
+    clearTimeout(timer);
+    if (!res.ok) {
+      console.warn('[forensics] AI model API returned', res.status);
+      return null;
+    }
     const data = await res.json();
-    return { ...data, available: true } as AiModelResult;
-  } catch {
+    if (data.model_count === 0 && data.errors?.length > 0) {
+      console.warn('[forensics] All AI models failed:', data.errors);
+      return null;
+    }
+    return { ...data, available: data.model_count > 0 } as AiModelResult;
+  } catch (e) {
+    console.warn('[forensics] AI model detection failed:', e);
     return null;
   }
 }
@@ -654,65 +682,79 @@ function determineVerdict(
     };
   }
 
-  if (pixelAnalysis && (noMetadata || noCamera)) {
-    // No camera data + pixel analysis = lean on pixels heavily.
-    // Missing camera data itself is a signal — real photos almost always have it.
-    const boosted = pixelAnalysis.ai_likelihood + 10;
+  // When pixel analysis is available, use it with metadata context
+  if (pixelAnalysis) {
+    const boosted = (noMetadata || noCamera) ? pixelAnalysis.ai_likelihood + 10 : pixelAnalysis.ai_likelihood;
     if (boosted >= 50) {
       return {
         verdict: 'likely_ai_generated',
-        verdict_label: 'AI-generated',
-        verdict_explanation: 'This image has no camera metadata and our pixel analysis found patterns consistent with AI generation — missing camera sensor signatures, synthetic texture patterns, and absent physical lens artifacts. Real photos from cameras and phones carry metadata and sensor traces that this image lacks entirely.',
-        confidence_note: 'The combination of no camera data plus AI-like pixel patterns is a strong indicator. Very few real photos lack both camera metadata and sensor traces simultaneously.',
+        verdict_label: noMetadata || noCamera ? 'AI-generated' : 'Probably AI-generated',
+        verdict_explanation: noMetadata || noCamera
+          ? 'This image has no camera metadata and our pixel analysis found patterns consistent with AI generation. Real photos from cameras and phones carry metadata and sensor traces that this image lacks entirely.'
+          : 'Our pixel analysis found patterns more consistent with AI generation than real photography.',
+        confidence_note: noMetadata || noCamera
+          ? 'The combination of no camera data plus AI-like pixel patterns is a strong indicator.'
+          : 'Pixel analysis is probabilistic but the overall pattern here favors AI.',
       };
     }
     return {
       verdict: 'likely_authentic',
       verdict_label: 'Probably a real photo',
-      verdict_explanation: 'Despite missing camera metadata (common when shared on social media), our pixel analysis found characteristics typical of a real photograph — camera sensor patterns, natural noise variation, and physical lens traces that AI generators don\'t reproduce.',
-      confidence_note: 'Metadata stripping is normal on social media. The pixel-level evidence here leans toward a real camera capture.',
+      verdict_explanation: noMetadata || noCamera
+        ? 'Despite missing camera metadata (common when shared on social media), our pixel analysis found characteristics typical of a real photograph.'
+        : 'Our pixel analysis found characteristics typical of real photographs — natural noise, texture variation, and sensor traces from camera hardware.',
+      confidence_note: 'No automated analysis is 100% definitive. If you have doubts, try to trace the image back to its original source.',
     };
   }
 
-  if (pixelAnalysis) {
-    if (pixelAnalysis.ai_likelihood >= 50) {
-      return {
-        verdict: 'likely_ai_generated',
-        verdict_label: 'Probably AI-generated',
-        verdict_explanation: 'Our pixel analysis found patterns more consistent with AI generation than real photography — missing camera sensor signatures and synthetic texture characteristics that real cameras don\'t produce.',
-        confidence_note: 'Pixel analysis is probabilistic. Heavily filtered or professionally retouched photos can sometimes look similar, but the overall pattern here favors AI.',
-      };
-    }
+  // Fallback: pixel analysis failed, use metadata alone
+  if (noMetadata && !hasCamera) {
+    return {
+      verdict: 'suspicious',
+      verdict_label: 'Suspicious — no origin data',
+      verdict_explanation: 'This image has no camera metadata, no lens data, and we couldn\'t run our full analysis on it. Real photos from phones and cameras almost always carry this data. Its absence is a warning sign — treat this image with skepticism until you can verify the source.',
+      confidence_note: 'Without metadata or pixel analysis, we\'re relying on what\'s missing. The safest approach is to find the original source.',
+    };
+  }
+
+  if (hasCamera && hasLens) {
     return {
       verdict: 'likely_authentic',
       verdict_label: 'Probably a real photo',
-      verdict_explanation: 'Our pixel analysis found characteristics typical of real photographs — natural noise, texture variation, and sensor traces that come from real camera hardware.',
-      confidence_note: 'No automated analysis is 100% definitive. If you have doubts, try to trace the image back to its original source.',
+      verdict_explanation: `Camera and lens metadata are present (${meta.camera_make ?? ''} ${meta.camera_model ?? ''}), which is consistent with a real photograph. AI-generated images almost never carry this data.`,
+      confidence_note: 'Camera metadata can theoretically be faked, but doing so convincingly requires effort.',
     };
   }
 
   return {
     verdict: 'suspicious',
-    verdict_label: 'Can\'t verify — no data available',
-    verdict_explanation: 'We couldn\'t extract enough data from this image to analyze it. Try submitting the original file rather than a screenshot or heavily compressed version.',
-    confidence_note: 'This usually means the image file is corrupted, in an unsupported format, or too small to analyze.',
+    verdict_label: 'Uncertain — limited data',
+    verdict_explanation: 'We have limited information about this image. Some metadata is present but without camera details or a complete pixel analysis, we can\'t make a confident determination. Treat with caution.',
+    confidence_note: 'Try submitting the original uncompressed file for better results.',
   };
 }
 
 async function runPixelAnalysis(file: File): Promise<PixelAnalysis> {
   const img = await loadImage(file);
+  if (img.width < 16 || img.height < 16) {
+    throw new Error('Image too small for pixel analysis');
+  }
+
   const maxDim = 512;
   const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-  const w = Math.round(img.width * scale);
-  const h = Math.round(img.height * scale);
+  const w = Math.max(16, Math.round(img.width * scale));
+  const h = Math.max(16, Math.round(img.height * scale));
 
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas 2D context unavailable');
   ctx.drawImage(img, 0, 0, w, h);
   const imageData = ctx.getImageData(0, 0, w, h);
   const px = imageData.data;
+
+  if (px.length < 64) throw new Error('Image data too small');
 
   // ────────────────────────────────────────────────────────────────────
   // 1. BAYER CFA CORRELATION (strongest single signal)

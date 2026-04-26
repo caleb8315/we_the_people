@@ -26,12 +26,17 @@ export async function POST(req: Request) {
   const rl = limit(getClientKey(req, 'img-forensics'), 30, 60_000);
   if (!rl.ok) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
 
-  const contentType = req.headers.get('content-type') ?? '';
+  let contentType = req.headers.get('content-type') ?? '';
   if (!contentType.startsWith('image/')) {
-    return NextResponse.json({ error: 'must send image/* content-type' }, { status: 400 });
+    contentType = 'image/jpeg';
   }
 
-  const body = await req.arrayBuffer();
+  let body: ArrayBuffer;
+  try {
+    body = await req.arrayBuffer();
+  } catch {
+    return NextResponse.json({ error: 'could not read body' }, { status: 400 });
+  }
   if (body.byteLength === 0) {
     return NextResponse.json({ error: 'empty body' }, { status: 400 });
   }
