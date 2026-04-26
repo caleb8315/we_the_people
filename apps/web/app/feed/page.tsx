@@ -11,7 +11,7 @@ import { applyMutes, decorateSignals, personalizeSignals, type SignalRowRaw } fr
 import { signalGeoPoint, type SignalGeoPoint } from '@/lib/signal-geo';
 
 export const metadata = { title: 'Feed · Crosscheck' };
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 const TOPICS = ['all', 'war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'tech', 'finance'] as const;
 const MODES = ['personalized', 'global'] as const;
@@ -54,7 +54,7 @@ export default async function FeedPage({
 
   const [{ data: prefs }, { data: savedViews }] = await Promise.all([
     userId
-      ? await sb
+      ? sb
           .from('preferences')
           .select('topics, muted_sources, muted_topics, countries_of_focus, feed_mode_preference, feed_view_preference')
           .eq('user_id', userId)
