@@ -49,6 +49,15 @@ export interface ElaResult {
   max_diff: number;
 }
 
+export interface AiModelResult {
+  verdict: 'ai_generated' | 'likely_ai' | 'authentic' | 'likely_authentic' | 'uncertain';
+  ai_score: number;
+  human_score: number;
+  model_count: number;
+  model_details: Array<{ model: string; ai: number; human: number }>;
+  available: boolean;
+}
+
 export interface ForensicReport {
   verdict: 'likely_authentic' | 'possibly_edited' | 'likely_ai_generated' | 'suspicious' | 'inconclusive';
   verdict_label: string;
@@ -58,6 +67,7 @@ export interface ForensicReport {
   metadata: MetadataReport;
   ela: ElaResult | null;
   pixel_analysis: PixelAnalysis | null;
+  ai_model: AiModelResult | null;
 }
 
 const AI_SOFTWARE_MARKERS = [
@@ -92,11 +102,12 @@ const AI_DIMENSION_PATTERNS = [
 export async function analyzeImage(file: File): Promise<ForensicReport> {
   const findings: ForensicFinding[] = [];
 
-  const [metadata, ela, dimensions, pixelAnalysis] = await Promise.all([
+  const [metadata, ela, dimensions, pixelAnalysis, aiModel] = await Promise.all([
     extractMetadata(file),
     runEla(file).catch(() => null),
     getImageDimensions(file),
     runPixelAnalysis(file).catch(() => null),
+    runAiModelDetection(file).catch(() => null),
   ]);
 
   if (dimensions) {
@@ -105,6 +116,7 @@ export async function analyzeImage(file: File): Promise<ForensicReport> {
 
   detectScreenshot(metadata, findings);
   checkAiMarkers(metadata, findings);
+  checkAiModelResults(aiModel, findings);
   checkCameraAuthenticity(metadata, findings);
   checkEditingSoftware(metadata, findings);
   checkDimensions(metadata, findings);
@@ -113,7 +125,7 @@ export async function analyzeImage(file: File): Promise<ForensicReport> {
   checkDateConsistency(metadata, findings);
   checkGps(metadata, findings);
 
-  const verdict = determineVerdict(findings, metadata, pixelAnalysis);
+  const verdict = determineVerdict(findings, metadata, pixelAnalysis, aiModel);
 
   return {
     ...verdict,
@@ -121,7 +133,62 @@ export async function analyzeImage(file: File): Promise<ForensicReport> {
     metadata,
     ela,
     pixel_analysis: pixelAnalysis,
+    ai_model: aiModel,
   };
+}
+
+async function runAiModelDetection(file: File): Promise<AiModelResult | null> {
+  try {
+    const res = await fetch('/api/image-forensics', {
+      method: 'POST',
+      headers: { 'content-type': file.type || 'image/jpeg' },
+      body: file,
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return { ...data, available: true } as AiModelResult;
+  } catch {
+    return null;
+  }
+}
+
+function checkAiModelResults(model: AiModelResult | null, findings: ForensicFinding[]) {
+  if (!model || !model.available || model.model_count === 0) return;
+
+  const pct = Math.round(model.ai_score * 100);
+  const modelNames = model.model_details.map((d) => d.model).join(' and ');
+
+  if (model.ai_score > 0.75) {
+    findings.push({
+      label: 'AI detection model: AI-generated',
+      detail: `Trained AI detection model${model.model_count > 1 ? 's' : ''} (${modelNames}) classified this image as ${pct}% likely AI-generated. These models are neural networks specifically trained on millions of real and AI-generated images.`,
+      severity: 'alert',
+    });
+  } else if (model.ai_score > 0.55) {
+    findings.push({
+      label: 'AI detection model: probably AI',
+      detail: `AI detection model${model.model_count > 1 ? 's' : ''} (${modelNames}) gave this a ${pct}% AI probability. This is above the threshold for likely AI-generated content.`,
+      severity: 'warning',
+    });
+  } else if (model.human_score > 0.75) {
+    findings.push({
+      label: 'AI detection model: real photo',
+      detail: `AI detection model${model.model_count > 1 ? 's' : ''} (${modelNames}) classified this as ${Math.round(model.human_score * 100)}% likely a real photograph.`,
+      severity: 'info',
+    });
+  } else if (model.human_score > 0.55) {
+    findings.push({
+      label: 'AI detection model: probably real',
+      detail: `AI detection model${model.model_count > 1 ? 's' : ''} (${modelNames}) gave this a ${Math.round(model.human_score * 100)}% real-photo probability. Slight lean toward authentic.`,
+      severity: 'info',
+    });
+  } else {
+    findings.push({
+      label: 'AI detection model: close call',
+      detail: `AI detection models gave mixed results: ${pct}% AI vs ${Math.round(model.human_score * 100)}% real. The image has characteristics of both.`,
+      severity: 'note',
+    });
+  }
 }
 
 async function extractMetadata(file: File): Promise<MetadataReport> {
@@ -392,6 +459,7 @@ function determineVerdict(
   findings: ForensicFinding[],
   meta: MetadataReport,
   pixelAnalysis: PixelAnalysis | null,
+  aiModel?: AiModelResult | null,
 ): Pick<ForensicReport, 'verdict' | 'verdict_label' | 'verdict_explanation' | 'confidence_note'> {
   const hasAiMarker = findings.some(f => f.label === 'AI generation marker detected');
   const hasAiDimensions = findings.some(f => f.label === 'AI-typical dimensions');
@@ -406,6 +474,42 @@ function determineVerdict(
   const pixelAiHigh = pixelAnalysis != null && pixelAnalysis.ai_likelihood >= 50;
   const pixelAiMedium = pixelAnalysis != null && pixelAnalysis.ai_likelihood >= 30;
   const hasNaturalNoise = findings.some(f => f.label === 'Natural sensor noise detected');
+
+  const modelAvailable = aiModel != null && aiModel.available && aiModel.model_count > 0;
+  const modelSaysAi = modelAvailable && aiModel.ai_score > 0.55;
+  const modelSaysStrongAi = modelAvailable && aiModel.ai_score > 0.75;
+  const modelSaysReal = modelAvailable && aiModel.human_score > 0.55;
+  const modelSaysStrongReal = modelAvailable && aiModel.human_score > 0.75;
+
+  // AI detection model is the strongest signal — trained on millions of images
+  if (modelSaysStrongAi) {
+    const pct = Math.round(aiModel!.ai_score * 100);
+    return {
+      verdict: 'likely_ai_generated',
+      verdict_label: 'AI-generated image',
+      verdict_explanation: `Our AI detection models are ${pct}% confident this image was generated by AI. These are neural networks trained on millions of real and AI-generated images — they detect patterns invisible to the human eye, including artifacts from diffusion models, GANs, and other generators.`,
+      confidence_note: `${aiModel!.model_count} AI detection model${aiModel!.model_count > 1 ? 's' : ''} analyzed this image. High-confidence AI detection is reliable, but no system is perfect — if you believe this is a real photo, check if you have the original uncompressed file.`,
+    };
+  }
+
+  if (modelSaysAi) {
+    const pct = Math.round(aiModel!.ai_score * 100);
+    return {
+      verdict: 'likely_ai_generated',
+      verdict_label: 'Probably AI-generated',
+      verdict_explanation: `Our AI detection models give this a ${pct}% probability of being AI-generated. The image has characteristics that trained detection models associate with AI-created content rather than real photography.`,
+      confidence_note: 'The probability is above the detection threshold but not extremely high. The image may be a heavily processed real photo or an AI image with some realistic qualities.',
+    };
+  }
+
+  if (modelSaysStrongReal && hasCamera && hasLens) {
+    return {
+      verdict: 'likely_authentic',
+      verdict_label: 'Real photograph',
+      verdict_explanation: `Multiple signals confirm this is a real photo: AI detection models are ${Math.round(aiModel!.human_score * 100)}% confident it's authentic, it has camera metadata (${meta.camera_make} ${meta.camera_model}), and lens data is present. This is very strong evidence of a genuine camera capture.`,
+      confidence_note: 'When AI models, camera metadata, and lens data all agree, the confidence is very high.',
+    };
+  }
 
   if (hasAiMarker) {
     return {
