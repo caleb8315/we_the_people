@@ -7,7 +7,7 @@ import { ChipRow } from '@/components/ui/chip-row';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SignalsMap } from '@/components/signals-map';
 import { logProductEvent } from '@/lib/product-events';
-import { decorateSignals, personalizeSignals, type SignalRowRaw } from '@/lib/signals';
+import { applyMutes, decorateSignals, personalizeSignals, type SignalRowRaw } from '@/lib/signals';
 import { signalGeoPoint, type SignalGeoPoint } from '@/lib/signal-geo';
 
 export const metadata = { title: 'Feed · Crosscheck' };
@@ -94,7 +94,9 @@ export default async function FeedPage({
   const allSignals = ((data ?? []) as Array<SignalRowRaw & { expires_at?: string | null }>).filter(
     (s) => !s.expires_at || s.expires_at > nowIso,
   );
-  const filtered = mode === 'personalized' ? personalizeSignals(allSignals, prefs) : allSignals;
+  const filtered = mode === 'personalized'
+    ? personalizeSignals(allSignals, prefs)
+    : applyMutes(allSignals, prefs);
   const signals = await decorateSignals(sb, filtered);
   const geoPoints: SignalGeoPoint[] = signals
     .map((s) => signalGeoPoint(s))

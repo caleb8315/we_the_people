@@ -261,10 +261,14 @@ export interface PreferenceFilter {
   countries_of_focus?: string[] | null;
 }
 
+/**
+ * Apply user preferences to filter signals. Used in personalized mode
+ * to narrow by focus topics and countries.
+ */
 export function personalizeSignals<T extends SignalRowRaw>(signals: T[], prefs: PreferenceFilter | null): T[] {
-  const focusTopics = new Set((prefs?.topics ?? []).map(String));
   const mutedTopics = new Set((prefs?.muted_topics ?? []).map(String));
   const mutedSources = new Set((prefs?.muted_sources ?? []).map(String));
+  const focusTopics = new Set((prefs?.topics ?? []).map(String));
   const countries = new Set((prefs?.countries_of_focus ?? []).map((c) => String(c).toUpperCase()));
 
   return signals
@@ -274,4 +278,19 @@ export function personalizeSignals<T extends SignalRowRaw>(signals: T[], prefs: 
     .filter((s) =>
       countries.size === 0 ? true : countries.has(String(s.country_code ?? '').toUpperCase()),
     );
+}
+
+/**
+ * Apply mutes regardless of feed mode. Muted topics and sources should
+ * ALWAYS be hidden — even in global mode. Users muting something means
+ * they don't want to see it, period.
+ */
+export function applyMutes<T extends SignalRowRaw>(signals: T[], prefs: PreferenceFilter | null): T[] {
+  if (!prefs) return signals;
+  const mutedTopics = new Set((prefs.muted_topics ?? []).map(String));
+  const mutedSources = new Set((prefs.muted_sources ?? []).map(String));
+
+  return signals
+    .filter((s) => !s.source_id || !mutedSources.has(String(s.source_id)))
+    .filter((s) => !mutedTopics.has(String(s.topic ?? 'other')));
 }
