@@ -77,6 +77,11 @@ export default async function FeedPage({
   const view: FeedView = requestedView ?? (userId ? prefView : 'list');
   const since = new Date(Date.now() - hours * 3600 * 1000).toISOString();
 
+  const mutedTopicsList: string[] = (prefs?.muted_topics ?? []) as string[];
+  const mutedSourcesList: string[] = (prefs?.muted_sources ?? []) as string[];
+  const focusTopicsList: string[] = (prefs?.topics ?? []) as string[];
+  const countriesList: string[] = (prefs?.countries_of_focus ?? []) as string[];
+
   let q = sb
     .from('signals')
     .select(
@@ -89,14 +94,27 @@ export default async function FeedPage({
   if (topic !== 'all') q = q.eq('topic', topic);
   if (minSeverity > 0) q = q.gte('severity', minSeverity);
 
+  // Filter muted topics at the DB level so they never reach the client
+  if (userId && mutedTopicsList.length > 0) {
+    for (const mt of mutedTopicsList) {
+      q = q.neq('topic', mt);
+    }
+  }
+
+  // In personalized mode, filter to focus topics at DB level
+  if (mode === 'personalized' && focusTopicsList.length > 0) {
+    q = q.in('topic', focusTopicsList);
+  }
+
   const { data, error } = await q;
   const nowIso = new Date().toISOString();
   const allSignals = ((data ?? []) as Array<SignalRowRaw & { expires_at?: string | null }>).filter(
     (s) => !s.expires_at || s.expires_at > nowIso,
   );
-  const filtered = mode === 'personalized'
-    ? personalizeSignals(allSignals, prefs)
-    : applyMutes(allSignals, prefs);
+  // Apply remaining filters (muted sources, countries) in JS
+  const filtered = userId
+    ? applyMutes(allSignals, prefs)
+    : allSignals;
   const signals = await decorateSignals(sb, filtered);
   const geoPoints: SignalGeoPoint[] = signals
     .map((s) => signalGeoPoint(s))
