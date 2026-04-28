@@ -14,7 +14,7 @@ import { usePathname } from 'next/navigation';
  */
 
 const LINKS = [
-  { href: '/dashboard', label: 'Home', icon: HomeIcon, authedOnly: true },
+  { href: '/dashboard', label: 'Dashboard', icon: DashboardIcon, authedOnly: true },
   { href: '/', label: 'Home', icon: HomeIcon, anonOnly: true },
   { href: '/feed', label: 'Feed', icon: FeedIcon },
   { href: '/verify', label: 'Verify', icon: VerifyIcon },
@@ -110,6 +110,17 @@ function VerifyIcon() {
     <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 3 4 6v6c0 4.5 3.3 8.3 8 9 4.7-.7 8-4.5 8-9V6l-8-3z" />
       <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+function DashboardIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="9" rx="1" />
+      <rect x="14" y="3" width="7" height="5" rx="1" />
+      <rect x="14" y="12" width="7" height="9" rx="1" />
+      <rect x="3" y="16" width="7" height="5" rx="1" />
     </svg>
   );
 }
