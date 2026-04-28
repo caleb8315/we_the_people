@@ -1,0 +1,38 @@
+name: Maintenance
+
+on:
+  schedule:
+    - cron: '11 3 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'If "true", report counts without deleting rows'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: maintenance
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run maintenance
+        run: |
+          dry="${{ github.event.inputs.dry_run || 'false' }}"
+          args=""
+          if [ "$dry" = "true" ]; then args="--dry-run"; fi
+          npm run maintenance -- $args

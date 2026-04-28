@@ -22,6 +22,7 @@ const Env = z.object({
   // developing signals, because the live corroboration fan-out's env
   // vars (Firecrawl / Brave / Bluesky) live in the web app, not here.
   WEB_APP_URL: emptyToUndef(z.string().url().optional()),
+  WORKER_SHARED_SECRET: emptyToUndef(z.string().min(16).optional()),
 });
 
 let cached: z.infer<typeof Env> | null = null;

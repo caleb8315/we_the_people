@@ -75,6 +75,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <Link href="/status" className="hover:text-ink-700">
               Status
             </Link>
+            <Link href="/reliability" className="hover:text-ink-700">
+              Reliability
+            </Link>
             <Link href="/changelog" className="hover:text-ink-700">
               Changelog
             </Link>

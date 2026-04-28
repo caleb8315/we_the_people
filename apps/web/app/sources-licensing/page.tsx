@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'Sources and licensing · Crosscheck',
@@ -14,6 +15,13 @@ export default function SourcesLicensingPage() {
         <p className="mt-2 text-ink-600">
           Crosscheck works from public reporting, open sensor feeds, and terms-bound public APIs. We
           link back to original reporting and keep source rights with the original publishers.
+        </p>
+        <p className="mt-2 text-sm text-ink-500">
+          Looking for the live monitored source list?{' '}
+          <Link href="/sources" className="underline hover:text-ink">
+            Open the public source catalog
+          </Link>
+          .
         </p>
       </header>
 

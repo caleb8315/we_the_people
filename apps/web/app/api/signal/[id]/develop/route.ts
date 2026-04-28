@@ -5,10 +5,10 @@
  * GDELT, sensors, tracked events), with a cooldown to avoid burning free
  * API budgets on rapid retries.
  *
- * Anonymous users can trigger this — enrichment benefits everyone, not
- * just the clicker — but a per-IP rate limit keeps it from being abused.
- * The signal's own `last_enriched_at` cooldown (5 min default) is the
- * real throttle; `force=true` is only honoured for authenticated users.
+ * Interactive enrichments require an authenticated session. Background
+ * worker calls can bypass the cookie check by presenting the shared worker
+ * secret, which keeps GitHub Actions and browser traffic on separate rails.
+ * `force=true` is only honoured for authenticated interactive users.
  */
 
 import { NextResponse } from 'next/server';
@@ -17,6 +17,7 @@ import { getAdminSupabase, getServerSupabase } from '@/lib/supabase-server';
 import { getClientKey, limit } from '@/lib/rate-limit';
 import { developSignal } from '@/lib/develop-signal';
 import { logProductEvent } from '@/lib/product-events';
+import { serverEnv } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -50,6 +51,20 @@ export async function POST(
   }
   const body = parsed.data ?? {};
 
+  let workerAuthorized = false;
+  try {
+    const sharedSecret = serverEnv().WORKER_SHARED_SECRET;
+    const bearer = req.headers.get('authorization');
+    const direct = req.headers.get('x-worker-secret');
+    workerAuthorized = Boolean(
+      sharedSecret &&
+        ((bearer?.startsWith('Bearer ') && bearer.slice('Bearer '.length) === sharedSecret) ||
+          direct === sharedSecret),
+    );
+  } catch {
+    workerAuthorized = false;
+  }
+
   // Identity check uses the cookie-based client so we know WHO is asking
   // (needed for force-bypass + telemetry), but the actual enrichment runs
   // under the service role because it has to UPDATE signals + INSERT into
@@ -58,9 +73,13 @@ export async function POST(
   const cookieSb = getServerSupabase();
   const { data: auth } = await cookieSb.auth.getUser();
   const userId = auth.user?.id ?? null;
+  if (!userId && !workerAuthorized) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
 
   // Force-bypass of the cooldown is only for authenticated users so an
-  // anonymous visitor can't pin the fan-out budget to one signal.
+  // automated worker or anonymous visitor can't pin the fan-out budget to
+  // one signal.
   const force = Boolean(body.force) && Boolean(userId);
 
   let admin;

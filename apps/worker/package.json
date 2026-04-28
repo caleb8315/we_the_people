@@ -11,6 +11,7 @@
     "email": "tsx src/index.ts email",
     "backfill": "tsx src/index.ts backfill",
     "develop": "tsx src/index.ts develop",
+    "maintenance": "tsx src/index.ts maintenance",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
