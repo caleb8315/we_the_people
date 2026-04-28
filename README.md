@@ -90,6 +90,32 @@ npm run backfill -- 48 --dry-run
 - Per-signal **source disagreement** breakdowns (numeric / cause / presence)
 - Per-signal **physical evidence** record (confirmed / partial / none
   detected) with explicit coverage limitations
+- Public trust surface: `/terms`, `/privacy`, `/contact`, `/dmca`,
+  `/corrections`, `/status`, `/sources`, `/reliability`, `/trust`,
+  `/changelog`, and `/.well-known/security.txt`
+- Self-serve account export from Settings and invite-only beta access request
+  flows on the landing and login pages
+
+## Production-readiness status
+
+Completed on `main`:
+
+- Invite-only beta auth flow with access requests and allowlist enforcement
+- Safer auth redirects and tighter API access for sensitive routes
+- Self-serve account export plus improved account management flows
+- Public sources catalog, public reliability page, and live status page
+- Terms, privacy, contact, DMCA, corrections, changelog, and security.txt
+- Shared worker secret for the background story-enrichment pipeline
+- Nightly maintenance workflow for retention-managed operational data
+- CI coverage for typecheck, lint, tests, and production build
+- Route-level error boundaries for branded recovery UX
+
+Still intentionally pending:
+
+- Sentry / external observability integration
+- Cloudflare Pages migration
+- Payment / donation wiring
+- Full marketing asset pack (favicon/OG/touch icons)
 
 ## What Crosscheck does not do
 

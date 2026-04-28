@@ -46,7 +46,8 @@ Optional (per-feature):
 - `MAX_DAILY_LLM_CALLS*` - LLM budget caps.
 - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_OPERATOR_CHAT_ID` - operator alert channel.
 - `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` - optional Redis rate limiting.
-- `WORKER_SHARED_SECRET` - signed secret if you trigger callbacks from workers.
+- `WORKER_SHARED_SECRET` - required if you run the `develop` worker against `/api/signal/:id/develop`.
+- `SUPPORT_EMAIL`, `PRIVACY_EMAIL`, `SECURITY_EMAIL`, `LEGAL_EMAIL` - public trust/contact addresses.
 
 ## Step 3: Deploy
 
@@ -81,6 +82,19 @@ Make sure these migrations from `supabase/migrations/` have been applied in orde
 - `015_reliability_dimensions.sql`
 - `016_reliability_labels.sql`
 
+Apply every migration through the latest file in `supabase/migrations/`,
+including:
+
+- `018_verifications_and_source_health.sql`
+- `019_image_observations.sql`
+- `020_phase4_social_sources.sql`
+- `021_phase5_kpi_views.sql`
+- `022_develop_signal_enrichment.sql`
+- `023_update_signals_public_view.sql`
+- `024_tech_finance_sources.sql`
+- `025_google_news_and_coverage_expansion.sql`
+- `026_product_events_and_retention.sql`
+
 For the reliability / contradictions / evidence rollout — including the
 backfill procedure that populates the new columns on recently-ingested
 signals without recomputing full history — see
@@ -90,12 +104,13 @@ signals without recomputing full history — see
 
 In GitHub -> Settings -> Secrets and variables -> Actions, add:
 
-- `SUPABASE_URL` (same value as `NEXT_PUBLIC_SUPABASE_URL`)
+- `NEXT_PUBLIC_SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `GEMINI_API_KEY`
 - `GROQ_API_KEY`
 - `RESEND_API_KEY`
 - `BRIEFING_FROM_EMAIL`
+- `WORKER_SHARED_SECRET`
 - `USER_DAILY_*` vars
 - Any other values you set in Vercel.
 
@@ -105,6 +120,8 @@ The workflows under `.github/workflows/` will then run on schedule:
 - `briefing.yml` daily + weekly
 - `alerts.yml` every 30 min
 - `email-briefings.yml` daily
+- `develop.yml` every 2 hours
+- `maintenance.yml` nightly
 
 ## Preview deploys (testing while at work)
 
@@ -125,7 +142,9 @@ git push origin feature/my-change
 3. Sign up a new account -> lands in onboarding -> dashboard.
 4. Dashboard shows the at-a-glance strip with real numbers.
 5. Settings -> change feed mode default, save -> `Saved.` appears.
-6. `/ops` redirects to login if your email is not in `ADMIN_EMAILS`.
+6. Settings -> `Export my data` downloads JSON.
+7. `/sources`, `/reliability`, `/status`, and `/changelog` load publicly.
+8. `/ops` redirects to login if your email is not in `ADMIN_EMAILS`.
 
 ## Troubleshooting
 

@@ -24,10 +24,9 @@ npm install
 ## 2. Create the Supabase project
 
 1. https://supabase.com → New project.
-2. SQL Editor → paste [`supabase/migrations/001_init.sql`](../supabase/migrations/001_init.sql) → Run.
-3. SQL Editor → paste [`supabase/migrations/002_seed_sources.sql`](../supabase/migrations/002_seed_sources.sql) → Run.
-4. Settings → API → copy the Project URL, the **anon** key, and the **service_role** key.
-5. Authentication → Providers → Email → keep Email provider enabled.
+2. Apply every file in `supabase/migrations/` in numeric order (`001` through latest).
+3. Settings → API → copy the Project URL, the **anon** key, and the **service_role** key.
+4. Authentication → Providers → Email → keep Email provider enabled.
    For MVP simplicity, disable **Confirm email** in Auth settings so users can sign up and log in immediately.
 
 ## 3. Fill the local env
@@ -38,6 +37,14 @@ cp .env.example .env
 ```
 
 The worker reads `.env` via `dotenv`. The web app reads env vars at build time (Vercel) or from `.env.local` locally.
+
+Important launch vars now included in `.env.example`:
+
+- `SUPPORT_EMAIL`
+- `PRIVACY_EMAIL`
+- `SECURITY_EMAIL`
+- `LEGAL_EMAIL`
+- `WORKER_SHARED_SECRET`
 
 ## 4. Run the dashboard locally
 
@@ -64,7 +71,12 @@ After success, `select count(*) from public.signals;` should be > 0.
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `NEXT_PUBLIC_APP_URL` (after first deploy, set this to the prod URL)
+   - `SUPPORT_EMAIL`
+   - `PRIVACY_EMAIL`
+   - `SECURITY_EMAIL`
+   - `LEGAL_EMAIL`
    - `BETA_ALLOWLIST` (comma-separated emails or domain suffixes like `@example.com`)
+   - `WORKER_SHARED_SECRET` (must match the worker env if `develop.yml` is enabled)
 4. Deploy.
 
 ## 7. Configure GitHub Actions schedulers
@@ -74,6 +86,7 @@ Add repo secrets:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `GEMINI_API_KEY` and/or `GROQ_API_KEY`
+- `WORKER_SHARED_SECRET` (required for the `develop` workflow)
 - Optional: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_OPERATOR_CHAT_ID`
 
 Optional repo **variables** for budget tuning:
@@ -88,7 +101,9 @@ Workflows provided:
 - [`.github/workflows/ingest.yml`](../.github/workflows/ingest.yml) — hourly
 - [`.github/workflows/briefing.yml`](../.github/workflows/briefing.yml) — daily + weekly
 - [`.github/workflows/alerts.yml`](../.github/workflows/alerts.yml) — every 30 minutes
-- [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — typecheck on push/PR
+- [`.github/workflows/develop.yml`](../.github/workflows/develop.yml) — scheduled story enrichment
+- [`.github/workflows/maintenance.yml`](../.github/workflows/maintenance.yml) — nightly retention cleanup
+- [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — typecheck, lint, and tests on push/PR
 
 Trigger each manually once via Actions → Run workflow to validate credentials.
 
@@ -97,3 +112,4 @@ Trigger each manually once via Actions → Run workflow to validate credentials.
 1. Insert a row in `public.beta_allowlist` for each invitee.
 2. Send them the Vercel URL and instruct them to visit `/login`.
 3. Confirm each sign-up in `auth.users`.
+4. Confirm the public trust surface resolves: `/terms`, `/privacy`, `/sources`, `/reliability`, `/status`, and `/.well-known/security.txt`.

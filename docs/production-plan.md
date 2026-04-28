@@ -10,15 +10,25 @@ This plan sits alongside, and does not replace, [launch-plan.md](launch-plan.md)
 
 What already exists in the repo (don't redo):
 
-- Next.js 14 web app (`apps/web`) with Supabase SSR auth, middleware CSP, rate limiting (`lib/rate-limit.ts`), RLS on user tables, magic-link / email-password auth.
-- Worker (`apps/worker`) with ingest, brief, alert, email-briefings, backfill, develop (story enrichment) jobs, driven by GitHub Actions cron.
+- Next.js 14 web app (`apps/web`) with Supabase SSR auth, middleware CSP, rate limiting (`lib/rate-limit.ts`), RLS on user tables, invite-only email/password auth, account export, and branded route error boundaries.
+- Worker (`apps/worker`) with ingest, brief, alert, email-briefings, backfill, develop (story enrichment), and maintenance jobs, driven by GitHub Actions cron.
 - Core package (`packages/core`) with reliability scoring, contradictions, evidence, confidence bands, clustering, domains, media.
-- Supabase schema (`supabase/migrations/001` through `023`) with `signals`, `evidence`, `briefings`, `contradictions`, `engine_runs`, `usage_ledger`, `beta_allowlist`, `product_events`, `user_saved_views`, `user_ai_state`.
+- Supabase schema (`supabase/migrations/001` through `026`) with `signals`, `evidence`, `briefings`, `contradictions`, `engine_runs`, `usage_ledger`, `beta_allowlist`, `product_events`, `user_saved_views`, `user_ai_state`, and maintenance/telemetry alignment updates.
 - Daily LLM budget guards (`MAX_DAILY_LLM_CALLS*`) and per-user daily limits (`USER_DAILY_*`).
 - Docs: `architecture.md`, `security.md`, `privacy.md`, `runbooks.md`, `metrics.md`, `launch-plan.md`, `migration-plan.md`, `changelog.md`, `deploy-to-vercel.md`.
-- `/ops` admin dashboard, `/trust`, `/about`, `/privacy` static pages, `/onboarding`, `/settings`, `/dashboard`, `/feed`, `/signal/[id]`, `/briefings`, `/verify`.
+- `/ops` admin dashboard, `/trust`, `/about`, `/privacy`, `/terms`, `/contact`, `/dmca`, `/corrections`, `/status`, `/changelog`, `/sources`, `/sources-licensing`, `/reliability`, `/onboarding`, `/settings`, `/dashboard`, `/feed`, `/signal/[id]`, `/briefings`, `/verify`.
 
-What's missing is the "last-mile production polish" — legal pages, trust surface, observability, monetization hooks, and the hosting migration that lets us stay free even once money shows up.
+What's still missing is the remaining "last-mile production polish" — deeper observability (Sentry / uptime monitors), funding hooks, richer trust explainers like `/how-conflicts-work`, and the hosting migration that lets us stay free even once money shows up.
+
+### Status snapshot (completed on `main`)
+
+- [x] Invite-only auth gate with access-request flow, redirect hardening, and safer API access on sensitive routes.
+- [x] Self-serve account export plus privacy/security/legal page expansion.
+- [x] Public trust surface for `/sources`, `/reliability`, `/status`, `/changelog`, `/terms`, `/contact`, `/dmca`, `/corrections`, and `/.well-known/security.txt`.
+- [x] Shared helper cleanup for source catalog grouping, product event names, and daily usage limits.
+- [x] Worker shared-secret auth for background story enrichment.
+- [x] Nightly maintenance workflow for retention-managed rows.
+- [x] CI now runs typecheck, lint, and tests on push/PR.
 
 ---
 
@@ -74,36 +84,36 @@ The hard blockers. A public reviewer or grant committee checks for these within 
 
 Legal / compliance:
 
-- **Terms of Service page** at `/terms`. Acceptable use, disclaimer of warranty, limitation of liability, governing law, "not legal advice / not a news outlet" clause matching the `README.md` positioning.
-- **Privacy policy hardening** — `/privacy` page needs a real contact email (replace `privacy@`), list of named processors (Supabase, Cloudflare, Brevo, Gemini, Groq, Firecrawl, Brave, Reddit, Bluesky, Sentry), and a clear data-retention table.
-- **DMCA / takedown policy** at `/dmca` with a designated agent email.
-- **Corrections policy** at `/corrections` (SLA for review, how retracted signals get annotated).
-- **Cookie notice** — a minimal "essential cookies only" banner. Since we set only auth cookies, one dismissible banner is compliant.
-- **Age gate statement** in ToS — pick "13+" (COPPA) or "16+" (EU-safe). Recommend 16+.
-- **security.txt** served at `/.well-known/security.txt` with reports email + disclosure policy.
-- **Source licensing / attribution page** at `/sources-licensing` (distinct from the live source catalog in Phase 1). Covers USGS/NASA/NOAA public domain, and our read-only terms for Reddit/Bluesky/RSS.
-- **Refunds / cancellation policy** stub page — needed once Stripe turns on, link it preemptively from ToS.
+- [x] **Terms of Service page** at `/terms`. Acceptable use, disclaimer of warranty, limitation of liability, governing law, "not legal advice / not a news outlet" clause matching the `README.md` positioning.
+- [x] **Privacy policy hardening** — `/privacy` page now has real contact emails, named processors, and a clearer data-retention summary.
+- [x] **DMCA / takedown policy** at `/dmca` with a designated agent email.
+- [x] **Corrections policy** at `/corrections` (SLA for review, how retracted signals get annotated).
+- [ ] **Cookie notice** — a minimal "essential cookies only" banner. Since we set only auth cookies, one dismissible banner is compliant.
+- [x] **Age gate statement** in ToS — currently set to 16+.
+- [x] **security.txt** served at `/.well-known/security.txt` with reports email + disclosure policy.
+- [x] **Source licensing / attribution page** at `/sources-licensing` (distinct from the live source catalog in Phase 1). Covers USGS/NASA/NOAA public domain, and our read-only terms for Reddit/Bluesky/RSS.
+- [ ] **Refunds / cancellation policy** stub page — needed once Stripe turns on, link it preemptively from ToS.
 
 Product polish:
 
-- **Buy custom domain** via Cloudflare Registrar (at-cost).
-- **Favicon, OG image, Apple touch icons** in `apps/web/public/`.
-- **Site-wide SEO metadata** — real `<title>`, meta description, canonical, Open Graph, Twitter card on every public route.
-- **Sitemap + robots.txt** dynamic routes.
-- **JSON-LD** (`NewsArticle` / `ItemList`) on `/signal/[id]` and `/feed`.
-- **Error boundaries** in each route group (currently only global `not-found.tsx`).
-- **Accessibility pass** — keyboard nav, focus rings, contrast (WCAG AA), alt text on map markers and any signal imagery.
-- **Mobile QA** on real devices (iOS Safari + Android Chrome) for feed, signal detail, map, onboarding, settings, briefings.
-- **First-run empty states** for `/feed` (no signals yet) and `/briefings` (no briefing yet).
-- **One-screen onboarding tour** explaining Agreement / Conflicts / Evidence gaps.
+- [ ] **Buy custom domain** via Cloudflare Registrar (at-cost).
+- [ ] **Favicon, OG image, Apple touch icons** in `apps/web/public/`.
+- [x] **Site-wide SEO metadata** — real `<title>`, meta description, canonical, Open Graph, Twitter card on every public route.
+- [x] **Sitemap + robots.txt** dynamic routes.
+- [ ] **JSON-LD** (`NewsArticle` / `ItemList`) on `/signal/[id]` and `/feed`.
+- [x] **Error boundaries** in each route group (app-level + global recovery UIs now exist).
+- [ ] **Accessibility pass** — keyboard nav, focus rings, contrast (WCAG AA), alt text on map markers and any signal imagery.
+- [ ] **Mobile QA** on real devices (iOS Safari + Android Chrome) for feed, signal detail, map, onboarding, settings, briefings.
+- [x] **First-run empty states** for `/feed` (no signals yet) and `/briefings` (no briefing yet).
+- [ ] **One-screen onboarding tour** explaining Agreement / Conflicts / Evidence gaps.
 
 Repo hygiene:
 
-- **Make the GitHub repo public** (gives unlimited Actions minutes and doubles as a trust signal).
-- Add `CODE_OF_CONDUCT.md` (Contributor Covenant).
-- Add `SECURITY.md` with how to report vulns (must match `security.txt`).
-- Add `ci.yml` workflow running `npm run typecheck`, `npm run lint`, `npm test` on every PR.
-- Enable Dependabot (or Renovate) for security and dependency updates.
+- [ ] **Make the GitHub repo public** (gives unlimited Actions minutes and doubles as a trust signal).
+- [x] Add `CODE_OF_CONDUCT.md` (Contributor Covenant).
+- [x] Add `SECURITY.md` with how to report vulns (must match `security.txt`).
+- [x] Add `ci.yml` workflow running `npm run typecheck`, `npm run lint`, `npm test` on every PR.
+- [ ] Enable Dependabot (or Renovate) for security and dependency updates.
 
 Exit gate for Phase 0: every link in the footer resolves, repo is public, CI is green on main.
 
@@ -113,14 +123,14 @@ Exit gate for Phase 0: every link in the footer resolves, repo is public, CI is 
 
 These pages are *specifically* what separates Crosscheck from a generic dashboard and makes grant reviewers stop scrolling. They are the product, not decoration.
 
-- `**/methodology`** — how reliability labels, contradiction detection, evidence scoring, and confidence bands are computed. Link to the relevant files in `packages/core/src/` (`scoring.ts`, `contradictions.ts`, `evidence.ts`, `confidence.ts`). Plain language + technical appendix.
-- `**/sources**` — live view of `public.sources` (which feeds are enabled, last fetch time, error rate from `engine_runs`). Builds from data we already have.
-- **Public reliability page** (`/reliability` or `/ops-public`) — sanitized version of `/ops`: ingest success rate over 30 days, signals ingested per day, sources currently monitored, last successful run per job. Powered by `engine_runs`.
-- `**/changelog`** — render `docs/changelog.md` as a public page with dates.
-- `**/how-conflicts-work**` — the differentiator explainer. Screenshot-driven: "here is a real signal with two sources disagreeing on casualty numbers; here's how we surface it."
-- `**/about**` — update existing page with mission, non-goals (pulled from `README.md`'s "what Crosscheck does not do"), team (even just founder), and funding model.
-- `**/contact**` — single form or email link.
-- **Status page** — either self-hosted `/status` driven by `engine_runs` + Supabase health, or a free Better Stack Status page. Publicly visible.
+- [x] `**/methodology`** — how reliability labels, contradiction detection, evidence scoring, and confidence bands are computed. Link to the relevant files in `packages/core/src/` (`scoring.ts`, `contradictions.ts`, `evidence.ts`, `confidence.ts`). Plain language + technical appendix.
+- [x] `**/sources**` — live view of `public.sources` (enabled feeds grouped from the live source catalog).
+- [x] **Public reliability page** (`/reliability` or `/ops-public`) — sanitized version of `/ops`: recent scheduled-job health, source coverage freshness, and monitored-source counts.
+- [x] `**/changelog`** — render `docs/changelog.md` as a public page with dates.
+- [ ] `**/how-conflicts-work**` — the differentiator explainer. Screenshot-driven: "here is a real signal with two sources disagreeing on casualty numbers; here's how we surface it."
+- [x] `**/about**` — existing page is live; keep iterating on mission/non-goals/team/funding copy.
+- [x] `**/contact**` — single email-based contact page.
+- [x] **Status page** — self-hosted `/status` now reflects live operational summary data.
 
 Exit gate for Phase 1: the footer has full coverage (terms, privacy, DMCA, corrections, methodology, sources, sources-licensing, contact, changelog, status, security). A reviewer can click any link and get a real page.
 
@@ -130,13 +140,13 @@ Exit gate for Phase 1: the footer has full coverage (terms, privacy, DMCA, corre
 
 What we can't see, we can't debug, and grants expect to see uptime numbers.
 
-- **Sentry Free** wired into `apps/web` (browser + server) and `apps/worker`. Alerts to email + Telegram (`TELEGRAM_OPERATOR_CHAT_ID` already in env).
-- **Better Stack / UptimeRobot** pinging `/`, `/feed`, `/api/signals` every 10 min from 3 regions.
-- **Vercel log retention** is short; port logs to Cloudflare Logpush or Logtail (both free tiers) as part of the Phase 5 migration.
-- **Uptime + error webhooks → Telegram operator channel** (already have the credential plumbing).
-- `**/ops` polish** — verify every KPI tile renders; add ingest-success-per-day chart if not already there.
-- **Prune cron** — nightly job to drop `usage_ledger` rows older than 60 days (per `docs/security.md`) and expired signals beyond `computeExpiry`. Add to `.github/workflows/`.
-- **Supabase backup check** — confirm daily backups are on, document restore procedure in `runbooks.md`. (Free tier retains 7 days — noted as an upgrade trigger.)
+- [ ] **Sentry Free** wired into `apps/web` (browser + server) and `apps/worker`. Alerts to email + Telegram (`TELEGRAM_OPERATOR_CHAT_ID` already in env).
+- [ ] **Better Stack / UptimeRobot** pinging `/`, `/feed`, `/api/signals` every 10 min from 3 regions.
+- [ ] **Vercel log retention** is short; port logs to Cloudflare Logpush or Logtail (both free tiers) as part of the Phase 5 migration.
+- [ ] **Uptime + error webhooks → Telegram operator channel** (already have the credential plumbing).
+- [ ] `**/ops` polish** — verify every KPI tile renders; add ingest-success-per-day chart if not already there.
+- [x] **Prune cron** — nightly job to drop `usage_ledger` rows older than 60 days (per `docs/security.md`) and expired signals beyond `computeExpiry`. Added to `.github/workflows/maintenance.yml`.
+- [ ] **Supabase backup check** — confirm daily backups are on, document restore procedure in `runbooks.md`. (Free tier retains 7 days — noted as an upgrade trigger.)
 
 Exit gate for Phase 2: a P1 error page-loads into Telegram within 2 minutes; uptime page shows 7+ days of green checks.
 
@@ -146,12 +156,12 @@ Exit gate for Phase 2: a P1 error page-loads into Telegram within 2 minutes; upt
 
 Every promise in `docs/privacy.md` must map to a real user-facing action.
 
-- `**/api/account/export`** — JSON export of every row tied to `auth.uid()` (profile, preferences, feedback, saved views, AI sessions). Already promised in privacy doc.
-- `**/api/account/delete**` — audit the existing route, confirm it cascades to every user-owned table and invalidates sessions.
-- **PII audit** — grep every `apps/worker/src/jobs/*` and `apps/web/app/api/`** for places raw emails land in logs, `engine_runs.errors`, or `product_events`. Strip or hash.
-- **Log scrubbing** — add a middleware on worker logs that drops request headers with `authorization` / `cookie`.
-- **Data retention enforcement** — confirm the prune cron matches retention language in `/privacy`.
-- **Data Processing Agreement (DPA) placeholder** — link out to Supabase + Cloudflare DPAs on the privacy page.
+- [x] `**/api/account/export`** — JSON export of every row tied to `auth.uid()` (profile, preferences, feedback, saved views, AI sessions). Already promised in privacy doc.
+- [ ] `**/api/account/delete**` — audit the existing route, confirm it cascades to every user-owned table and invalidates sessions.
+- [ ] **PII audit** — grep every `apps/worker/src/jobs/*` and `apps/web/app/api/`** for places raw emails land in logs, `engine_runs.errors`, or `product_events`. Strip or hash.
+- [ ] **Log scrubbing** — add a middleware on worker logs that drops request headers with `authorization` / `cookie`.
+- [x] **Data retention enforcement** — prune cron now matches the retention language in `/privacy`.
+- [ ] **Data Processing Agreement (DPA) placeholder** — link out to Supabase + Cloudflare DPAs on the privacy page.
 
 Exit gate for Phase 3: a user can sign up, use the app for a week, export their data, and delete their account — end-to-end, in the UI, with everything gone.
 
@@ -302,8 +312,8 @@ Pre-flight, in order:
 1. Cloudflare Pages production deploy green; custom domain resolves.
 2. Supabase migrations `001` through latest applied on production project.
 3. Env vars present in Cloudflare (production + preview) and GitHub Actions secrets.
-4. Footer links all resolve; `/terms`, `/privacy`, `/dmca`, `/corrections`, `/methodology`, `/sources`, `/changelog`, `/contact`, `/status`, `/security.txt` all return 200.
-5. One end-to-end happy path: signup → magic link or email-password → onboarding → dashboard → feed → signal detail → feedback submit → briefing open → settings change → account export → account delete.
+4. Footer links all resolve; `/terms`, `/privacy`, `/dmca`, `/corrections`, `/methodology`, `/sources`, `/sources-licensing`, `/reliability`, `/changelog`, `/contact`, `/status`, and `/.well-known/security.txt` all return 200.
+5. One end-to-end happy path: signup → email-password → onboarding → dashboard → feed → signal detail → feedback submit → briefing open → settings change → account export → account delete.
 6. Sentry receives a test error from web + worker.
 7. Uptime monitor shows 3 consecutive green checks.
 8. Telegram operator channel receives a test alert.

@@ -27,6 +27,8 @@ npm run ingest               # one ingest cycle
 ## PR checklist
 
 - `npm run typecheck` passes.
+- `npm run lint` passes.
+- `npm run test` passes.
 - Any schema change ships with a migration file in `supabase/migrations/`.
 - New user-visible changes include a line in `docs/changelog.md`.
 - Security-sensitive changes update `docs/security.md`.
