@@ -20,7 +20,8 @@ Operational playbooks for the beta. Keep these up to date as the system evolves.
 
 1. Add entries to `public.beta_allowlist` (one row per email, tagged with cohort).
 2. Send outreach from your founder email with a link to `/login`.
-3. Monitor the `auth.users` table for sign-ups; confirm at least one magic-link was consumed per invitee.
+3. Monitor the `auth.users` table for sign-ups; confirm invitees can create an
+   email/password account after approval.
 
 ## 4. Ingestion is failing
 
@@ -46,6 +47,16 @@ Symptoms: briefings revert to deterministic bullet form; `engine_runs.meta.llm_s
 3. If user PII may be involved, draft user notification within 24h and send within 72h.
 4. Write a post-mortem in `docs/incidents/` (create as needed).
 
+## 6a. Rotate worker shared secret
+
+1. Generate a new random value of at least 16 characters for `WORKER_SHARED_SECRET`.
+2. Update it in:
+   - GitHub Actions secrets
+   - Web deployment environment variables
+   - Any local `.env` files used for worker testing
+3. Re-run the `Develop signals` workflow manually and confirm `/api/signal/:id/develop`
+   responds successfully for worker traffic.
+
 ## 7. Account deletion requested via email
 
 If a user cannot log in to delete themselves:
@@ -60,6 +71,26 @@ delete from auth.users where id = '<id>';
 ```
 
 Confirm by rerunning the select and ensuring zero rows.
+
+## 7a. Nightly maintenance and retention
+
+The maintenance workflow prunes short-retention operational data and expired
+signals:
+
+- `usage_ledger` rows older than 60 days
+- `signals` rows whose `expires_at` is in the past
+
+Manual dry run:
+
+```bash
+npm run maintenance -- --dry-run
+```
+
+Live run:
+
+```bash
+npm run maintenance
+```
 
 ## 8. User preference research (14-day readout)
 

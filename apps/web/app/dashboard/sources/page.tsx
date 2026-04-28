@@ -3,63 +3,16 @@ import { redirect } from 'next/navigation';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { Badge } from '@/components/ui/badge';
 import { StatTile } from '@/components/ui/stat-tile';
+import {
+  groupSourceCatalog,
+  hasGeoCoverage,
+  SOURCE_GROUP_LABELS,
+  SOURCE_GROUP_ORDER,
+  type SourceCatalogRow,
+} from '@osint/core/source-catalog';
 
 export const metadata = { title: 'Sources · Crosscheck' };
 export const dynamic = 'force-dynamic';
-
-interface SourceRow {
-  id: string;
-  name: string;
-  kind: string;
-  country_code: string | null;
-  credibility: number;
-  metadata: Record<string, unknown> | null;
-  enabled: boolean;
-}
-
-function groupKey(s: SourceRow): string {
-  const kind = String(s.kind ?? '').toLowerCase();
-  const type = String((s.metadata as any)?.type ?? '').toLowerCase();
-  if (type === 'earthquake' || type === 'natural_events' || type === 'volcano' || type === 'hurricane') return 'science_sensors';
-  if (type === 'satellite' || type === 'space_weather') return 'satellite_space';
-  if (type === 'weather' || type === 'weather_alerts') return 'weather';
-  if (type === 'markets') return 'markets';
-  if (type === 'cyber' || type === 'cyber_intel') return 'cyber';
-  if (type === 'humanitarian' || type === 'official_bulletin') return 'humanitarian_official';
-  if (type === 'news_regional') return 'regional_news';
-  if (type === 'events') return 'events';
-  return kind === 'rss' ? 'news_wires' : 'apis';
-}
-
-function hasGeoCoverage(s: SourceRow): boolean {
-  if (s.country_code) return true;
-  const type = String((s.metadata as any)?.type ?? '').toLowerCase();
-  return [
-    'earthquake',
-    'natural_events',
-    'volcano',
-    'hurricane',
-    'satellite',
-    'space_weather',
-    'weather',
-    'weather_alerts',
-    'humanitarian',
-    'events',
-  ].includes(type);
-}
-
-const GROUP_LABELS: Record<string, string> = {
-  news_wires: 'News wires',
-  science_sensors: 'Science sensors (satellite, seismic, volcano, hurricane)',
-  satellite_space: 'Satellite and space-weather intelligence',
-  weather: 'Weather and alerts',
-  markets: 'Markets and macro',
-  cyber: 'Cyber advisories',
-  humanitarian_official: 'Humanitarian and official bulletins',
-  regional_news: 'Regional news coverage',
-  events: 'Global events (GDELT)',
-  apis: 'Other APIs',
-};
 
 export default async function SourcesPage() {
   const sb = getServerSupabase();
@@ -82,32 +35,13 @@ export default async function SourcesPage() {
   ]);
 
   const muted = new Set((prefs?.muted_sources ?? []) as string[]);
-  const rows = (sources ?? []) as SourceRow[];
-
-  const groups = new Map<string, SourceRow[]>();
-  for (const s of rows) {
-    const key = groupKey(s);
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(s);
-  }
+  const rows = (sources ?? []) as SourceCatalogRow[];
+  const groups = groupSourceCatalog(rows);
 
   const mutedCount = rows.filter((s) => muted.has(s.id)).length;
   const activeCount = rows.length - mutedCount;
   const highCredCount = rows.filter((s) => s.credibility >= 80).length;
   const mapReadyCount = rows.filter((s) => hasGeoCoverage(s)).length;
-
-  const order = [
-    'news_wires',
-    'regional_news',
-    'science_sensors',
-    'satellite_space',
-    'weather',
-    'humanitarian_official',
-    'markets',
-    'cyber',
-    'events',
-    'apis',
-  ];
 
   return (
     <div className="space-y-6">
@@ -125,12 +59,12 @@ export default async function SourcesPage() {
         <StatTile label="Map-ready sources" value={mapReadyCount} hint="geo-capable coverage" />
       </section>
 
-      {order
+      {SOURCE_GROUP_ORDER
         .filter((k) => groups.has(k))
         .map((k) => (
           <section key={k}>
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-600">
-              {GROUP_LABELS[k] ?? k}
+              {SOURCE_GROUP_LABELS[k] ?? k}
             </h2>
             <ul className="grid gap-2 sm:grid-cols-2">
               {groups.get(k)!.map((s) => {

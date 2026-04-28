@@ -4,40 +4,47 @@ This mirrors the in-app `/privacy` page. Update both in sync.
 
 ## What we collect
 
-- **Email address** — only to send magic-link sign-in emails and optional briefing emails.
-- **Preferences** — topics, muted sources, alert threshold.
-- **Feedback** — tags you attach to signals/briefings (useful/noise/wrong/helpful_context).
+- **Account data** — your email address and any optional display name you add.
+- **Preferences** — topics, muted sources, alert thresholds, briefing cadence, and saved views.
+- **Feedback and verification submissions** — feedback tags on signals/briefings plus optional verification requests you submit.
+- **AI workspace state** — your saved AI profile, chat sessions, and chat messages.
+- **Minimal product telemetry** — first-party `product_events` rows that measure feature usage inside Crosscheck.
 
 ## What we do not collect
 
-- No real names, addresses, phone numbers, or payment info (beta is free).
-- No IP address logs beyond ephemeral rate-limit buckets.
-- No third-party analytics, ad trackers, or fingerprinting scripts.
+- No payment information (beta is free).
+- No third-party ad trackers, fingerprinting scripts, or embedded analytics pixels.
+- No requirement to use your real name.
 
 ## How we use data
 
-- Your email is used only for authentication + optional briefing delivery.
-- Preferences are used only to personalize *your* feed and alerts.
-- Feedback is aggregated into anonymous scoring weights that improve ranking for all users.
+- Your email is used for authentication and, if enabled, briefing delivery.
+- Preferences personalize *your* feed, briefings, and alert behavior.
+- Feedback and telemetry help us tune ranking, onboarding, and low-noise defaults.
+- Verification submissions are stored so you can revisit your results.
 
-## Sharing
+## Sharing and processors
 
-- We never sell data.
-- We never share identifiable data with third parties.
-- Service providers (Supabase, Vercel, email relay) receive only the minimum data required to provide the service.
+- We never sell personal data.
+- We never share identifiable data except with processors needed to run the service.
+- Current processors include **Supabase** (database/auth), **Cloudflare/Vercel** (hosting and edge delivery), and optional service integrations such as **Resend/Brevo**, **Gemini**, **Groq**, **Firecrawl**, and **Brave** when those features are enabled.
 
 ## Retention
 
-- User rows (`profiles`, `preferences`, `feedback`) are retained until you delete your account.
-- Signals/briefings are public and auto-expire by severity.
-- Rate-limit buckets live in-memory and reset within one minute.
+- User-owned rows are retained until you delete your account.
+- Account exports are self-serve through `/api/account/export`.
+- Account deletion is self-serve from Settings and removes linked user-owned rows through auth/database cascades.
+- Signals and briefings are public product data and follow platform retention/expiry rules rather than account deletion.
+- Rate-limit buckets are in-memory and short-lived.
+- `usage_ledger` rows older than 60 days are intended to be pruned by scheduled maintenance.
 
 ## Your rights
 
-- Export: email us (contact in the footer) to receive your account data as JSON.
-- Deletion: click "Delete account" in Settings. Your auth row and all linked rows are removed within minutes.
-- Access: all your account data is visible in Settings.
+- **Export** — signed-in users can download a JSON export from Settings.
+- **Deletion** — signed-in users can delete their account from Settings.
+- **Access** — your current profile and preference state is visible in-app.
 
 ## Contact
 
-`privacy@` (domain to be configured at launch).
+- Privacy requests: `privacy@crosscheck.news`
+- Support: `hello@crosscheck.news`

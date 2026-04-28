@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { getClientKey, limit } from '@/lib/rate-limit';
+import { isEmailAllowed } from '@/lib/allowlist';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -28,6 +29,12 @@ export async function POST(req: Request) {
 
   const sb = getServerSupabase();
   const email = parsed.data.email.toLowerCase();
+  const allowed = await isEmailAllowed(email);
+  if (!allowed) {
+    // Keep the beta gate explicit for signups while avoiding extra detail
+    // about whether an address is already known to the system.
+    return NextResponse.json({ error: 'invite_required' }, { status: 403 });
+  }
 
   const { error } = await sb.auth.signUp({
     email,

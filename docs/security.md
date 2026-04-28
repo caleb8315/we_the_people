@@ -8,7 +8,7 @@ The platform is anonymous-read by default. Only preferences, feedback, and profi
 
 - Unauthorized reads of user preferences or feedback rows.
 - Abuse of write endpoints (feedback, preferences) to spam or harass.
-- Credential theft (magic-link interception, token reuse).
+- Credential theft (password reuse, phishing, token reuse).
 - Service-role key exposure.
 - AI-provider quota exhaustion / cost attacks.
 
@@ -30,13 +30,13 @@ Explicitly out of scope for v1 (but tracked):
 
 ### Auth
 
-- Magic-link (OTP) only. No passwords.
-- Allowlist gate: only emails matching `BETA_ALLOWLIST` (env) or `beta_allowlist` (DB) receive a link. Non-matches receive a generic success response to prevent enumeration.
+- Email/password auth for the current beta, backed by Supabase Auth.
+- Allowlist gate: only emails matching `BETA_ALLOWLIST` (env) or `beta_allowlist` (DB) can sign up or sign in. Unapproved users are directed to the access-request flow.
 - Session cookie refreshed in middleware on every request.
 
 ### API
 
-- All `/api/*` routes enforce a per-IP sliding-window rate limit (see `lib/rate-limit.ts`).
+- Sensitive `/api/*` routes enforce per-IP sliding-window rate limits (see `lib/rate-limit.ts`) and session checks where user context is required.
 - Write endpoints validate the full body with `zod`.
 - Protected endpoints require a valid Supabase session via the SSR client.
 - Service-role client is **never** imported from a client component.
@@ -54,7 +54,7 @@ Explicitly out of scope for v1 (but tracked):
 
 - Signals auto-expire based on their reliability label and severity (see `computeExpiry`).
 - Quarantined / flagged rows expire in ≤ 24h unless promoted.
-- Users can delete their account from Settings (`/api/account/delete`), which cascades to profile, preferences, and feedback.
+- Users can export their account data from Settings (`/api/account/export`) and delete their account (`/api/account/delete`), which cascades to profile, preferences, feedback, saved views, and AI state.
 - `usage_ledger` rows older than 60 days should be pruned by a scheduled maintenance job.
 
 ## Incident response

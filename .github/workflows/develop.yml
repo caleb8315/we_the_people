@@ -7,7 +7,7 @@ name: Develop signals
 # Bluesky creds stay on the web side only.
 #
 # Cadence: every 2 hours at :37 (offset from ingest at :17).
-# Per run: up to 6 stale signals, spaced 6s apart, ~60-90s total.
+# Per run: up to 8 stale signals by default, spaced 6s apart.
 # This is the "automatic enrichment" path — see the note in
 # apps/worker/src/jobs/develop.ts for why we don't enrich every signal
 # at ingest time.
@@ -39,9 +39,10 @@ jobs:
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      WORKER_SHARED_SECRET: ${{ secrets.WORKER_SHARED_SECRET }}
       # The worker calls POST $WEB_APP_URL/api/signal/:id/develop. That
       # endpoint holds the Firecrawl / Brave / Bluesky credentials on
-      # the web side, so we only need the URL here — not the secrets.
+      # the web side; the shared secret authenticates worker traffic.
       WEB_APP_URL: ${{ vars.WEB_APP_URL }}
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +53,7 @@ jobs:
       - run: npm ci
       - name: Run develop
         run: |
-          max="${{ github.event.inputs.max || '6' }}"
+          max="${{ github.event.inputs.max || '8' }}"
           dry="${{ github.event.inputs.dry_run || 'false' }}"
           args="--max=$max"
           if [ "$dry" = "true" ]; then args="$args --dry-run"; fi

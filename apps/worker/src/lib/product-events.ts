@@ -1,20 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ProductEventName } from '@osint/core/product-events';
 
-type ProductEventName =
-  | 'feed_viewed'
-  | 'feed_mode_switched'
-  | 'briefing_generated'
-  | 'briefing_opened'
-  | 'alert_sent'
-  | 'alert_muted'
-  | 'preferences_updated'
-  | 'feed_view_toggled'
-  | 'map_opened'
-  | 'map_filter_changed'
-  | 'signal_opened_from_map'
-  | 'mobile_nav_used'
-  | 'feed_scrolled_depth'
-  | 'saved_view_applied';
+export type { ProductEventName } from '@osint/core/product-events';
 
 export async function logProductEvent(
   sb: SupabaseClient,

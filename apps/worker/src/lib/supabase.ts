@@ -13,7 +13,7 @@ export function supabase(): SupabaseClient {
 }
 
 export async function startEngineRun(
-  job: 'ingest' | 'brief' | 'alert' | 'develop',
+  job: 'ingest' | 'brief' | 'alert' | 'develop' | 'maintenance',
 ): Promise<string | null> {
   const { data, error } = await supabase()
     .from('engine_runs')

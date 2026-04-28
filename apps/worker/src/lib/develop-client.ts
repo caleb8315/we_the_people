@@ -35,6 +35,7 @@ export interface DevelopResponse {
 export async function callDevelopEndpoint(
   webUrl: string,
   signalId: string,
+  workerSecret?: string,
 ): Promise<DevelopResponse> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), PER_CALL_TIMEOUT_MS);
@@ -45,6 +46,7 @@ export async function callDevelopEndpoint(
         'content-type': 'application/json',
         // Distinctive UA so /api observability can see cron traffic.
         'user-agent': 'Crosscheck-Develop-Worker/1.0',
+        ...(workerSecret ? { authorization: `Bearer ${workerSecret}` } : {}),
       },
       body: JSON.stringify({}),
       signal: ctrl.signal,

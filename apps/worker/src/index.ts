@@ -4,6 +4,7 @@ import { runAlerts } from './jobs/alert';
 import { runEmailBriefings } from './jobs/email-briefings';
 import { runBackfill } from './jobs/backfill';
 import { runDevelop } from './jobs/develop';
+import { runMaintenance } from './jobs/maintenance';
 
 /**
  * CLI dispatcher. Invoked by GitHub Actions with a single command plus
@@ -20,6 +21,7 @@ import { runDevelop } from './jobs/develop';
  *   tsx src/index.ts develop                  # enrich stale developing signals
  *   tsx src/index.ts develop --dry-run        # list candidates, no writes
  *   tsx src/index.ts develop --max=12         # override max signals per run
+ *   tsx src/index.ts maintenance              # prune retention-managed rows
  */
 const args = process.argv.slice(2);
 const [cmd, arg] = args;
@@ -65,9 +67,20 @@ async function main() {
       });
       return;
     }
+    case 'maintenance': {
+      const dryRun = args.includes('--dry-run');
+      const usageArg = args.find((a) => a.startsWith('--usage-days='));
+      const signalArg = args.find((a) => a.startsWith('--signal-hours='));
+      await runMaintenance({
+        dryRun,
+        usageRetentionDays: usageArg ? Number(usageArg.slice('--usage-days='.length)) : undefined,
+        expiredSignalGraceDays: signalArg ? Number(signalArg.slice('--signal-hours='.length)) / 24 : undefined,
+      });
+      return;
+    }
     default:
       console.error(
-        `unknown command: ${cmd}. use: ingest | brief [weekly] | alert | email | backfill [hours] [--dry-run] [--limit=N] | develop [--dry-run] [--max=N] [--cooldown=MIN] [--window=HRS]`,
+        `unknown command: ${cmd}. use: ingest | brief [weekly] | alert | email | backfill [hours] [--dry-run] [--limit=N] | develop [--dry-run] [--max=N] [--cooldown=MIN] [--window=HRS] | maintenance [--dry-run] [--usage-days=N] [--signal-hours=N]`,
       );
       process.exit(2);
   }

@@ -1,13 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-
-export type UserLimitBucket = 'ai_chat' | 'priority_alert' | 'daily_briefing' | 'briefing_call';
-
-const LIMITS: Record<UserLimitBucket, number> = {
-  ai_chat: Number(process.env.USER_DAILY_CHAT_LIMIT ?? 10),
-  priority_alert: Number(process.env.USER_DAILY_PRIORITY_ALERT_LIMIT ?? 5),
-  daily_briefing: Number(process.env.USER_DAILY_BRIEFING_EMAIL_LIMIT ?? 1),
-  briefing_call: Number(process.env.USER_DAILY_BRIEFING_CALL_LIMIT ?? 2),
-};
+import { USER_DAILY_LIMITS, type UserLimitBucket } from '@osint/core/daily-limits';
 
 /**
  * @param userCap Optional per-user preference cap that overrides the
@@ -21,7 +13,7 @@ export async function consumeUserDailyLimit(
   userCap?: number,
 ): Promise<{ ok: boolean; used: number; limit: number }> {
   const day = new Date().toISOString().slice(0, 10);
-  const platformLimit = LIMITS[bucket];
+  const platformLimit = USER_DAILY_LIMITS[bucket];
   const effectiveLimit = userCap != null ? Math.min(userCap, platformLimit) : platformLimit;
 
   const { data, error } = await sb

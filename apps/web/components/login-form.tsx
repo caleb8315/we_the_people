@@ -2,11 +2,13 @@
 
 import { useState } from 'react';
 import { Segmented } from './ui/segmented';
+import { sanitizeNextPath } from '@/lib/safe-redirect';
 
 type Mode = 'signin' | 'signup';
 type Result = { ok: boolean; message: string } | null;
 
 export function LoginForm({ next }: { next: string }) {
+  const safeNext = sanitizeNextPath(next);
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,16 +34,21 @@ export function LoginForm({ next }: { next: string }) {
       const body = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setResult({ ok: false, message: body.error ?? 'Authentication failed.' });
+        const message =
+          body.error === 'invite_required'
+            ? 'This beta is invite-only right now. Request access below and we will review your email for the next cohort.'
+            : body.error === 'access_pending'
+              ? 'That email is not approved for beta access yet. Request access below if you have not already.'
+              : body.error ?? 'Authentication failed.';
+        setResult({ ok: false, message });
       } else if (mode === 'signup') {
         setResult({
           ok: true,
-          message:
-            'Account created. If email confirmation is disabled in Supabase, you can sign in immediately.',
+          message: 'Account created. You can sign in immediately if your project does not require email confirmation.',
         });
         setMode('signin');
       } else {
-        window.location.href = next || '/dashboard';
+        window.location.href = safeNext;
       }
     } catch {
       setResult({ ok: false, message: 'Network error. Please try again.' });
@@ -115,8 +122,8 @@ export function LoginForm({ next }: { next: string }) {
       )}
 
       <p className="text-xs text-ink-400">
-        MVP mode: email/password auth. In Supabase Auth settings, disable “Confirm email” for
-        instant signup login.
+        Beta access is restricted to approved emails. If your project requires email confirmation,
+        finish that step before signing in.
       </p>
 
       <style jsx>{`

@@ -11,8 +11,8 @@
  * Architecture note: the live corroboration pipeline (Firecrawl / Brave /
  * Bluesky auth tokens etc.) lives in the web app, not here. Rather than
  * duplicate env + code, we HTTP-call the same `/api/signal/:id/develop`
- * endpoint the UI button hits. This keeps the web app the single owner
- * of live-source configuration.
+ * endpoint the UI button hits. A shared secret lets the cron call that
+ * endpoint without leaving it open to anonymous budget-burn abuse.
  *
  * Selection rules:
  *   - verification_status IN (developing, unverified) — we only enrich
@@ -70,6 +70,7 @@ export async function runDevelop(opts: DevelopOptions = {}): Promise<{
   const errors: string[] = [];
 
   const webUrl = env().WEB_APP_URL?.replace(/\/$/, '') ?? null;
+  const workerSecret = env().WORKER_SHARED_SECRET ?? null;
   if (!webUrl) {
     await finishEngineRun(runId, {
       status: 'failed',
@@ -82,6 +83,24 @@ export async function runDevelop(opts: DevelopOptions = {}): Promise<{
       '[develop] WEB_APP_URL not set. Add it to worker env (Vercel URL of the deployed web app, e.g. https://crosscheck.vercel.app) to enable this job.',
     );
     return { candidates: 0, attempted: 0, enriched: 0, cooldown: 0, errors: 0, skipped_reason: 'WEB_APP_URL not set' };
+  }
+  if (!workerSecret) {
+    await finishEngineRun(runId, {
+      status: 'failed',
+      records_in: 0,
+      records_out: 0,
+      errors: ['WORKER_SHARED_SECRET not configured'],
+      meta: {},
+    });
+    console.warn('[develop] WORKER_SHARED_SECRET not set. Configure the same secret in web and worker env to enable authenticated enrichment.');
+    return {
+      candidates: 0,
+      attempted: 0,
+      enriched: 0,
+      cooldown: 0,
+      errors: 0,
+      skipped_reason: 'WORKER_SHARED_SECRET not set',
+    };
   }
 
   const sb = supabase();
@@ -153,7 +172,7 @@ export async function runDevelop(opts: DevelopOptions = {}): Promise<{
 
   for (const row of rows) {
     attempted++;
-    const r = await callDevelopEndpoint(webUrl, row.id);
+    const r = await callDevelopEndpoint(webUrl, row.id, workerSecret);
 
     if (r.status === 'enriched') {
       enriched++;

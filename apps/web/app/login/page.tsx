@@ -1,17 +1,28 @@
 import { LoginForm } from '@/components/login-form';
+import { AccessRequestForm } from '@/components/access-request-form';
 import { redirect } from 'next/navigation';
 import { getServerSupabase } from '@/lib/supabase-server';
+import { sanitizeNextPath } from '@/lib/safe-redirect';
 
 export const metadata = { title: 'Sign in · Crosscheck' };
+export const dynamic = 'force-dynamic';
 
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: { next?: string; error?: string; reason?: string };
 }) {
-  const sb = getServerSupabase();
-  const { data } = await sb.auth.getUser();
-  if (data.user) redirect(searchParams.next ?? '/dashboard');
+  const next = sanitizeNextPath(searchParams.next, '/dashboard');
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    try {
+      const sb = getServerSupabase();
+      const { data } = await sb.auth.getUser();
+      if (data.user) redirect(next);
+    } catch {
+      // Auth stays unavailable for this render; show the login screen instead
+      // of failing the whole page at build time.
+    }
+  }
 
   return (
     <div className="mx-auto max-w-md space-y-5">
@@ -36,7 +47,22 @@ export default async function LoginPage({
         </p>
       )}
       <div className="rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
-        <LoginForm next={searchParams.next ?? '/dashboard'} />
+        <LoginForm next={next} />
+      </div>
+      <div className="rounded-card border border-ink-100 bg-canvas-50 p-5 shadow-card sm:p-6">
+        <div className="space-y-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-400">
+              Private beta
+            </p>
+            <h2 className="mt-1 text-lg font-semibold text-ink">Need access?</h2>
+            <p className="mt-1 text-sm text-ink-500">
+              Request an invite for testing. Approved emails can sign in as soon as they are added
+              to the beta allowlist.
+            </p>
+          </div>
+          <AccessRequestForm />
+        </div>
       </div>
     </div>
   );
