@@ -10,12 +10,28 @@ import Link from 'next/link';
 import { NavBar } from '@/components/nav-bar';
 import { MobileBottomNav } from '@/components/mobile-bottom-nav';
 import { getServerSupabase } from '@/lib/supabase-server';
+import { siteConfig } from '@/lib/site-config';
 
 export const metadata: Metadata = {
   title: 'Crosscheck — see where reporting agrees, conflicts, and lacks evidence',
   description:
     'Crosscheck clusters public reporting and open sensor data by event, then shows how sources agree, where they conflict, and which pieces of evidence are missing.',
+  metadataBase: new URL(siteConfig.siteUrl),
   robots: { index: true, follow: true },
+  openGraph: {
+    title: 'Crosscheck',
+    description:
+      'See where reporting agrees, conflicts, and lacks evidence across public sources and sensor networks.',
+    url: siteConfig.siteUrl,
+    siteName: 'Crosscheck',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Crosscheck',
+    description:
+      'See where reporting agrees, conflicts, and lacks evidence across public sources and sensor networks.',
+  },
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -44,11 +60,35 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <Link href="/about" className="hover:text-ink-700">
               About
             </Link>
+            <Link href="/sources" className="hover:text-ink-700">
+              Sources
+            </Link>
             <Link href="/privacy" className="hover:text-ink-700">
               Privacy
             </Link>
+            <Link href="/terms" className="hover:text-ink-700">
+              Terms
+            </Link>
+            <Link href="/contact" className="hover:text-ink-700">
+              Contact
+            </Link>
+            <Link href="/status" className="hover:text-ink-700">
+              Status
+            </Link>
+            <Link href="/changelog" className="hover:text-ink-700">
+              Changelog
+            </Link>
             <Link href="/trust" className="hover:text-ink-700">
               Methodology
+            </Link>
+            <Link href="/corrections" className="hover:text-ink-700">
+              Corrections
+            </Link>
+            <Link href="/dmca" className="hover:text-ink-700">
+              DMCA
+            </Link>
+            <Link href="/sources-licensing" className="hover:text-ink-700">
+              Sources & licensing
             </Link>
             {userEmail && <span className="ml-auto text-ink-300">Signed in as {userEmail}</span>}
           </div>
@@ -57,6 +97,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             missing across sources and sensor networks. Every signal links to the underlying
             reports; every disagreement shows both sides. It is not an investigation tool and not
             a news app.
+          </p>
+          <p className="mt-2 max-w-2xl">
+            Contact: <a href={`mailto:${siteConfig.supportEmail}`} className="underline hover:text-ink-700">{siteConfig.supportEmail}</a>{' '}
+            · Security: <a href={`mailto:${siteConfig.securityEmail}`} className="underline hover:text-ink-700">{siteConfig.securityEmail}</a>
           </p>
         </footer>
       </body>

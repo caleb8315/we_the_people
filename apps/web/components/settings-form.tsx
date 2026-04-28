@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Segmented } from './ui/segmented';
+import { siteConfig } from '@/lib/site-config';
 
 const TOPICS = ['war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'tech', 'finance', 'other'] as const;
 type Topic = (typeof TOPICS)[number];
@@ -115,6 +116,7 @@ export function SettingsForm({
   const [displayName, setDisplayName] = useState(account.display_name ?? '');
   const [newPassword, setNewPassword] = useState('');
   const [accountStatus, setAccountStatus] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const groupedSources = new Map<(typeof SOURCE_GROUP_ORDER)[number], SourceOpt[]>();
   for (const source of sources) {
     const key = sourceGroupKey(source);
@@ -224,6 +226,37 @@ export function SettingsForm({
   async function signOut() {
     await fetch('/api/auth/signout', { method: 'POST' });
     window.location.href = '/login';
+  }
+
+  async function exportAccount() {
+    setAccountStatus('Preparing your account export…');
+    setExporting(true);
+    try {
+      const res = await fetch('/api/account/export', { method: 'GET' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setAccountStatus(body?.error ?? 'Could not export account data. Try again later.');
+        return;
+      }
+
+      const disposition = res.headers.get('content-disposition') ?? '';
+      const match = disposition.match(/filename="([^"]+)"/);
+      const filename = match?.[1] ?? 'crosscheck-account-export.json';
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setAccountStatus('Account export downloaded.');
+    } catch {
+      setAccountStatus('Could not reach the server. Try again.');
+    } finally {
+      setExporting(false);
+    }
   }
 
   async function deleteAccount() {
@@ -455,6 +488,14 @@ export function SettingsForm({
             >
               Sign out
             </button>
+            <button
+              type="button"
+              onClick={exportAccount}
+              disabled={exporting}
+              className="rounded-full border border-ink-100 px-3 py-2 text-sm hover:bg-ink-100 disabled:opacity-60"
+            >
+              {exporting ? 'Preparing export…' : 'Export my data'}
+            </button>
           </div>
           {accountStatus && <p className="text-sm text-ink-600">{accountStatus}</p>}
         </div>
@@ -463,6 +504,9 @@ export function SettingsForm({
           <p className="mt-1 text-sm text-ink-600">
             Removes your profile, preferences, saved views, feedback, and AI chat history.
             This cannot be undone.
+          </p>
+          <p className="mt-2 text-xs text-ink-500">
+            Need help instead? Contact <a className="underline" href={`mailto:${siteConfig.privacyEmail}`}>{siteConfig.privacyEmail}</a>.
           </p>
           <button
             type="button"

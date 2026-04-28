@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getServerSupabase } from '@/lib/supabase-server';
+import { AccessRequestForm } from '@/components/access-request-form';
 
 export const metadata = {
   title: 'Crosscheck — see where reporting agrees, conflicts, and lacks evidence',
@@ -110,6 +111,30 @@ export default async function LandingPage() {
           </Link>
         </div>
       </section>
+
+      {!signedIn && (
+        <section className="grid gap-5 rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:grid-cols-[1.1fr_0.9fr] sm:p-6">
+          <div className="space-y-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">
+              Private beta access
+            </p>
+            <h2 className="text-2xl font-semibold tracking-tight text-ink">Request an invite for user testing</h2>
+            <p className="max-w-xl text-sm text-ink-500">
+              Crosscheck is opening carefully so we can validate source quality, briefing usefulness,
+              and onboarding friction with real users. Request access here and operators can review it
+              from the built-in ops queue.
+            </p>
+            <ul className="space-y-2 text-sm text-ink-600">
+              <li>Approved testers can sign in with email/password immediately.</li>
+              <li>Requests stay private and are reviewed manually during the beta cohorts.</li>
+              <li>Need institutional access? Include your newsroom, NGO, or research use case.</li>
+            </ul>
+          </div>
+          <div className="rounded-card border border-ink-100 bg-canvas-50 p-4">
+            <AccessRequestForm />
+          </div>
+        </section>
+      )}
 
       {/* Topic browser — the reference's "Travel Place" row, adapted. */}
       <section>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { getClientKey, limit } from '@/lib/rate-limit';
+import { isEmailAllowed } from '@/lib/allowlist';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -22,9 +23,14 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'invalid_credentials' }, { status: 400 });
 
+  const email = parsed.data.email.toLowerCase();
+  if (!(await isEmailAllowed(email))) {
+    return NextResponse.json({ error: 'access_pending' }, { status: 403 });
+  }
+
   const sb = getServerSupabase();
   const { error } = await sb.auth.signInWithPassword({
-    email: parsed.data.email.toLowerCase(),
+    email,
     password: parsed.data.password,
   });
 

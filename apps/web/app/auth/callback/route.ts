@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/lib/supabase-server';
+import { sanitizeNextPath } from '@/lib/safe-redirect';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -11,7 +12,7 @@ export const runtime = 'nodejs';
 export async function GET(req: Request) {
   const { searchParams, origin } = new URL(req.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/feed';
+  const next = sanitizeNextPath(searchParams.get('next'), '/feed');
 
   if (code) {
     const sb = getServerSupabase();
