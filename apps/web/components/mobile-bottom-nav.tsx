@@ -18,7 +18,6 @@ const LINKS = [
   { href: '/', label: 'Home', icon: HomeIcon, anonOnly: true },
   { href: '/feed', label: 'Feed', icon: FeedIcon },
   { href: '/verify', label: 'Verify', icon: VerifyIcon },
-  { href: '/briefings', label: 'Briefings', icon: BriefingsIcon, authedOnly: true },
   { href: '/settings', label: 'Profile', icon: ProfileIcon, authedOnly: true },
   { href: '/login', label: 'Profile', icon: ProfileIcon, anonOnly: true },
 ] as const;
