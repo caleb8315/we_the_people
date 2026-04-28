@@ -38,34 +38,23 @@ export interface SignalRowRaw {
   reliability_summary?: string | null;
 }
 
+export interface CommunityFeedback {
+  helpful: number;
+  unclear: number;
+  inaccurate: number;
+  total: number;
+}
+
 export interface DecoratedSignal extends SignalRowRaw {
   contradictions_count: number;
   is_disputed: boolean;
   is_new_since: boolean;
-  /**
-   * At most 3 of this signal's contradictions, in original order, ready to
-   * render as one-line bullets inside the signal card without a follow-up
-   * fetch.
-   */
   contradictions_inline: ContradictionInline[];
-  /**
-   * Phase-5 structured physical evidence (status / confidence / sources /
-   * limitations). Lifted from `raw_data.physical_evidence`. `null` for
-   * signals ingested before Phase 5 ran.
-   */
   physical_evidence: PhysicalEvidence | null;
-  /**
-   * Phase-4 back-compat booleans, derived from
-   * `raw_data.reliability.{usgs_match,eonet_match}`. Kept for cards that
-   * render before Phase 5 has backfilled `physical_evidence`.
-   */
   has_usgs_confirmation: boolean;
   has_satellite_confirmation: boolean;
-  /**
-   * Unified confidence contract (Phase 0). Every UI surface consumes this —
-   * never re-derives bands / bullets / source trace from the raw columns.
-   */
   confidence_report: ConfidenceReport;
+  community_feedback: CommunityFeedback;
 }
 
 const INLINE_CONTRADICTIONS_PER_SIGNAL = 3;
@@ -121,10 +110,7 @@ export async function decorateSignals(
   if (!signals.length) return [];
 
   const ids = signals.map((s) => s.id);
-  // Phase 4 — the signal card needs contradictions visible without a click,
-  // so we fetch the full contract columns (type / severity / summary /
-  // metadata) up front and carry a trimmed inline array per signal.
-  const [{ data: contradictionRows }, { data: evidenceRows }] = await Promise.all([
+  const [{ data: contradictionRows }, { data: evidenceRows }, { data: feedbackRows }] = await Promise.all([
     sb
       .from('contradictions')
       .select('signal_id, type, severity, summary, metadata, evidence_ids, created_at')
@@ -135,6 +121,10 @@ export async function decorateSignals(
       .select('signal_id, source_id, url, domain, title, published_at, is_credible, excerpt')
       .in('signal_id', ids)
       .order('published_at', { ascending: false }),
+    sb
+      .from('feedback')
+      .select('signal_id, kind')
+      .in('signal_id', ids),
   ]);
 
   const counts = new Map<string, number>();
@@ -207,6 +197,18 @@ export async function decorateSignals(
     }
   }
 
+  const feedbackBySignal = new Map<string, CommunityFeedback>();
+  for (const row of feedbackRows ?? []) {
+    const r = row as { signal_id: string; kind: string };
+    if (!r.signal_id) continue;
+    const fb = feedbackBySignal.get(r.signal_id) ?? { helpful: 0, unclear: 0, inaccurate: 0, total: 0 };
+    if (r.kind === 'useful') fb.helpful++;
+    else if (r.kind === 'helpful_context') fb.unclear++;
+    else if (r.kind === 'wrong') fb.inaccurate++;
+    fb.total++;
+    feedbackBySignal.set(r.signal_id, fb);
+  }
+
   const newSinceTs = opts.newSince ? Date.parse(opts.newSince) : 0;
 
   return signals.map((s) => {
@@ -248,6 +250,7 @@ export async function decorateSignals(
       has_usgs_confirmation: readBoolFlag(s.raw_data ?? null, 'usgs_match'),
       has_satellite_confirmation: readBoolFlag(s.raw_data ?? null, 'eonet_match'),
       confidence_report,
+      community_feedback: feedbackBySignal.get(s.id) ?? { helpful: 0, unclear: 0, inaccurate: 0, total: 0 },
     };
   });
 }

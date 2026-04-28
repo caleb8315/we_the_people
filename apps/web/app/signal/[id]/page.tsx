@@ -30,11 +30,9 @@ type PageProps = { params: { id: string } };
 export default async function SignalPage({ params }: PageProps) {
   const sb = getAdminSupabase();
 
-  const [{ data: signal }, { data: enrichmentRow }, { data: evidence }, { data: contradictions }] =
+  const [{ data: signal }, { data: enrichmentRow }, { data: evidence }, { data: contradictions }, { data: feedbackRows }] =
     await Promise.all([
       sb.from('signals_public').select('*').eq('id', params.id).maybeSingle(),
-      // `last_enriched_at` lives on the base `signals` table; the
-      // `signals_public` view exposes the reader-facing columns only.
       sb.from('signals').select('last_enriched_at').eq('id', params.id).maybeSingle(),
       sb
         .from('evidence')
@@ -42,6 +40,7 @@ export default async function SignalPage({ params }: PageProps) {
         .eq('signal_id', params.id)
         .order('published_at', { ascending: false }),
       sb.from('contradictions').select('*').eq('signal_id', params.id),
+      sb.from('feedback').select('kind').eq('signal_id', params.id),
     ]);
 
   if (!signal) notFound();
@@ -57,6 +56,11 @@ export default async function SignalPage({ params }: PageProps) {
 
   const contradictionsCount = (contradictions ?? []).length;
   const evidenceCount = (evidence ?? []).length;
+
+  const fbHelp = (feedbackRows ?? []).filter((r: any) => r.kind === 'useful').length;
+  const fbUnclear = (feedbackRows ?? []).filter((r: any) => r.kind === 'helpful_context').length;
+  const fbWrong = (feedbackRows ?? []).filter((r: any) => r.kind === 'wrong').length;
+  const fbTotal = fbHelp + fbUnclear + fbWrong;
 
   const physicalEvidence = extractPhysicalEvidence(signal.raw_data ?? null);
   const isComplexSignal = Array.isArray(signal.tags)
@@ -207,6 +211,15 @@ export default async function SignalPage({ params }: PageProps) {
           <span aria-hidden="true">·</span>
           <span>First seen {new Date(signal.first_seen_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
         </div>
+
+        {fbTotal > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-ink-500">
+            <span className="font-medium text-ink-400">Community feedback:</span>
+            {fbHelp > 0 && <span className="text-brand-600">{fbHelp} found helpful</span>}
+            {fbWrong > 0 && <span className="text-danger-600">{fbWrong} flagged inaccurate</span>}
+            {fbUnclear > 0 && <span className="text-amber-600">{fbUnclear} found unclear</span>}
+          </div>
+        )}
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <SignalFeedbackButtons signalId={signal.id} />

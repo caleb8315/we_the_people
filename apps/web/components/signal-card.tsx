@@ -197,6 +197,7 @@ export function SignalCard({ s }: { s: SignalRow }) {
               </span>
               <span aria-hidden="true">·</span>
               <RelativeTime iso={s.occurred_at ?? s.first_seen_at} />
+              {(s as any).community_feedback?.total > 0 && <FeedbackIndicator fb={(s as any).community_feedback} />}
             </div>
             <span
               aria-hidden="true"
@@ -290,6 +291,34 @@ function PhysicalEvidenceBlock({ pe }: { pe: PhysicalEvidence }) {
       </ul>
     </div>
   );
+}
+
+function FeedbackIndicator({ fb }: { fb: { helpful: number; unclear: number; inaccurate: number; total: number } }) {
+  if (fb.total < 1) return null;
+
+  if (fb.inaccurate >= 2 || (fb.inaccurate > 0 && fb.inaccurate >= fb.helpful)) {
+    return (
+      <>
+        <span aria-hidden="true">·</span>
+        <span className="text-danger-600" title={`${fb.inaccurate} reader${fb.inaccurate === 1 ? '' : 's'} flagged this as inaccurate`}>
+          {fb.inaccurate} flagged inaccurate
+        </span>
+      </>
+    );
+  }
+
+  if (fb.helpful >= 2) {
+    return (
+      <>
+        <span aria-hidden="true">·</span>
+        <span className="text-brand-600" title={`${fb.helpful} reader${fb.helpful === 1 ? '' : 's'} found this helpful`}>
+          {fb.helpful} found helpful
+        </span>
+      </>
+    );
+  }
+
+  return null;
 }
 
 function cleanCardSummary(raw: string): string {
