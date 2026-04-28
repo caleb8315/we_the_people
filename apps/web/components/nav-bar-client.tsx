@@ -33,7 +33,7 @@ export function NavBarClient({
   const greeting = displayName ? `Hello, ${displayName}` : 'Hello there';
 
   return (
-    <header className="sticky top-0 z-40 border-b border-ink-100/70 bg-canvas/85 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-ink-100 bg-canvas">
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:gap-6 sm:px-6 sm:py-4">
         {/* Amber logo tile — mirrors the reference's square app icon. */}
         <Link href="/" className="group flex items-center gap-3">
