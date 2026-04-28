@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 
 const TOPICS = ['all', 'war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'tech', 'finance'] as const;
 const MODES = ['personalized', 'global'] as const;
-const VIEWS = ['list', 'map', 'briefings'] as const;
+const VIEWS = ['list', 'map'] as const;
 type FeedMode = (typeof MODES)[number];
 type FeedView = (typeof VIEWS)[number];
 
@@ -52,7 +52,7 @@ export default async function FeedPage({
     return auth.user?.email?.split('@')[0] ?? null;
   })();
 
-  const [{ data: prefs }, { data: savedViews }, { data: briefings }] = await Promise.all([
+  const [{ data: prefs }, { data: savedViews }] = await Promise.all([
     userId
       ? sb
           .from('preferences')
@@ -69,11 +69,6 @@ export default async function FeedPage({
           .order('updated_at', { ascending: false })
           .limit(5)
       : Promise.resolve({ data: [] }),
-    sb
-      .from('briefings')
-      .select('id, kind, period_start, headline, topics')
-      .order('period_start', { ascending: false })
-      .limit(10),
   ]);
 
   const defaultMode: FeedMode = prefs?.feed_mode_preference === 'global' ? 'global' : 'personalized';
@@ -301,9 +296,14 @@ export default async function FeedPage({
               options={[
                 { label: 'List', value: 'list', href: qp(mode, topic, 'list') },
                 { label: `Map (${geoPoints.length})`, value: 'map', href: qp(mode, topic, 'map') },
-                { label: 'Briefings', value: 'briefings', href: qp(mode, topic, 'briefings') },
               ]}
             />
+            <Link
+              href="/briefings"
+              className="rounded-full border border-ink-100 bg-paper px-3.5 py-1.5 text-sm text-ink-600 hover:border-ink-200 hover:text-ink"
+            >
+              Briefings
+            </Link>
           </div>
         </div>
 
@@ -373,36 +373,6 @@ export default async function FeedPage({
               : undefined
           }
         />
-      ) : view === 'briefings' ? (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-600">Recent briefings</h2>
-          {!briefings || briefings.length === 0 ? (
-            <EmptyState
-              title="No briefings yet."
-              body="The first briefing runs after the first ingest cycle completes."
-            />
-          ) : (
-            <ul className="space-y-3">
-              {briefings.map((b: any) => (
-                <li key={b.id}>
-                  <Link
-                    href={`/briefings/${b.id}`}
-                    className="block rounded-card border border-ink-100 bg-paper p-4 shadow-card transition hover:border-ink-200 hover:shadow-card-hover"
-                  >
-                    <div className="flex items-center gap-2 text-xs text-ink-500">
-                      <span className="rounded-full border border-ink-100 bg-canvas-50 px-2 py-0.5 text-[11px] font-medium capitalize">{b.kind}</span>
-                      <span>{new Date(b.period_start).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-                    </div>
-                    <h3 className="mt-2 text-base font-semibold leading-snug text-ink clamp-2">{b.headline}</h3>
-                    {b.topics?.length > 0 && (
-                      <p className="mt-1.5 text-xs text-ink-400">{b.topics.join(' · ')}</p>
-                    )}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
       ) : view === 'map' ? (
         <div className="space-y-3">
           <SignalsMap
