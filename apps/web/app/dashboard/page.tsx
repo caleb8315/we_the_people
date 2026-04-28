@@ -124,7 +124,7 @@ export default async function DashboardPage() {
             ⚡
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">Priority workspace</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">Intel center</p>
             <p className="mt-1 text-sm font-semibold text-ink group-hover:text-amber-700">High-severity signals for your focus topics</p>
             <p className="mt-1 text-xs text-ink-500">
               {criticalCount > 0 ? `${criticalCount} critical signal${criticalCount === 1 ? '' : 's'} right now` : 'Filtered to your interests'} · {disputedCount > 0 ? `${disputedCount} disputed` : 'no disputes'}
