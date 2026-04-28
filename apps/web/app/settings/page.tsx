@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase-server';
 import { SettingsForm } from '@/components/settings-form';
 
 export const metadata = { title: 'Settings · Crosscheck' };
+export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage() {
   const sb = getServerSupabase();

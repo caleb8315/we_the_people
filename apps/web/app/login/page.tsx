@@ -5,16 +5,24 @@ import { getServerSupabase } from '@/lib/supabase-server';
 import { sanitizeNextPath } from '@/lib/safe-redirect';
 
 export const metadata = { title: 'Sign in · Crosscheck' };
+export const dynamic = 'force-dynamic';
 
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: { next?: string; error?: string; reason?: string };
 }) {
-  const sb = getServerSupabase();
-  const { data } = await sb.auth.getUser();
   const next = sanitizeNextPath(searchParams.next, '/dashboard');
-  if (data.user) redirect(next);
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    try {
+      const sb = getServerSupabase();
+      const { data } = await sb.auth.getUser();
+      if (data.user) redirect(next);
+    } catch {
+      // Auth stays unavailable for this render; show the login screen instead
+      // of failing the whole page at build time.
+    }
+  }
 
   return (
     <div className="mx-auto max-w-md space-y-5">
