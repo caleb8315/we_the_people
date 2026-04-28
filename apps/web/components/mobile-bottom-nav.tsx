@@ -14,9 +14,11 @@ import { usePathname } from 'next/navigation';
  */
 
 const LINKS = [
-  { href: '/', label: 'Home', icon: HomeIcon },
+  { href: '/dashboard', label: 'Home', icon: HomeIcon, authedOnly: true },
+  { href: '/', label: 'Home', icon: HomeIcon, anonOnly: true },
   { href: '/feed', label: 'Feed', icon: FeedIcon },
   { href: '/verify', label: 'Verify', icon: VerifyIcon },
+  { href: '/briefings', label: 'Briefings', icon: BriefingsIcon, authedOnly: true },
   { href: '/settings', label: 'Profile', icon: ProfileIcon, authedOnly: true },
   { href: '/login', label: 'Profile', icon: ProfileIcon, anonOnly: true },
 ] as const;
@@ -108,6 +110,17 @@ function VerifyIcon() {
     <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 3 4 6v6c0 4.5 3.3 8.3 8 9 4.7-.7 8-4.5 8-9V6l-8-3z" />
       <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+function BriefingsIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" />
+      <path d="M18 14h-8" />
+      <path d="M15 18h-5" />
+      <path d="M10 6h8v4h-8V6Z" />
     </svg>
   );
 }
