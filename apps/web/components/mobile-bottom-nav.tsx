@@ -14,7 +14,7 @@ import { usePathname } from 'next/navigation';
  */
 
 const LINKS = [
-  { href: '/dashboard', label: 'Dashboard', icon: DashboardIcon, authedOnly: true },
+  { href: '/dashboard', label: 'Home', icon: HomeIcon, authedOnly: true },
   { href: '/', label: 'Home', icon: HomeIcon, anonOnly: true },
   { href: '/feed', label: 'Feed', icon: FeedIcon },
   { href: '/verify', label: 'Verify', icon: VerifyIcon },
