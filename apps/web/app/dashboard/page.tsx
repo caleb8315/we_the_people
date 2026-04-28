@@ -59,6 +59,7 @@ export default async function DashboardPage() {
     (s) => s.verification_status === 'verified' && s.first_seen_at >= dayAgo,
   ).length;
   const disputedCount = decoratedPersonal.reduce((n, s) => n + ((s.contradictions_count ?? 0) > 0 ? 1 : 0), 0);
+  const criticalCount = decoratedPersonal.filter((s) => s.severity >= 85).length;
   const topPriority = decoratedPersonal[0] ?? null;
 
   const today = new Date().toISOString().slice(0, 10);
@@ -113,26 +114,43 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      {/* Featured top-priority signal — the single thing most users care about. */}
-      {topPriority ? (
-        <TopPriorityCard
-          id={topPriority.id}
-          title={topPriority.title}
-          severity={topPriority.severity}
-          topic={topPriority.topic ?? 'event'}
-          verification={topPriority.verification_status}
-        />
-      ) : (
-        <Card tone="neutral">
-          <p className="text-sm text-ink-500">
-            No personalized signals yet — adjust your topics or try the{' '}
-            <Link href="/feed?mode=global" className="text-brand-700 underline-offset-2 hover:underline">
-              global feed
-            </Link>
-            .
-          </p>
-        </Card>
-      )}
+      {/* Priority workspace + top signal — side by side on desktop */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Link
+          href="/dashboard/intel"
+          className="group flex items-start gap-4 rounded-card border border-amber-200 bg-gradient-to-br from-amber-50/80 via-paper to-paper p-5 shadow-card transition hover:shadow-card-hover"
+        >
+          <span className="mt-0.5 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-xl text-white shadow-sm">
+            ⚡
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">Priority workspace</p>
+            <p className="mt-1 text-sm font-semibold text-ink group-hover:text-amber-700">High-severity signals for your focus topics</p>
+            <p className="mt-1 text-xs text-ink-500">
+              {criticalCount > 0 ? `${criticalCount} critical signal${criticalCount === 1 ? '' : 's'} right now` : 'Filtered to your interests'} · {disputedCount > 0 ? `${disputedCount} disputed` : 'no disputes'}
+            </p>
+          </div>
+        </Link>
+        {topPriority ? (
+          <TopPriorityCard
+            id={topPriority.id}
+            title={topPriority.title}
+            severity={topPriority.severity}
+            topic={topPriority.topic ?? 'event'}
+            verification={topPriority.verification_status}
+          />
+        ) : (
+          <Card tone="neutral">
+            <p className="text-sm text-ink-500">
+              No personalized signals yet — adjust your topics or try the{' '}
+              <Link href="/feed?mode=global" className="text-brand-700 underline-offset-2 hover:underline">
+                global feed
+              </Link>
+              .
+            </p>
+          </Card>
+        )}
+      </div>
 
       {/* Two-column body: signals on the left, sidebar rail on the right. */}
       <div className="grid gap-6 lg:grid-cols-3">
@@ -213,11 +231,6 @@ export default async function DashboardPage() {
 
           <Card title="Quick tools">
             <ul className="-my-1 divide-y divide-ink-100">
-              <QuickTool
-                href="/dashboard/intel"
-                title="Priority workspace"
-                body="High-severity signals, narrowed to your focus."
-              />
               <QuickTool
                 href="/dashboard/sources"
                 title="Source control"
