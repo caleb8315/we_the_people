@@ -288,11 +288,21 @@ Hard rules:
 - Prefer the words agreement, conflict, corroboration, confidence, evidence, and limitation.
 - Neutral tone. Never accuse. Prefer language like "reports indicate", "sources disagree",
   "observed data suggests", "corroboration is developing", "no sensor confirmation detected".
+- Forbidden phrasing: "verified facts", "fact-checked", "debunked", "AI verified",
+  "this is true/false", "this is propaganda", "this side is lying", "confirmed motive"
+  (except when the underlying evidence record explicitly carries that wording).
 - When sources disagree, surface the disagreement (both sides + citations) rather than picking one.
-- Group by topic. 3–5 short paragraphs. Under 350 words.
 - When a signal shows "freshly corroborated", it means our live-search fan-out surfaced additional
   sources after the initial ingest — treat that as legitimate growth of coverage, not as a new event.
-- End with a one-line "what to watch next 48h".
+
+Required structure (use these exact section headings, in order):
+1. **What happened** — neutral one-line description of each top development with the source count (3–5 items).
+2. **What is widely supported** — points where credible outlets agree.
+3. **What is disputed or unclear** — source disagreements, with both sides cited; never pick one.
+4. **What changed in the last ${kind === 'weekly' ? 'week' : '24 hours'}** — agreement shifts, new corroboration, new sensor data.
+5. **What to watch next** — concrete, neutral things a reader can check; no predictions, no calls to action.
+
+Hard length cap: 350 words total. Group by topic where it makes sense.
 
 Signals (format: topic/reliability, with credible/total source count and top domains):
 ${list}
