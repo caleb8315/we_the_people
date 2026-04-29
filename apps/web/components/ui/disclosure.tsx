@@ -7,12 +7,14 @@ export function Disclosure({
   badge,
   defaultOpen = false,
   tone = 'neutral',
+  id,
   children,
 }: {
   title: string;
   badge?: React.ReactNode;
   defaultOpen?: boolean;
   tone?: 'neutral' | 'danger' | 'warn';
+  id?: string;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -24,7 +26,7 @@ export function Disclosure({
         : 'border-ink-100 bg-paper';
 
   return (
-    <section className={`rounded-card border shadow-card ${toneClass}`}>
+    <section id={id} className={`rounded-card border shadow-card scroll-mt-20 ${toneClass}`}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
