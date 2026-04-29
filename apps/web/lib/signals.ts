@@ -1,9 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   buildConfidenceReport,
+  buildTrustExplanation,
   type ConfidenceReport,
   type EvidenceItem,
   type PhysicalEvidence,
+  type TrustExplanation,
   type VerificationStatus,
 } from '@osint/core';
 import type { ContradictionInline } from './contradictions-display';
@@ -54,6 +56,7 @@ export interface DecoratedSignal extends SignalRowRaw {
   has_usgs_confirmation: boolean;
   has_satellite_confirmation: boolean;
   confidence_report: ConfidenceReport;
+  trust_explanation: TrustExplanation;
   community_feedback: CommunityFeedback;
 }
 
@@ -225,6 +228,7 @@ export async function decorateSignals(
       evidence_ids: c.evidence_ids ?? [],
     }));
     const isComplex = Array.isArray(s.tags) && s.tags.includes('complex_signal');
+    const evidenceForReport = evidenceBySignal.get(s.id) ?? [];
     const confidence_report = buildConfidenceReport({
       verification_status: s.verification_status as VerificationStatus,
       reliability_score: s.reliability_score ?? null,
@@ -233,12 +237,23 @@ export async function decorateSignals(
         | 'UNCLEAR'
         | 'LIKELY_UNRELIABLE'
         | null) ?? null,
-      evidence: evidenceBySignal.get(s.id) ?? [],
+      evidence: evidenceForReport,
       contradictions: contradictionsForReport,
       physical_evidence,
       source_count: s.source_count ?? 0,
       credible_source_count: s.credible_source_count ?? 0,
       complex_signal: isComplex,
+    });
+    const trust_explanation = buildTrustExplanation({
+      report: confidence_report,
+      source_count: s.source_count ?? 0,
+      credible_source_count: s.credible_source_count ?? 0,
+      contradictions_count: count,
+      contradiction_types: contradictionsForReport.map((c) => c.type),
+      physical_evidence,
+      syndicated: detectSyndicationFromEvidence(evidenceForReport),
+      complex_signal: isComplex,
+      title: s.title,
     });
     return {
       ...s,
@@ -250,12 +265,32 @@ export async function decorateSignals(
       has_usgs_confirmation: readBoolFlag(s.raw_data ?? null, 'usgs_match'),
       has_satellite_confirmation: readBoolFlag(s.raw_data ?? null, 'eonet_match'),
       confidence_report,
+      trust_explanation,
       community_feedback: feedbackBySignal.get(s.id) ?? { helpful: 0, unclear: 0, inaccurate: 0, total: 0 },
     };
   });
 }
 
 const TRACE_EVIDENCE_PER_SIGNAL = 8;
+
+/**
+ * Cheap, deterministic syndication hint for the trust explainer on the
+ * feed surface. Mirrors the helper used on the signal detail page.
+ */
+function detectSyndicationFromEvidence(evidence: EvidenceItem[]): boolean {
+  if (!Array.isArray(evidence) || evidence.length < 4) return false;
+  const counts = new Map<string, number>();
+  for (const row of evidence) {
+    const d = (row.domain ?? '').toLowerCase().replace(/^www\./, '');
+    if (!d) continue;
+    counts.set(d, (counts.get(d) ?? 0) + 1);
+  }
+  const distinct = counts.size;
+  const max = [...counts.values()].reduce((m, n) => (n > m ? n : m), 0);
+  if (max >= 3) return true;
+  if (distinct > 0 && distinct * 3 < evidence.length) return true;
+  return false;
+}
 
 export interface PreferenceFilter {
   topics?: string[] | null;
