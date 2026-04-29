@@ -8,6 +8,12 @@ The goal is not to make AI the judge of truth. The goal is to help people
 understand what is known, what is disputed, how reporting is framed, and where
 to inspect the evidence.
 
+This should be openly positioned as an AI-heavy product. Users should know that
+Crosscheck uses a lot of AI to read, compare, summarize, and explain reporting,
+while also knowing that the final trust signals come from evidence,
+corroboration, source diversity, and stored contradictions rather than a model
+making unsupported truth claims.
+
 ## Product principles
 
 1. **Core verification stays authoritative.** `@osint/core` remains the source
@@ -25,6 +31,9 @@ to inspect the evidence.
 5. **Every warning needs a path to learn more.** Short feed language should link
    to signal details, evidence, source lists, contradiction notes, or the trust
    methodology page.
+6. **Be transparent that AI is used heavily.** The product should not hide AI
+   usage. The trust page and AI surfaces should say when AI helped summarize,
+   compare, translate, extract, or explain evidence.
 
 ## Current foundation
 
@@ -128,6 +137,19 @@ Requirements:
 - Keep worker calls on `usage_ledger`.
 - Keep user-triggered calls on per-user daily limits.
 - Fail closed to deterministic output when AI is unavailable.
+
+Free-tier setup:
+
+- Use one legitimate Gemini account/project and one legitimate Groq account.
+- Create two API keys per provider when the provider allows it: one primary key
+  and one backup/rotation key.
+- Do not create extra accounts to bypass free-tier limits. That risks account
+  bans, unreliable service, and provider terms violations.
+- Treat Groq and Gemini as backups for each other. If Gemini is unavailable or
+  over budget, try Groq. If both are unavailable, fall back to deterministic
+  summaries and existing confidence copy.
+- Keep usage free by prioritizing caching, short prompts, per-user daily limits,
+  worker budgets, and AI only where it adds real user value.
 
 ### 2. AI claim extraction candidates
 
@@ -382,6 +404,8 @@ Target:
   terms. Use compliant multi-provider fallback, caching, limits, and optional
   local models instead.
 - Always prefer a useful uncertainty statement over false certainty.
+- Be honest in product copy that AI is used extensively, but make it equally
+  clear that users can inspect the underlying evidence themselves.
 
 ## Success criteria
 
