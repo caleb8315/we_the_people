@@ -8,11 +8,11 @@ The goal is not to make AI the judge of truth. The goal is to help people
 understand what is known, what is disputed, how reporting is framed, and where
 to inspect the evidence.
 
-This should be openly positioned as an AI-heavy product. Users should know that
-Crosscheck uses a lot of AI to read, compare, summarize, and explain reporting,
-while also knowing that the final trust signals come from evidence,
-corroboration, source diversity, and stored contradictions rather than a model
-making unsupported truth claims.
+Crosscheck should be positioned as a trust and news verification platform, not
+as an "AI platform." AI can power parts of the experience, and individual
+AI-assisted outputs should be labeled where users interact with them, but the
+main product promise should stay focused on evidence, corroboration, source
+diversity, and plain-language context.
 
 ## Product principles
 
@@ -31,9 +31,10 @@ making unsupported truth claims.
 5. **Every warning needs a path to learn more.** Short feed language should link
    to signal details, evidence, source lists, contradiction notes, or the trust
    methodology page.
-6. **Be transparent that AI is used heavily.** The product should not hide AI
-   usage. The trust page and AI surfaces should say when AI helped summarize,
-   compare, translate, extract, or explain evidence.
+6. **Do not lead with AI as the brand.** Everyday product copy should lead with
+   evidence and trust. Specific generated outputs can say they are AI-assisted,
+   while broader AI usage disclosure belongs in terms, privacy, and methodology
+   pages.
 
 ## Current foundation
 
@@ -345,21 +346,29 @@ Targets:
 - `apps/web/app/api/image-forensics/route.ts`
 - `apps/web/app/verify/page.tsx`
 
-### 12. AI transparency in methodology
+### 12. AI transparency in terms and methodology
 
-The trust page should clearly explain where AI is used and where it is not.
+Marketing and feed copy should not lead with AI. AI usage should be disclosed
+in terms, privacy, and the trust/methodology page so people who care can read
+the full picture without it dominating the product surface.
 
-Add:
+In-product, individual AI-assisted outputs (summaries, framing notes,
+contradiction guides, analyst chat replies) should still be labeled at the
+output level so users understand which specific text was generated with AI.
 
+Add to terms/privacy/methodology:
+
+- AI is used to help summarize, compare, translate, and explain reporting.
 - AI does not decide verification status.
 - AI summaries are evidence-bound.
 - AI can make mistakes.
 - Users can inspect sources directly.
 - The platform prioritizes corroboration over outrage or virality.
 
-Target:
+Targets:
 
 - `apps/web/app/trust/page.tsx`
+- terms and privacy pages in `apps/web/app/`
 
 ## Implementation sequence
 
@@ -404,8 +413,10 @@ Target:
   terms. Use compliant multi-provider fallback, caching, limits, and optional
   local models instead.
 - Always prefer a useful uncertainty statement over false certainty.
-- Be honest in product copy that AI is used extensively, but make it equally
-  clear that users can inspect the underlying evidence themselves.
+- Do not market the product as an AI platform. Lead with evidence and trust.
+- Disclose AI usage in terms, privacy, and methodology pages.
+- Label individual AI-assisted outputs at the output level so users know which
+  specific text was generated with AI.
 
 ## Success criteria
 
