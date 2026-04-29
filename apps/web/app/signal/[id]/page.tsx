@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
   buildConfidenceReport,
@@ -172,49 +173,23 @@ export default async function SignalPage({ params }: PageProps) {
           </div>
         )}
 
-        {/* The verdict — big, band-tinted, conversational. Same pattern
-            as the /verify result hero so users read the same language
-            whether they're verifying a claim or opening a tracked event. */}
-        <div className={`mt-4 rounded-2xl border p-4 sm:p-5 ${bandTone.wrap}`}>
-          <div className="flex items-center gap-2">
-            <span
-              aria-hidden="true"
-              className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${bandDotClass(report.band)}`}
-            />
-            <p className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${bandTone.label}`}>
-              {report.label_display}
-            </p>
-            <span className="ml-auto text-[11px] text-ink-500">
-              {signal.credible_source_count} of {signal.source_count} credible
-            </span>
-          </div>
-          <p className="mt-2.5 text-[15px] leading-relaxed text-ink sm:text-base">
-            {bottomLine}
-          </p>
-        </div>
-
-        {/* The reasoning behind the verdict — collapsible, open by default
-            on contested/low/medium (where the caveats matter), collapsed
-            when it's high-confidence and there's nothing more to say. */}
-        {report.explanation_bullets.length > 0 && (
-          <details open={report.band !== 'high'} className="group mt-3">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl border border-ink-100 bg-canvas-50 px-4 py-2.5 text-[12px] font-semibold uppercase tracking-[0.16em] text-ink-500 hover:bg-canvas-100">
-              <span>Here&rsquo;s why we&rsquo;re saying that</span>
-              <span className="text-ink-400 transition-transform group-open:rotate-180" aria-hidden="true">⌄</span>
-            </summary>
-            <ul className="mt-3 space-y-1.5 px-1 text-[14px] leading-relaxed text-ink-700 sm:text-sm">
-              {report.explanation_bullets.map((b, i) => (
-                <li key={i} className="flex gap-2">
-                  <span
-                    aria-hidden="true"
-                    className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
-                  />
-                  <span>{b}</span>
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
+        {/* Trust hero — the single block that tells you everything you
+            need to know about how this story is being reported. Replaces
+            the older verdict callout + "Here's why we're saying that"
+            details (those duplicated this card and made the page noisy).
+            The hero pulls its summary, framing chips, and structured
+            sections directly from the deterministic trust explainer, so
+            this surface is identical in language to the feed cards and
+            the AI briefing prompt — by construction. */}
+        <TrustHero
+          signalId={signal.id}
+          band={report.band}
+          bandTone={bandTone}
+          credibleSourceCount={signal.credible_source_count ?? 0}
+          totalSourceCount={signal.source_count ?? 0}
+          explanation={trustExplanation}
+          bottomLine={bottomLine}
+        />
 
         {/* Technical meta — the stuff most readers don't need to see first.
             Kept together as a subtle strip at the bottom of the header so
@@ -242,7 +217,6 @@ export default async function SignalPage({ params }: PageProps) {
         </div>
       </header>
 
-      <TrustExplanationCard explanation={trustExplanation} />
 
 
       {/* Develop-the-story — runs the same live corroboration fan-out
@@ -844,60 +818,226 @@ function LearnMoreLinks({ title, topic }: { title: string; topic: string | null 
 }
 
 /**
- * Plain-language trust card.
+ * Trust hero — single, high-density block that replaces the older
+ * verdict callout + "Here's why we're saying that" details.
  *
- * Renders the deterministic `TrustExplanation` produced by
- * `@osint/core/trust-explainer`: one summary line, "why we say this"
- * bullets, an optional "watch for" hint, and a row of "Learn more"
- * links that always include a path back to `/trust`. Every label here
- * comes from the explainer — we never paraphrase its strings, so the
- * absolute-truth phrasing test in core/__tests__ fully covers what
- * readers see.
+ * Layout (top → bottom):
+ *   1. Verdict line (band-tinted) with the explainer summary, source
+ *      count, and glanceable framing chips.
+ *   2. Three structured sections — What is widely supported, What is
+ *      disputed or unclear, What to watch — driven by the explainer.
+ *   3. "Watch for" hint where the explainer provided one.
+ *   4. Action row: "Ask the analyst about this story" pre-fills the AI
+ *      workspace with the explainer's suggested prompt; "Learn more"
+ *      pills jump to the relevant in-page section or `/trust`.
+ *
+ * Every line on this surface comes from the deterministic explainer,
+ * which means it is identical to what the feed card and the AI briefing
+ * prompt see — and the forbidden-phrase test in core/__tests__ covers
+ * everything the reader sees here.
  */
-function TrustExplanationCard({ explanation }: { explanation: TrustExplanation }) {
+function TrustHero({
+  signalId,
+  band,
+  bandTone,
+  credibleSourceCount,
+  totalSourceCount,
+  explanation,
+  bottomLine,
+}: {
+  signalId: string;
+  band: ConfidenceBand;
+  bandTone: { wrap: string; label: string };
+  credibleSourceCount: number;
+  totalSourceCount: number;
+  explanation: TrustExplanation;
+  bottomLine: string;
+}) {
   return (
-    <section className="rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
-      <header className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-ink-500">
-          What this means
-        </h2>
-        <span className="text-[11px] text-ink-400">Plain-English summary · LLM-free</span>
-      </header>
-      <p className="mt-3 text-[15px] leading-relaxed text-ink sm:text-base">
-        {explanation.summary}
+    <section className={`mt-4 rounded-2xl border p-4 sm:p-5 ${bandTone.wrap}`}>
+      {/* Verdict line. */}
+      <div className="flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${bandDotClass(band)}`}
+        />
+        <p className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${bandTone.label}`}>
+          {bottomLineLabelForBand(band)}
+        </p>
+        <span className="ml-auto text-[11px] text-ink-500">
+          {credibleSourceCount} of {totalSourceCount} on trusted list
+        </span>
+      </div>
+      <p className="mt-2.5 text-[15px] leading-relaxed text-ink sm:text-base">
+        {explanation.summary || bottomLine}
       </p>
-      {explanation.why_bullets.length > 0 && (
-        <ul className="mt-3 space-y-1.5 text-[14px] leading-relaxed text-ink-700 sm:text-sm">
-          {explanation.why_bullets.map((b, i) => (
-            <li key={i} className="flex gap-2">
-              <span aria-hidden="true" className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-              <span>{b}</span>
+
+      {/* Glanceable framing chips. */}
+      {explanation.headline_chips.length > 0 && (
+        <ul className="mt-3 flex flex-wrap gap-1.5">
+          {explanation.headline_chips.map((c, i) => (
+            <li key={i}>
+              {c.href ? (
+                <a
+                  href={c.href}
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${chipToneClass(c.tone)}`}
+                >
+                  {c.label}
+                </a>
+              ) : (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${chipToneClass(c.tone)}`}
+                >
+                  {c.label}
+                </span>
+              )}
             </li>
           ))}
         </ul>
       )}
+
+      {/* Structured supported / disputed / unclear sections. Mirror the
+          briefing prompt's structure so the analyst voice is consistent
+          across surfaces. */}
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <TrustSection
+          title="What is widely supported"
+          tone="support"
+          items={explanation.whats_supported}
+          empty="Not enough independent reporting yet to call anything widely supported."
+        />
+        <TrustSection
+          title="What is disputed or unclear"
+          tone="dispute"
+          items={explanation.whats_disputed}
+          empty="No source disagreements have been detected for this signal."
+        />
+        <TrustSection
+          title="What to watch"
+          tone="watch"
+          items={explanation.whats_unclear}
+          empty="Nothing specific to watch for at this time."
+        />
+      </div>
+
+      {/* Watch-for nudge — concrete, single-sentence, only rendered when
+          the explainer has something to say. */}
       {explanation.watch_for && (
-        <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-[14px] text-ink-700 sm:text-sm">
-          <span className="mr-1.5 font-semibold uppercase tracking-wider text-amber-700 text-[11px]">
+        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-[13.5px] text-ink-700 sm:text-sm">
+          <span className="mr-1.5 font-semibold uppercase tracking-wider text-amber-700 text-[10px]">
             Watch for
           </span>
           {explanation.watch_for}
         </p>
       )}
-      <div className="mt-4 flex flex-wrap gap-2">
+
+      {/* Action row — the AI shortcut + the deterministic learn-more
+          pills. Putting them together tells the user that the analyst
+          and the methodology page are continuations of THIS surface. */}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Link
+          href={`/dashboard/ai?signal=${encodeURIComponent(signalId)}&prompt=${encodeURIComponent(explanation.suggested_prompt)}`}
+          className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white shadow-[0_6px_16px_-4px_rgba(245,158,11,0.55)] transition hover:bg-amber-600"
+        >
+          <span aria-hidden="true">✨</span>
+          Ask the analyst about this story
+        </Link>
         {explanation.learn_more.map((link, i) => (
           <a
             key={`${link.href}-${i}`}
             href={link.href}
             title={link.hint}
-            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-ink-100 bg-canvas-50 px-3 py-1.5 text-xs text-ink-600 hover:border-ink-200 hover:text-ink"
+            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-ink-100 bg-paper px-3 py-1.5 text-xs text-ink-600 hover:border-ink-200 hover:text-ink"
           >
             {link.label}
           </a>
         ))}
       </div>
+
+      <p className="mt-3 text-[10px] uppercase tracking-[0.18em] text-ink-400">
+        LLM-free trust summary · AI is opt-in via the analyst button
+      </p>
     </section>
   );
+}
+
+function TrustSection({
+  title,
+  tone,
+  items,
+  empty,
+}: {
+  title: string;
+  tone: 'support' | 'dispute' | 'watch';
+  items: string[];
+  empty: string;
+}) {
+  const toneClass =
+    tone === 'support'
+      ? 'border-emerald-200 bg-emerald-50/70'
+      : tone === 'dispute'
+        ? 'border-danger-200 bg-danger-50/70'
+        : 'border-ink-100 bg-canvas-50';
+  const labelTone =
+    tone === 'support'
+      ? 'text-emerald-700'
+      : tone === 'dispute'
+        ? 'text-danger-700'
+        : 'text-ink-500';
+  const dotTone =
+    tone === 'support'
+      ? 'bg-emerald-500'
+      : tone === 'dispute'
+        ? 'bg-danger-500'
+        : 'bg-amber-500';
+  return (
+    <div className={`rounded-xl border px-3 py-2.5 ${toneClass}`}>
+      <p className={`text-[10.5px] font-semibold uppercase tracking-[0.16em] ${labelTone}`}>
+        {title}
+      </p>
+      {items.length === 0 ? (
+        <p className="mt-1.5 text-[12.5px] text-ink-500">{empty}</p>
+      ) : (
+        <ul className="mt-1.5 space-y-1 text-[12.5px] leading-relaxed text-ink-700 sm:text-[13px]">
+          {items.map((item, i) => (
+            <li key={i} className="flex gap-1.5">
+              <span aria-hidden="true" className={`mt-[6px] h-1 w-1 shrink-0 rounded-full ${dotTone}`} />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function chipToneClass(tone: 'support' | 'dispute' | 'caution' | 'sensor' | 'neutral'): string {
+  switch (tone) {
+    case 'support':
+      return 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200';
+    case 'dispute':
+      return 'bg-danger-100 text-danger-700 hover:bg-danger-200';
+    case 'caution':
+      return 'bg-amber-100 text-amber-800 hover:bg-amber-200';
+    case 'sensor':
+      return 'bg-sky-100 text-sky-800 hover:bg-sky-200';
+    case 'neutral':
+    default:
+      return 'bg-ink-100 text-ink-700 hover:bg-ink-200';
+  }
+}
+
+function bottomLineLabelForBand(band: ConfidenceBand): string {
+  switch (band) {
+    case 'high':
+      return 'WIDELY SUPPORTED';
+    case 'medium':
+      return 'STILL DEVELOPING';
+    case 'low':
+      return 'LIMITED REPORTING';
+    case 'contested':
+      return 'SOURCES DISAGREE';
+  }
 }
 
 /**
