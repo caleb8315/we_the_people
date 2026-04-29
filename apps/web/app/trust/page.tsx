@@ -68,7 +68,7 @@ export default function TrustPage() {
         </p>
       </section>
 
-      <section>
+      <section id="source-disagreement">
         <h2>Source disagreement</h2>
         <p>
           When reports disagree on a material detail — casualty counts, cause (accident vs.
@@ -98,6 +98,58 @@ export default function TrustPage() {
           with others. It is not a political judgment. Bootstrap sources are widely-cited
           international wire outlets and scientific sensor networks; you can mute any source
           in Settings, and the feed honours that choice everywhere.
+        </p>
+      </section>
+
+      <section id="ai-transparency">
+        <h2>Where AI is and is not used</h2>
+        <p className="text-ink-600">
+          Crosscheck uses AI as an assistant around the verification core, never as the
+          arbiter of truth. The deterministic reliability scorer, the source-disagreement
+          detector, the corroboration scorer, the confidence band, and every label you see
+          on a card or signal page are computed without an LLM call.
+        </p>
+        <p className="mt-2 text-ink-600">
+          AI is used in narrow, evidence-bound places, all of which fall back to deterministic
+          copy if the AI provider is unavailable, the budget is exhausted, or the user has hit
+          their daily limit:
+        </p>
+        <ul>
+          <li>
+            <strong>Briefings</strong> — the daily and personal briefings use AI to write a
+            short, structured narrative on top of the same source counts and disagreement
+            records you can see in the deterministic evidence list at the bottom of every
+            briefing.
+          </li>
+          <li>
+            <strong>Per-user analyst chat</strong> — the AI workspace answers questions about
+            the live feed it has been shown. It is grounded in your own signals, sources, and
+            briefings; it does not browse the web independently.
+          </li>
+          <li>
+            <strong>Optional story enrichment</strong> — the &quot;Develop this story&quot;
+            button can fan out across web, Reddit, Bluesky, GDELT and Wikipedia to surface
+            additional public sources for an existing signal. The retrieval is non-LLM; AI
+            only summarises what was already retrieved.
+          </li>
+        </ul>
+        <p className="mt-2 text-ink-600">
+          AI in Crosscheck never:
+        </p>
+        <ul>
+          <li>writes or overrides a signal&apos;s reliability label, confidence band, or verification status;</li>
+          <li>creates a parallel truth score outside the deterministic core;</li>
+          <li>declares a story to be &quot;verified facts&quot;, &quot;fact-checked&quot;, &quot;debunked&quot;, or &quot;propaganda&quot;;</li>
+          <li>accuses a person, group, or state of anything;</li>
+          <li>frames a sensor network&apos;s lack of detection as evidence the event did not happen;</li>
+          <li>claims to have read content behind paywalls or classified sources.</li>
+        </ul>
+        <p className="mt-2 text-ink-600">
+          AI can still make mistakes. Every assistant-generated line is paired with a deeper
+          surface — the evidence list, the source-disagreement comparison, the physical
+          evidence record, or this page — so you can inspect the underlying sources directly.
+          When in doubt, treat the deterministic evidence as authoritative and the AI line as
+          a reading guide.
         </p>
       </section>
 

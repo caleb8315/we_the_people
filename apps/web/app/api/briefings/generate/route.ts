@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { statusShortLabel } from '@osint/core';
 import type { VerificationStatus } from '@osint/core/types';
+import { runAiCompletion } from '@osint/core/ai-provider';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { getClientKey, limit } from '@/lib/rate-limit';
 import { consumeUserDailyLimit } from '@/lib/daily-limits';
@@ -70,11 +71,14 @@ export async function POST(req: Request) {
     '- When sources disagree, surface both sides rather than picking one.',
     '- Never accuse any person, group, or state of anything.',
     '- When sensor networks have not detected supporting evidence, say so plainly — never phrase absence as a denial of the event.',
-    'Structure:',
-    '- Top 5 developments (one sentence each, with 1–2 citation-style references)',
-    '- What changed in the last 24 hours (agreement shifts, new disagreements, new sensor confirmations)',
-    '- What to watch next',
+    'Structure (use these exact section headings, in order):',
+    '1. **What happened** — neutral one-line description of each top development with the source count (3–5 items).',
+    '2. **What is supported** — points where credible outlets agree.',
+    '3. **What is disputed** — source disagreements, with both sides cited, never picking one.',
+    '4. **What changed in the last 24 hours** — agreement shifts, new corroboration, new sensor data.',
+    '5. **What to watch next** — concrete, neutral things a reader can check, no predictions.',
     'Each item should note how well the reporting is corroborated (corroborated / developing / single-source) and the confidence band.',
+    'Hard length cap: 350 words total.',
     '',
     'Signals:',
     ...filtered.map(
@@ -98,48 +102,15 @@ export async function POST(req: Request) {
 
 async function callBriefingModel(prompt: string): Promise<string> {
   const env = serverEnv();
-  if (env.GEMINI_API_KEY) {
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.35, maxOutputTokens: 900 },
-          }),
-        },
-      );
-      if (res.ok) {
-        const j = (await res.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-        const text = j.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (text) return text;
-      }
-    } catch {
-      // continue fallback
-    }
-  }
-  if (env.GROQ_API_KEY) {
-    try {
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${env.GROQ_API_KEY}` },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.35,
-          max_tokens: 900,
-        }),
-      });
-      if (res.ok) {
-        const j = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-        const text = j.choices?.[0]?.message?.content?.trim();
-        if (text) return text;
-      }
-    } catch {
-      // fall through
-    }
-  }
+  const result = await runAiCompletion({
+    providers: [
+      { provider: 'gemini', apiKey: env.GEMINI_API_KEY },
+      { provider: 'groq', apiKey: env.GROQ_API_KEY },
+    ],
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.35,
+    maxTokens: 900,
+  });
+  if (result.text) return result.text;
   return 'Briefing generator is temporarily unavailable. Please retry later.';
 }

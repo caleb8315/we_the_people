@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import {
   buildConfidenceReport,
+  buildTrustExplanation,
   physicalEvidencePhrase,
   statusDescription,
   statusLabel,
@@ -9,6 +10,7 @@ import {
   type DetectedContradiction,
   type EvidenceItem,
   type PhysicalEvidence,
+  type TrustExplanation,
   type VerificationStatus,
 } from '@osint/core';
 import { getAdminSupabase } from '@/lib/supabase-server';
@@ -114,6 +116,18 @@ export default async function SignalPage({ params }: PageProps) {
     contradictionsCount,
     isComplexSignal,
   );
+
+  const trustExplanation: TrustExplanation = buildTrustExplanation({
+    report,
+    source_count: signal.source_count ?? 0,
+    credible_source_count: signal.credible_source_count ?? 0,
+    contradictions_count: contradictionsCount,
+    contradiction_types: contradictionItems.map((c) => c.type),
+    physical_evidence: physicalEvidence,
+    syndicated: detectSyndicatedRepetition(evidence ?? []),
+    complex_signal: isComplexSignal,
+    title: signal.title,
+  });
 
   return (
     <article className="space-y-5 sm:space-y-6">
@@ -228,6 +242,9 @@ export default async function SignalPage({ params }: PageProps) {
         </div>
       </header>
 
+      <TrustExplanationCard explanation={trustExplanation} />
+
+
       {/* Develop-the-story — runs the same live corroboration fan-out
           the /verify page uses against this signal, pulling in fresh
           sources the ingest adapters haven't caught yet. */}
@@ -327,6 +344,7 @@ export default async function SignalPage({ params }: PageProps) {
       )}
 
       <Disclosure
+        id="source-disagreement"
         title={`Source disagreement (${contradictionsCount})`}
         defaultOpen={contradictionsCount > 0 || isComplexSignal}
         tone={contradictionsCount > 0 ? 'danger' : isComplexSignal ? 'warn' : 'neutral'}
@@ -360,6 +378,7 @@ export default async function SignalPage({ params }: PageProps) {
               A public claim and observed reporting appear to disagree on a material detail. We surface the mismatch
               and the underlying sources — we do not accuse anyone and we make no finding of fact.
             </p>
+            <DisputeReadingGuide types={contradictionItems.map((c) => c.type)} />
             <ul className="mt-3 space-y-3 text-sm">
               {(contradictions ?? []).map((c: any) => {
                 const meta = (c.metadata ?? {}) as Record<string, any>;
@@ -409,6 +428,7 @@ export default async function SignalPage({ params }: PageProps) {
 
       {physicalEvidence && (
         <Disclosure
+          id="physical-evidence"
           title={`Physical evidence · ${physicalEvidence.status.replace('_', ' ')}`}
           defaultOpen={true}
         >
@@ -458,7 +478,7 @@ export default async function SignalPage({ params }: PageProps) {
         </Disclosure>
       )}
 
-      <Disclosure title={`All evidence (${evidenceCount})`} defaultOpen={evidenceCount > 0}>
+      <Disclosure id="all-evidence" title={`All evidence (${evidenceCount})`} defaultOpen={evidenceCount > 0}>
         {evidenceCount === 0 ? (
           <p className="text-sm text-ink-400">No evidence rows yet.</p>
         ) : (
@@ -821,4 +841,131 @@ function LearnMoreLinks({ title, topic }: { title: string; topic: string | null 
       </div>
     </details>
   );
+}
+
+/**
+ * Plain-language trust card.
+ *
+ * Renders the deterministic `TrustExplanation` produced by
+ * `@osint/core/trust-explainer`: one summary line, "why we say this"
+ * bullets, an optional "watch for" hint, and a row of "Learn more"
+ * links that always include a path back to `/trust`. Every label here
+ * comes from the explainer — we never paraphrase its strings, so the
+ * absolute-truth phrasing test in core/__tests__ fully covers what
+ * readers see.
+ */
+function TrustExplanationCard({ explanation }: { explanation: TrustExplanation }) {
+  return (
+    <section className="rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
+      <header className="flex items-baseline justify-between gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-ink-500">
+          What this means
+        </h2>
+        <span className="text-[11px] text-ink-400">Plain-English summary · LLM-free</span>
+      </header>
+      <p className="mt-3 text-[15px] leading-relaxed text-ink sm:text-base">
+        {explanation.summary}
+      </p>
+      {explanation.why_bullets.length > 0 && (
+        <ul className="mt-3 space-y-1.5 text-[14px] leading-relaxed text-ink-700 sm:text-sm">
+          {explanation.why_bullets.map((b, i) => (
+            <li key={i} className="flex gap-2">
+              <span aria-hidden="true" className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+              <span>{b}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {explanation.watch_for && (
+        <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-[14px] text-ink-700 sm:text-sm">
+          <span className="mr-1.5 font-semibold uppercase tracking-wider text-amber-700 text-[11px]">
+            Watch for
+          </span>
+          {explanation.watch_for}
+        </p>
+      )}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {explanation.learn_more.map((link, i) => (
+          <a
+            key={`${link.href}-${i}`}
+            href={link.href}
+            title={link.hint}
+            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-ink-100 bg-canvas-50 px-3 py-1.5 text-xs text-ink-600 hover:border-ink-200 hover:text-ink"
+          >
+            {link.label}
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Plain-English dispute reading guide.
+ *
+ * When a signal has detected contradictions, this block tells the
+ * reader HOW to inspect the disagreement without picking a winner.
+ * It is fully deterministic — driven only by the contradiction type
+ * mix on the signal — so it never invents new claims about either
+ * side. AI capability 6 in the AI trust platform plan covers turning
+ * this into an LLM-assisted reading guide; this is the deterministic
+ * baseline that ships first.
+ */
+function DisputeReadingGuide({ types }: { types: Array<string> }) {
+  const unique = new Set(types);
+  const items: string[] = [];
+  if (unique.has('cause_conflict')) {
+    items.push('Read the official statement and the local reporting separately. The cause is what is most disputed — note who claims what, and what evidence they offer.');
+  }
+  if (unique.has('numeric_conflict')) {
+    items.push('Compare the numbers across sources. Note when each source published, and whether later updates revised earlier figures.');
+  }
+  if (unique.has('presence_conflict')) {
+    items.push('One side reports activity that the other does not. Look for the underlying observation (sensor, eyewitness, statement) before treating either as settled.');
+  }
+  if (items.length === 0) {
+    items.push('Read the cited reports side by side before sharing specifics. Look for the original observation behind each claim.');
+  }
+  items.push('If the dispute is about cause or motive, treat that part as unsettled — even when the underlying event itself is well-supported.');
+  return (
+    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2.5">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700">
+        How to read this dispute
+      </p>
+      <ul className="mt-1.5 space-y-1 text-[13px] text-ink-700">
+        {items.map((item, i) => (
+          <li key={i} className="flex gap-2">
+            <span aria-hidden="true" className="mt-[6px] h-1 w-1 shrink-0 rounded-full bg-amber-500" />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Heuristic syndication detector for the trust explainer.
+ *
+ * Real syndication detection lives in the corroboration scorer, but the
+ * explainer just needs a coarse "are most evidence rows from the same
+ * domain?" hint. We return true when 3+ rows share a domain or when the
+ * total domain count is < 1/3 of total rows (a strong sign the same wire
+ * report is being repeated). Cheap, deterministic, no LLM.
+ */
+function detectSyndicatedRepetition(
+  evidenceRows: Array<{ domain?: string | null }>,
+): boolean {
+  if (!Array.isArray(evidenceRows) || evidenceRows.length < 4) return false;
+  const counts = new Map<string, number>();
+  for (const row of evidenceRows) {
+    const d = (row.domain ?? '').toLowerCase().replace(/^www\./, '');
+    if (!d) continue;
+    counts.set(d, (counts.get(d) ?? 0) + 1);
+  }
+  const distinct = counts.size;
+  const max = [...counts.values()].reduce((m, n) => (n > m ? n : m), 0);
+  if (max >= 3) return true;
+  if (distinct > 0 && distinct * 3 < evidenceRows.length) return true;
+  return false;
 }

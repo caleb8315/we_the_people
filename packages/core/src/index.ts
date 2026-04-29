@@ -22,3 +22,4 @@ export * from './confidence';
 export * from './social';
 export * from './media';
 export * from './product-events';
+export * from './trust-explainer';

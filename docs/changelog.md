@@ -4,6 +4,14 @@ User-facing changes to the beta. Update as new cohorts get features.
 
 ## Unreleased
 
+- Built phases 1–4 of the AI trust platform plan ([docs/ai-trust-platform-plan.md](ai-trust-platform-plan.md)):
+  - **Phase 1 — shared AI provider.** Web routes (`/api/ai/chat`, `/api/briefings/generate`) and the worker briefing job now share a single Gemini → Groq abstraction in `@osint/core/ai-provider` with consistent timeouts, structured attempt traces, and fail-closed behaviour.
+  - **Phase 2 — plain-language trust explanations.** New `@osint/core/trust-explainer` module composes the existing `ConfidenceReport` into a one-sentence summary, "why we say this" bullets, an optional "watch for" hint, and a row of "Learn more" links pointing back to the evidence list, source-disagreement section, physical evidence record, and `/trust`. Tests assert that user-facing trust copy never contains absolute-truth phrasing ("verified facts", "fact-checked", "debunked", "this is true/false", "AI verified", "this is propaganda", "this side is lying", "confirmed motive").
+  - Wired the explainer onto every signal detail page as a "What this means" card with anchor-aware deep links into the page sections.
+  - **Phase 3 — dispute reading guide.** Deterministic, contradiction-type-aware reading guide on the source-disagreement section that tells readers how to inspect a dispute without picking a winner.
+  - **Phase 4 — structured briefings.** Worker briefing prompt and on-demand `/api/briefings/generate` prompt now require five fixed sections — "What happened", "What is widely supported", "What is disputed or unclear", "What changed", "What to watch next" — with an explicit forbidden-phrasing list.
+  - **Capability 12 — AI transparency.** `/trust` now has an "Where AI is and is not used" section spelling out which surfaces are deterministic, which use LLMs, and what AI is never allowed to do (write reliability labels, declare facts, accuse anyone, frame sensor absence as denial).
+  - Tightened the default AI analyst system prompt for citation-first answers and an explicit "what is supported / disputed / changed / watch" structure.
 - Hardened beta access and auth flows: sanitized `next` redirects, enforced the beta allowlist on signup/signin, and added access-request forms on the landing and login pages.
 - Added self-serve account export (`/api/account/export`) plus Settings UI to download account JSON directly.
 - Shipped the production trust surface: `/terms`, `/contact`, `/dmca`, `/corrections`, `/status`, `/sources`, `/sources-licensing`, `/reliability`, `/changelog`, and `/.well-known/security.txt`.

@@ -23,7 +23,9 @@
     "./cluster": "./src/cluster.ts",
     "./confidence": "./src/confidence.ts",
     "./social": "./src/social.ts",
-    "./media": "./src/media.ts"
+    "./media": "./src/media.ts",
+    "./ai-provider": "./src/ai-provider.ts",
+    "./trust-explainer": "./src/trust-explainer.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
