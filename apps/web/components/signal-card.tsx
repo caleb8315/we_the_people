@@ -1,6 +1,11 @@
 import Link from 'next/link';
 import { statusLabel } from '@osint/core';
-import type { ConfidenceBand, ConfidenceReport, PhysicalEvidence } from '@osint/core';
+import type {
+  ConfidenceBand,
+  ConfidenceReport,
+  PhysicalEvidence,
+  TrustExplanation,
+} from '@osint/core';
 import {
   formatContradictionInline,
   type ContradictionInline,
@@ -43,6 +48,7 @@ export interface SignalRow {
   is_new_since?: boolean;
   tags?: string[] | null;
   confidence_report?: ConfidenceReport;
+  trust_explanation?: TrustExplanation;
   physical_evidence?: PhysicalEvidence | null;
   contradictions_inline?: ContradictionInline[];
 }
@@ -117,9 +123,10 @@ export function SignalCard({ s }: { s: SignalRow }) {
 
           {/* Verdict callout — the single line the reader is here for.
               Band-tinted background so it reads as the card's headline
-              judgement rather than a subtle footer. The bullets that
-              used to sit beneath it moved to the signal-detail page —
-              on a feed card they added noise without adding new info. */}
+              judgement rather than a subtle footer. The summary is
+              sourced from the deterministic trust explainer when
+              available so feed copy is identical to the signal page,
+              and run through the same forbidden-phrase guard. */}
           {report && (
             <div
               className={`mt-3 flex items-start gap-2.5 rounded-xl border px-3 py-2.5 ${bandCalloutClass(band)}`}
@@ -130,9 +137,30 @@ export function SignalCard({ s }: { s: SignalRow }) {
               />
               <p className="min-w-0 text-[14px] leading-snug clamp-3 sm:text-[15px]">
                 <span className="font-semibold text-ink">{report.label_display}.</span>{' '}
-                <span className="text-ink-700">{report.summary}</span>
+                <span className="text-ink-700">
+                  {s.trust_explanation?.summary ?? report.summary}
+                </span>
               </p>
             </div>
+          )}
+
+          {/* Compact "Watch for" line — appears only when the explainer
+              has a hint to give (contested cause, single-source story,
+              syndicated wire repetition). Keeps low-confidence cards
+              honest without adding chrome to every signal. */}
+          {s.trust_explanation?.watch_for && (
+            <p className="mt-2 flex items-start gap-1.5 text-[12.5px] text-amber-800 sm:text-[13px]">
+              <span
+                aria-hidden="true"
+                className="mt-[3px] inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+              />
+              <span className="clamp-2">
+                <span className="font-semibold uppercase tracking-wider text-amber-700 text-[10px]">
+                  Watch for
+                </span>{' '}
+                {s.trust_explanation.watch_for}
+              </span>
+            </p>
           )}
 
           {isComplexSignal && (
