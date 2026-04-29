@@ -48,6 +48,15 @@ export interface TrustLearnMoreLink {
   hint: string;
 }
 
+/** Glanceable framing chip. Each carries its own tone so UI surfaces can
+ * tint them without re-deriving classes. */
+export interface TrustHeadlineChip {
+  label: string;
+  tone: 'support' | 'dispute' | 'caution' | 'sensor' | 'neutral';
+  /** Optional in-page anchor the chip should jump to (#source-disagreement, etc.). */
+  href?: string;
+}
+
 export interface TrustExplanation {
   /** One sentence the reader sees first. Always plain English. */
   summary: string;
@@ -57,6 +66,16 @@ export interface TrustExplanation {
   watch_for: string | null;
   /** Always non-empty: every explanation links to a deeper surface. */
   learn_more: TrustLearnMoreLink[];
+  /** Glanceable chips (1–4) summarising the framing at a glance. */
+  headline_chips: TrustHeadlineChip[];
+  /** What multiple sources broadly agree on (1–3 lines, may be empty). */
+  whats_supported: string[];
+  /** Where sources disagree or evidence is missing (1–3 lines). */
+  whats_disputed: string[];
+  /** Things that could change the picture / things to inspect (1–3 lines). */
+  whats_unclear: string[];
+  /** A short suggested chat-prompt the reader can ask the AI analyst. */
+  suggested_prompt: string;
 }
 
 /** Phrases that absolutely must not appear in user-facing trust copy. */
@@ -89,18 +108,28 @@ export function buildTrustExplanation(
   const why = buildWhy(input);
   const watch = buildWatchFor(input, contraTypes);
   const learnMore = buildLearnMoreLinks(band, input);
+  const chips = buildHeadlineChips(input);
+  const supported = buildWhatsSupported(input).map(safeOrNull).filter(isString);
+  const disputed = buildWhatsDisputed(input, contraTypes).map(safeOrNull).filter(isString);
+  const unclear = buildWhatsUnclear(input).map(safeOrNull).filter(isString);
+  const prompt = buildSuggestedPrompt(input, contraTypes);
 
   // Defensive guard: strip any string that contains a forbidden phrase.
   // We never want a future tweak to accidentally smuggle a truth claim
   // through this surface — better to drop a bullet than mislead readers.
   const safeSummary = stripIfForbidden(summary) ?? FALLBACK_SUMMARY;
-  const safeWhy = why.map(stripIfForbidden).filter((b): b is string => Boolean(b));
+  const safeWhy = why.map(stripIfForbidden).filter(isString);
 
   return {
     summary: safeSummary,
     why_bullets: safeWhy.slice(0, 3),
     watch_for: watch ? stripIfForbidden(watch) : null,
     learn_more: learnMore,
+    headline_chips: chips,
+    whats_supported: supported.slice(0, 3),
+    whats_disputed: disputed.slice(0, 3),
+    whats_unclear: unclear.slice(0, 3),
+    suggested_prompt: prompt,
   };
 }
 
@@ -278,6 +307,155 @@ function stripIfForbidden(line: string | null | undefined): string | null {
     if (rx.test(line)) return null;
   }
   return line;
+}
+
+function safeOrNull(line: string): string | null {
+  return stripIfForbidden(line);
+}
+
+function isString(value: string | null): value is string {
+  return Boolean(value);
+}
+
+/**
+ * Headline framing chips. Up to four glanceable pills the UI can tint
+ * inline next to the verdict. They never contain forbidden phrasing.
+ */
+function buildHeadlineChips(input: TrustExplanationInput): TrustHeadlineChip[] {
+  const chips: TrustHeadlineChip[] = [];
+  if (input.contradictions_count > 0) {
+    chips.push({
+      label: input.contradictions_count === 1 ? 'Sources disagree' : `${input.contradictions_count} disputes`,
+      tone: 'dispute',
+      href: '#source-disagreement',
+    });
+  }
+  if (input.credible_source_count >= 4) {
+    chips.push({ label: `${input.credible_source_count} trusted outlets agree`, tone: 'support' });
+  } else if (input.credible_source_count >= 2) {
+    chips.push({ label: `${input.credible_source_count} trusted outlets`, tone: 'support' });
+  } else if (input.source_count >= 5 && input.credible_source_count === 0) {
+    chips.push({ label: `${input.source_count} sources, none trusted-list`, tone: 'caution' });
+  } else if (input.source_count <= 1) {
+    chips.push({ label: 'Single source', tone: 'caution' });
+  }
+  if (input.physical_evidence?.status === 'confirmed') {
+    chips.push({ label: 'Sensor-confirmed', tone: 'sensor', href: '#physical-evidence' });
+  } else if (input.physical_evidence?.status === 'partial') {
+    chips.push({ label: 'Partial sensor signal', tone: 'sensor', href: '#physical-evidence' });
+  } else if (input.physical_evidence?.status === 'none_detected') {
+    chips.push({ label: 'No sensor coverage', tone: 'neutral', href: '#physical-evidence' });
+  }
+  if (input.syndicated && chips.length < 4) {
+    chips.push({ label: 'Syndicated wire copy', tone: 'caution' });
+  }
+  return chips.slice(0, 4);
+}
+
+/**
+ * Plain-language "What multiple sources agree on" lines.
+ * Deterministic — derived from source counts and contradiction shape,
+ * never from raw evidence text.
+ */
+function buildWhatsSupported(input: TrustExplanationInput): string[] {
+  const out: string[] = [];
+  const credible = input.credible_source_count;
+  const total = input.source_count;
+  const others = Math.max(0, total - credible);
+  if (credible >= 2) {
+    out.push(
+      others > 0
+        ? `${credible} trusted outlets and ${others} other source${others === 1 ? '' : 's'} all describe the same event.`
+        : `${credible} trusted outlets all describe the same event.`,
+    );
+  } else if (credible === 1 && total > 1) {
+    out.push(`One trusted outlet plus ${total - 1} other source${total - 1 === 1 ? '' : 's'} describe the same event.`);
+  } else if (total >= 5) {
+    out.push(`${total} independent sources describe the same event.`);
+  } else if (total >= 2) {
+    out.push(`${total} sources describe the same event.`);
+  }
+  if (input.physical_evidence?.status === 'confirmed') {
+    out.push('Open sensor networks recorded a matching event.');
+  } else if (input.physical_evidence?.status === 'partial') {
+    out.push('Open sensor networks recorded a partial match consistent with the reporting.');
+  }
+  return out;
+}
+
+/**
+ * Plain-language "Where sources disagree or evidence is missing" lines.
+ */
+function buildWhatsDisputed(
+  input: TrustExplanationInput,
+  contraTypes: string[],
+): string[] {
+  const out: string[] = [];
+  if (input.contradictions_count > 0) {
+    const kinds = [...new Set(contraTypes.map(shortConflictKind))].filter(Boolean);
+    if (kinds.length > 0) {
+      out.push(`Reports disagree on ${kinds.join(', ')}.`);
+    } else {
+      out.push('Reports disagree on a material detail of this story.');
+    }
+  }
+  if (input.syndicated) {
+    out.push('Several reports look like the same wire copy republished — that is volume, not independent confirmation.');
+  }
+  if (input.physical_evidence?.status === 'none_detected' && input.contradictions_count === 0) {
+    out.push('Open sensor networks have not picked up supporting evidence in this window — that is a coverage gap, not a denial of the event.');
+  }
+  if (input.report.band === 'low' && input.source_count <= 1) {
+    out.push('Only one source is reporting this so far. There is not enough independent material to corroborate any specifics.');
+  }
+  return out;
+}
+
+/**
+ * Plain-language "What is still unclear / what to watch" lines.
+ */
+function buildWhatsUnclear(input: TrustExplanationInput): string[] {
+  const out: string[] = [];
+  if (input.contradictions_count > 0) {
+    out.push('Whether the disputed details settle as more sources report or revise their figures.');
+  }
+  if (input.report.band === 'medium' || input.report.band === 'low') {
+    out.push('Whether additional independent outlets pick this up — single-tier coverage often shifts in the first hours.');
+  }
+  if (input.physical_evidence?.status === 'partial' || input.physical_evidence?.status === 'none_detected') {
+    out.push('Whether sensor coverage improves (next satellite pass, additional readings, weather updates).');
+  }
+  if (out.length === 0) {
+    out.push('Whether new reporting changes the basic shape of the event.');
+  }
+  return out;
+}
+
+/**
+ * One-line suggested chat prompt. The AI workspace can pre-fill its
+ * input with this; the user does not have to come up with the question.
+ */
+function buildSuggestedPrompt(
+  input: TrustExplanationInput,
+  contraTypes: string[],
+): string {
+  const t = (input.title ?? 'this story').replace(/\s+/g, ' ').trim().slice(0, 120);
+  if (input.contradictions_count > 0) {
+    if (contraTypes.includes('cause_conflict')) {
+      return `For "${t}": which sources disagree on the cause, and how strong is each side's evidence?`;
+    }
+    if (contraTypes.includes('numeric_conflict')) {
+      return `For "${t}": which numbers are disputed, and how have they changed across sources over time?`;
+    }
+    return `For "${t}": where exactly do sources disagree, and which side has more independent corroboration?`;
+  }
+  if (input.report.band === 'low') {
+    return `For "${t}": what would it take for this single-source story to be considered well-supported?`;
+  }
+  if (input.syndicated) {
+    return `For "${t}": which sources are independent reporting versus syndicated copies of the same wire?`;
+  }
+  return `For "${t}": what is widely supported, what is disputed, and what should I watch for next?`;
 }
 
 /**

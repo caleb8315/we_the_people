@@ -161,7 +161,14 @@ describe('buildTrustExplanation', () => {
       contradictions_count: 0,
       physical_evidence: pe,
     });
-    const all = [exp.summary, ...exp.why_bullets, exp.watch_for ?? ''].join(' ');
+    const all = [
+      exp.summary,
+      ...exp.why_bullets,
+      exp.watch_for ?? '',
+      ...exp.whats_supported,
+      ...exp.whats_disputed,
+      ...exp.whats_unclear,
+    ].join(' ');
     assert.ok(
       /not detected|coverage/i.test(all),
       'must describe sensor absence as coverage',
@@ -170,5 +177,55 @@ describe('buildTrustExplanation', () => {
       !/did not happen|never happened/i.test(all),
       'must NOT phrase sensor absence as denial of the event',
     );
+  });
+
+  it('produces the structured supported / disputed / unclear sections expected by the signal hero', () => {
+    const exp = buildTrustExplanation({
+      report: contestedReport(),
+      source_count: 4,
+      credible_source_count: 3,
+      contradictions_count: 1,
+      contradiction_types: ['cause_conflict'],
+      title: 'Strike on city center',
+    });
+    assert.ok(exp.whats_supported.length >= 1, 'expected at least one supported line');
+    assert.ok(exp.whats_disputed.length >= 1, 'expected at least one disputed line for a contested signal');
+    assert.ok(exp.whats_unclear.length >= 1, 'expected at least one unclear line');
+    assert.ok(
+      exp.whats_disputed.some((line) => /cause|attribution/i.test(line)),
+      'disputed lines should mention cause/attribution for a cause_conflict',
+    );
+  });
+
+  it('produces glanceable headline chips and never includes a forbidden phrase in chip labels', () => {
+    const exp = buildTrustExplanation({
+      report: highReport(),
+      source_count: 4,
+      credible_source_count: 4,
+      contradictions_count: 0,
+    });
+    assert.ok(exp.headline_chips.length >= 1, 'expected at least one chip');
+    for (const chip of exp.headline_chips) {
+      for (const rx of FORBIDDEN_TRUST_PHRASES) {
+        assert.ok(
+          !rx.test(chip.label),
+          `Chip label contained forbidden phrase ${rx}: ${chip.label}`,
+        );
+      }
+    }
+  });
+
+  it('produces a suggested chat prompt grounded in the signal title', () => {
+    const exp = buildTrustExplanation({
+      report: contestedReport(),
+      source_count: 2,
+      credible_source_count: 2,
+      contradictions_count: 1,
+      contradiction_types: ['numeric_conflict'],
+      title: 'Earthquake in coastal city',
+    });
+    assert.ok(typeof exp.suggested_prompt === 'string' && exp.suggested_prompt.length > 0);
+    assert.match(exp.suggested_prompt, /Earthquake in coastal city/);
+    assert.ok(isPlainTrustSafe(exp.suggested_prompt), 'suggested prompt must be safe');
   });
 });
