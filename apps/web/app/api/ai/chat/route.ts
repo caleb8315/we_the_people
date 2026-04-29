@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { statusShortLabel } from '@osint/core';
 import type { VerificationStatus } from '@osint/core/types';
+import { runAiCompletion, type AiMessage } from '@osint/core/ai-provider';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { DEFAULT_AI_SYSTEM_PROMPT } from '@/lib/ai-defaults';
 import { getClientKey, limit } from '@/lib/rate-limit';
@@ -216,68 +217,27 @@ async function generateAssistantReply(input: {
 }): Promise<string> {
   const env = serverEnv();
 
-  const baseMessages = [
+  const baseMessages: AiMessage[] = [
     { role: 'system', content: input.systemPrompt },
     ...input.context.map((m) => ({
-      role: m.role === 'assistant' ? 'assistant' : 'user',
+      role: (m.role === 'assistant' ? 'assistant' : m.role === 'system' ? 'system' : 'user') as AiMessage['role'],
       content: m.content,
     })),
   ];
 
   const messages = compactForModel(baseMessages, 14_000);
 
-  if (env.GEMINI_API_KEY) {
-    try {
-      const prompt = messages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:generateContent?key=${env.GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: input.temperature,
-              maxOutputTokens: input.maxOutputTokens,
-            },
-          }),
-        },
-      );
-      if (res.ok) {
-        const j = (await res.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-        const text = j.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (text) return text;
-      }
-    } catch {
-      // fall through to Groq
-    }
-  }
+  const result = await runAiCompletion({
+    providers: [
+      { provider: 'gemini', apiKey: env.GEMINI_API_KEY, model: input.model },
+      { provider: 'groq', apiKey: env.GROQ_API_KEY },
+    ],
+    messages,
+    temperature: input.temperature,
+    maxTokens: input.maxOutputTokens,
+  });
 
-  if (env.GROQ_API_KEY) {
-    try {
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${env.GROQ_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages,
-          temperature: input.temperature,
-          max_tokens: input.maxOutputTokens,
-        }),
-      });
-      if (res.ok) {
-        const j = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-        const text = j.choices?.[0]?.message?.content?.trim();
-        if (text) return text;
-      }
-    } catch {
-      // fall through
-    }
-  }
-
+  if (result.text) return result.text;
   return 'AI provider unavailable right now. Your message was saved to your private session; retry in a few minutes.';
 }
 
@@ -335,10 +295,10 @@ function buildGroundingContext(input: {
   ].join('\n');
 }
 
-function compactForModel(
-  messages: Array<{ role: string; content: string }>,
+function compactForModel<T extends { role: string; content: string }>(
+  messages: T[],
   maxChars: number,
-) {
+): T[] {
   const out = [...messages];
   while (out.map((m) => m.content.length).reduce((a, b) => a + b, 0) > maxChars && out.length > 4) {
     out.splice(1, 1);
