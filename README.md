@@ -90,6 +90,8 @@ npm run backfill -- 48 --dry-run
 - Per-signal **source disagreement** breakdowns (numeric / cause / presence)
 - Per-signal **physical evidence** record (confirmed / partial / none
   detected) with explicit coverage limitations
+- Per-signal **plain-language trust explanation** ("What this means")
+  with deterministic, LLM-free copy and a forbidden-phrasing test in CI
 - Public trust surface: `/terms`, `/privacy`, `/contact`, `/dmca`,
   `/corrections`, `/status`, `/sources`, `/reliability`, `/trust`,
   `/changelog`, and `/.well-known/security.txt`
