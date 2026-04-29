@@ -214,6 +214,73 @@ export default async function LandingPage() {
         </div>
       </section>
 
+      {/* AI as evidence assistant — the AI trust platform layer. The
+          ordering is intentional: AI sits BELOW the deterministic
+          "Agreement / Conflicts / Evidence gaps" core because it is an
+          assistant around the verification core, never the arbiter of
+          truth. This block makes the AI surfaces visible without
+          overselling them. */}
+      <section className="rounded-card border border-amber-200 bg-amber-50/60 p-5 sm:p-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-700">
+              AI as evidence assistant
+            </p>
+            <h2 className="mt-1 text-xl font-semibold tracking-tight text-ink sm:text-2xl">
+              An analyst that explains the evidence — not a chatbot, not a fact-checker.
+            </h2>
+          </div>
+          <Link
+            href="/trust#ai-transparency"
+            className="text-sm font-semibold text-amber-700 hover:text-amber-800"
+          >
+            Where AI is and isn&rsquo;t used →
+          </Link>
+        </div>
+        <p className="mt-3 max-w-3xl text-sm text-ink-600 sm:text-[15px]">
+          AI explains how reporting and sensor data agree, conflict, and where evidence is missing.
+          Every line is grounded in the same public sources you can inspect yourself, and every AI
+          surface falls back to deterministic copy if the model is unavailable.
+        </p>
+        <div className="mt-5 grid gap-4 sm:grid-cols-3">
+          <AiFeature
+            title="Plain-language trust card"
+            body="Every signal carries a deterministic, LLM-free explanation: what's widely supported, what's disputed, and what to watch. Tested in CI to never claim 'verified facts' or 'fact-checked'."
+          />
+          <AiFeature
+            title="Structured AI briefings"
+            body="Daily and personal briefings are organised into five sections — what happened, what is supported, what is disputed, what changed, what to watch — never adjudicating the story."
+          />
+          <AiFeature
+            title="Signal-grounded analyst"
+            body="The AI workspace is grounded in your live feed and briefings. Open any signal and ask a pre-filled question with one click, instead of starting from a blank chat."
+          />
+        </div>
+        <div className="mt-5 flex flex-wrap items-center gap-2">
+          <Link
+            href={signedIn ? '/dashboard/ai' : '/login?next=/dashboard/ai'}
+            className="rounded-full bg-amber-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(245,158,11,0.55)] hover:bg-amber-600"
+          >
+            Open the AI analyst
+          </Link>
+          <Link
+            href="/briefings"
+            className="rounded-full border border-amber-200 bg-paper px-5 py-2 text-sm font-medium text-ink hover:border-amber-300"
+          >
+            See today&rsquo;s briefing
+          </Link>
+        </div>
+      </section>
+
+    </div>
+  );
+}
+
+function AiFeature({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-card border border-ink-100 bg-paper p-4 shadow-card">
+      <h3 className="text-sm font-semibold text-ink">{title}</h3>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-ink-600">{body}</p>
     </div>
   );
 }

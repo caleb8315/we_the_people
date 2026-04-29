@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 type Session = { id: string; title: string; updated_at: string };
 type Message = { id: string; role: 'user' | 'assistant' | 'system'; content: string; created_at: string };
@@ -12,6 +13,8 @@ export function AiWorkspace() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [primed, setPrimed] = useState(false);
+  const searchParams = useSearchParams();
 
   async function load(sessionId?: string | null) {
     const qp = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
@@ -27,6 +30,18 @@ export function AiWorkspace() {
     load(activeSessionId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId]);
+
+  // Pre-fill the chat input when the user lands here with a `?prompt=...`
+  // query string (e.g. from the "Ask the analyst about this story" button
+  // on the signal detail page). Only ever runs once per mount.
+  useEffect(() => {
+    if (primed) return;
+    const prompt = searchParams.get('prompt');
+    if (prompt) {
+      setInput(prompt);
+      setPrimed(true);
+    }
+  }, [primed, searchParams]);
 
   async function send() {
     if (!input.trim()) return;
@@ -108,6 +123,14 @@ export function AiWorkspace() {
           ))}
           {messages.length === 0 && <p className="text-sm text-ink-500">Start your first analyst query.</p>}
         </div>
+        {primed && messages.length === 0 && (
+          <p className="mt-3 rounded-md border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
+            <span className="mr-1.5 font-semibold uppercase tracking-wider text-amber-700 text-[10px]">
+              Pre-filled from signal
+            </span>
+            Edit the question if you like, then press Send. The analyst is grounded in your live feed context.
+          </p>
+        )}
         <div className="mt-3 flex gap-2">
           <textarea
             rows={3}
