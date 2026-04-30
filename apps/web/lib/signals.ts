@@ -283,6 +283,12 @@ export async function decorateSignals(
       credible_source_count: s.credible_source_count ?? 0,
       complex_signal: isComplex,
     });
+    // Resolve the upgraded analysis FIRST so we can fold its results
+    // into the existing trust-explainer surfaces (verdict callout,
+    // headline chips, watch-for hint, disputed section). This is the
+    // merge path that lets the feed card / signal page trust hero get
+    // smarter automatically — without rendering a duplicate panel.
+    const analysis = resolveAnalysis(s, evidenceForReport, contradictionsForReport);
     const trust_explanation = buildTrustExplanation({
       report: confidence_report,
       source_count: s.source_count ?? 0,
@@ -293,8 +299,15 @@ export async function decorateSignals(
       syndicated: detectSyndicationFromEvidence(evidenceForReport),
       complex_signal: isComplex,
       title: s.title,
+      // April 2026 evidence-comparison enrichment — pass the upgraded
+      // analysis into the explainer so the EXISTING surfaces (signal
+      // hero, feed card, briefings prompt) inherit the broader
+      // conflict taxonomy + numeric severity + bias signal without
+      // any caller-side changes.
+      analyzed_conflicts: analysis.analyzed_conflicts,
+      bias_report: analysis.bias_report,
+      confidence_breakdown: analysis.confidence_breakdown,
     });
-    const analysis = resolveAnalysis(s, evidenceForReport, contradictionsForReport);
     return {
       ...s,
       contradictions_count: count,
