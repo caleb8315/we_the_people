@@ -55,6 +55,8 @@ export interface TrustHeadlineChip {
   tone: 'support' | 'dispute' | 'caution' | 'sensor' | 'neutral';
   /** Optional in-page anchor the chip should jump to (#source-disagreement, etc.). */
   href?: string;
+  /** Optional tooltip / aria-label expansion for jargon-y labels. */
+  hint?: string;
 }
 
 export interface TrustExplanation {
@@ -139,45 +141,53 @@ const FALLBACK_SUMMARY =
 function buildSummary(input: TrustExplanationInput): string {
   const { report, contradictions_count: cc } = input;
   if (cc > 0) {
-    return 'Different outlets are reporting different things about important parts of this story.';
+    return 'Different sites are reporting different things about important parts of this story. We have flagged the specific points where they disagree below.';
   }
   switch (report.band) {
     case 'high':
+      if (input.syndicated) {
+        return `${input.source_count} sites are carrying this story, but most of them appear to be running the same article. Fewer outlets are reporting it independently than the count suggests.`;
+      }
       return input.source_count >= 4
-        ? `${input.source_count} independent sources are all reporting the same event.`
-        : 'Multiple independent sources support the basic shape of this event.';
+        ? `${input.source_count} different newsrooms are reporting this, and they describe the event the same way.`
+        : 'A few different newsrooms are reporting this and they agree on the basic shape of the event.';
     case 'medium':
-      return input.syndicated
-        ? 'Several articles repeat the same wire report — that is useful coverage, but it is not the same as many independent confirmations.'
-        : 'This story is still developing. Several sources report the event, but the details are not all settled yet.';
+      if (input.syndicated) {
+        return 'A lot of sites are running this story, but most of them appear to be republishing the same article rather than reporting it themselves. Treat the source count as smaller than it looks.';
+      }
+      return 'This story is still developing. A few sources are reporting it, but the details are not all settled yet.';
     case 'low':
       if (input.source_count <= 1) {
         return 'We have only seen one source for this so far. Read it directly and watch for others picking it up.';
       }
-      return `${input.source_count} sources are reporting this, but we have not been able to independently corroborate the details yet.`;
+      return `${input.source_count} sources are reporting this, but we have not been able to confirm the details with other independent reporting yet.`;
     case 'contested':
-      return 'Different outlets are reporting different things about important parts of this story.';
+      return 'Different sites are reporting different things about important parts of this story. We have flagged the specific points where they disagree below.';
   }
 }
 
 function buildWhy(input: TrustExplanationInput): string[] {
   const out: string[] = [];
 
-  // Lead with corroboration shape (mirrors the existing confidence
-  // bullets but in slightly friendlier language).
+  // Lead with the source-count picture. When we have flagged the
+  // signal as syndicated, we deliberately do NOT claim the sources are
+  // independent — that would directly contradict the syndication
+  // bullet we add below.
   if (input.source_count > 0) {
-    if (input.source_count >= 5) {
+    if (input.syndicated) {
       out.push(
-        `${input.source_count} independent sources are reporting this across multiple outlets.`,
+        `${input.source_count} sites are carrying this story, but most of them look like they are running the same article rather than reporting it themselves.`,
+      );
+    } else if (input.source_count >= 5) {
+      out.push(
+        `${input.source_count} different newsrooms are reporting this — that is meaningful corroboration when each one is reporting independently.`,
       );
     } else if (input.source_count >= 3) {
       out.push(
-        `${input.source_count} sources are reporting this, and the core event description is broadly consistent.`,
+        `${input.source_count} sources are reporting this and the core event description is broadly consistent.`,
       );
     } else if (input.source_count === 2) {
-      out.push(
-        'Two sources are reporting this so far. Helpful signal, but still early.',
-      );
+      out.push('Two sources are reporting this so far. Helpful signal, but still early.');
     } else {
       out.push('Only one source is reporting this so far. That is not enough to judge reliability.');
     }
@@ -195,25 +205,25 @@ function buildWhy(input: TrustExplanationInput): string[] {
 
   if (input.physical_evidence) {
     if (input.physical_evidence.status === 'confirmed') {
-      out.push('Open sensor networks picked up something matching this description.');
+      out.push('Public sensor networks (earthquakes, weather, satellite hotspots) recorded a matching event.');
     } else if (input.physical_evidence.status === 'partial') {
-      out.push('Sensor networks partially confirm something is happening, but coverage is incomplete.');
+      out.push('Public sensor networks partially confirm something is happening, but the picture is incomplete.');
     } else if (input.physical_evidence.status === 'none_detected') {
       out.push(
-        'Open sensor networks have not detected supporting evidence in this window — that describes coverage, not whether the event happened.',
+        'Public sensor networks have not picked up matching data in this window. That is a coverage gap, not a verdict on the event itself.',
       );
     }
   }
 
   if (input.syndicated && out.length < 3) {
     out.push(
-      'Several of these reports appear to repeat the same wire report rather than reporting independently.',
+      'A republished article (often a single news-agency or press-release piece) gets carried by many sites at once. That looks like wide coverage but is closer to one source than many.',
     );
   }
 
   if (input.complex_signal && out.length < 3) {
     out.push(
-      'This story has many sources and moving parts — automatic source-disagreement detection was skipped, so review the evidence list directly.',
+      'This story has many sources and moving parts — automatic disagreement detection was skipped, so look through the evidence list directly.',
     );
   }
 
@@ -234,10 +244,10 @@ function buildWatchFor(
     return 'Hold off on sharing specific claims until the disagreement settles.';
   }
   if (input.report.band === 'low' && input.source_count <= 1) {
-    return 'Single-source reports change a lot in the first hours. Wait for corroboration before trusting the detail.';
+    return 'Single-source reports change a lot in the first hours. Wait for confirmation from other newsrooms before trusting the detail.';
   }
   if (input.syndicated) {
-    return 'Watch out for posts treating wire copies as independent confirmation — they are not.';
+    return 'A high source count is misleading here — most of these sites are running the same article. Don\u2019t treat that as many newsrooms confirming it independently.';
   }
   return null;
 }
@@ -321,22 +331,64 @@ function buildHeadlineChips(input: TrustExplanationInput): TrustHeadlineChip[] {
       label: input.contradictions_count === 1 ? 'Sources disagree' : `${input.contradictions_count} disputes`,
       tone: 'dispute',
       href: '#source-disagreement',
+      hint: 'Open the source-disagreement section below to see exactly what they disagree on.',
     });
   }
+  // Source-count chip — but be honest about syndication. When most
+  // sites are running the same article the count is misleading, so we
+  // tone it amber and use clearer wording. When sources really do look
+  // independent, we keep the green support tone.
   if (input.source_count >= 2) {
-    chips.push({ label: `${input.source_count} sources reporting`, tone: 'support' });
+    if (input.syndicated) {
+      chips.push({
+        label: `${input.source_count} sites carrying it`,
+        tone: 'caution',
+        hint:
+          'Most of these sites appear to be running the same article rather than reporting it themselves. Treat the count as smaller than it looks.',
+      });
+    } else {
+      chips.push({
+        label: `${input.source_count} sources reporting`,
+        tone: 'support',
+        hint: 'Different newsrooms reporting the same event independently. Each adds real corroboration.',
+      });
+    }
   } else if (input.source_count <= 1) {
-    chips.push({ label: 'Single source', tone: 'caution' });
+    chips.push({
+      label: 'Single source',
+      tone: 'caution',
+      hint: 'Only one site is reporting this so far. Wait for others to pick it up before trusting specifics.',
+    });
   }
   if (input.physical_evidence?.status === 'confirmed') {
-    chips.push({ label: 'Sensor-confirmed', tone: 'sensor', href: '#physical-evidence' });
+    chips.push({
+      label: 'Sensor-confirmed',
+      tone: 'sensor',
+      href: '#physical-evidence',
+      hint: 'Public sensor networks (USGS earthquakes, NASA satellites, NOAA weather) recorded a matching event.',
+    });
   } else if (input.physical_evidence?.status === 'partial') {
-    chips.push({ label: 'Partial sensor signal', tone: 'sensor', href: '#physical-evidence' });
+    chips.push({
+      label: 'Partial sensor signal',
+      tone: 'sensor',
+      href: '#physical-evidence',
+      hint: 'Public sensor networks recorded a partial match consistent with the reporting.',
+    });
   } else if (input.physical_evidence?.status === 'none_detected') {
-    chips.push({ label: 'No sensor coverage', tone: 'neutral', href: '#physical-evidence' });
+    chips.push({
+      label: 'No sensor coverage',
+      tone: 'neutral',
+      href: '#physical-evidence',
+      hint: 'Public sensor networks did not pick up matching data — that is a coverage gap, not a denial of the event.',
+    });
   }
   if (input.syndicated && chips.length < 4) {
-    chips.push({ label: 'Syndicated wire copy', tone: 'caution' });
+    chips.push({
+      label: 'Same article republished',
+      tone: 'caution',
+      hint:
+        'Many of the sites carrying this story appear to be running the same underlying article (often a single news-agency or press-release piece) rather than each reporting it themselves.',
+    });
   }
   return chips.slice(0, 4);
 }
@@ -349,15 +401,23 @@ function buildHeadlineChips(input: TrustExplanationInput): TrustHeadlineChip[] {
 function buildWhatsSupported(input: TrustExplanationInput): string[] {
   const out: string[] = [];
   const total = input.source_count;
-  if (total >= 5) {
-    out.push(`${total} independent sources describe the same event.`);
+  if (input.syndicated) {
+    // Important: do NOT call these "independent" — that's the lie the
+    // user spotted. State the bare fact (X sites are carrying it) and
+    // leave the corroboration verdict to the disputed/unclear sections.
+    if (total >= 2) {
+      out.push(`${total} sites are carrying this story.`);
+    }
+    out.push('The basic shape of the event (what, where, roughly when) is consistent everywhere it is reported.');
+  } else if (total >= 5) {
+    out.push(`${total} different newsrooms are reporting the same event independently.`);
   } else if (total >= 2) {
-    out.push(`${total} sources describe the same event.`);
+    out.push(`${total} sources are reporting this and they describe the event the same way.`);
   }
   if (input.physical_evidence?.status === 'confirmed') {
-    out.push('Open sensor networks recorded a matching event.');
+    out.push('Public sensor networks recorded a matching event.');
   } else if (input.physical_evidence?.status === 'partial') {
-    out.push('Open sensor networks recorded a partial match consistent with the reporting.');
+    out.push('Public sensor networks recorded a partial match consistent with the reporting.');
   }
   return out;
 }
@@ -373,19 +433,21 @@ function buildWhatsDisputed(
   if (input.contradictions_count > 0) {
     const kinds = [...new Set(contraTypes.map(shortConflictKind))].filter(Boolean);
     if (kinds.length > 0) {
-      out.push(`Reports disagree on ${kinds.join(', ')}.`);
+      out.push(`Reports disagree on ${kinds.join(', ')}. The exact disagreement is listed below with citations.`);
     } else {
-      out.push('Reports disagree on a material detail of this story.');
+      out.push('Reports disagree on a material detail of this story. The exact disagreement is listed below with citations.');
     }
   }
   if (input.syndicated) {
-    out.push('Several reports look like the same wire copy republished — that is volume, not independent confirmation.');
+    out.push(
+      `Most of the ${input.source_count > 0 ? input.source_count + ' sites' : 'sites'} carrying this story appear to be running the same article rather than reporting it themselves. Treat the source count as smaller than it looks.`,
+    );
   }
   if (input.physical_evidence?.status === 'none_detected' && input.contradictions_count === 0) {
-    out.push('Open sensor networks have not picked up supporting evidence in this window — that is a coverage gap, not a denial of the event.');
+    out.push('Public sensor networks have not picked up matching data in this window. That is a coverage gap, not a denial of the event.');
   }
   if (input.report.band === 'low' && input.source_count <= 1) {
-    out.push('Only one source is reporting this so far. There is not enough independent material to corroborate any specifics.');
+    out.push('Only one source is reporting this so far. There is not enough other reporting to confirm any specifics yet.');
   }
   return out;
 }
@@ -396,10 +458,12 @@ function buildWhatsDisputed(
 function buildWhatsUnclear(input: TrustExplanationInput): string[] {
   const out: string[] = [];
   if (input.contradictions_count > 0) {
-    out.push('Whether the disputed details settle as more sources report or revise their figures.');
+    out.push('Whether the disputed details settle as more sources report or revise their numbers.');
   }
-  if (input.report.band === 'medium' || input.report.band === 'low') {
-    out.push('Whether additional independent outlets pick this up — single-tier coverage often shifts in the first hours.');
+  if (input.syndicated) {
+    out.push('Whether other newsrooms pick this up and report it independently, or whether it stays one article being republished everywhere.');
+  } else if (input.report.band === 'medium' || input.report.band === 'low') {
+    out.push('Whether additional newsrooms pick this up. Coverage from only one or two sources often shifts in the first hours.');
   }
   if (input.physical_evidence?.status === 'partial' || input.physical_evidence?.status === 'none_detected') {
     out.push('Whether sensor coverage improves (next satellite pass, additional readings, weather updates).');
@@ -432,7 +496,7 @@ function buildSuggestedPrompt(
     return `For "${t}": what would it take for this single-source story to be considered well-supported?`;
   }
   if (input.syndicated) {
-    return `For "${t}": which sources are independent reporting versus syndicated copies of the same wire?`;
+    return `For "${t}": which sites are reporting this themselves versus just republishing the same article?`;
   }
   return `For "${t}": what is widely supported, what is disputed, and what should I watch for next?`;
 }

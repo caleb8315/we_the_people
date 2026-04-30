@@ -869,27 +869,44 @@ function TrustHero({
         {explanation.summary || bottomLine}
       </p>
 
-      {/* Glanceable framing chips. */}
+      {/* Glanceable framing chips. Each chip carries an optional `hint`
+          that explains the label in plain English — important for chips
+          like "Same article republished" where a normal reader needs to
+          know what we mean. The hint surfaces as a hover tooltip + an
+          explicit aria-label for screen readers, and the chip shows a
+          tiny "?" affordance so it's obvious there is more info. */}
       {explanation.headline_chips.length > 0 && (
         <ul className="mt-3 flex flex-wrap gap-1.5">
-          {explanation.headline_chips.map((c, i) => (
-            <li key={i}>
-              {c.href ? (
-                <a
-                  href={c.href}
-                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${chipToneClass(c.tone)}`}
-                >
-                  {c.label}
-                </a>
-              ) : (
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${chipToneClass(c.tone)}`}
-                >
-                  {c.label}
-                </span>
-              )}
-            </li>
-          ))}
+          {explanation.headline_chips.map((c, i) => {
+            const className = `inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${chipToneClass(c.tone)}`;
+            const inner = (
+              <>
+                <span>{c.label}</span>
+                {c.hint && (
+                  <span
+                    aria-hidden="true"
+                    className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-white/60 text-[9px] font-bold text-ink-600"
+                  >
+                    ?
+                  </span>
+                )}
+              </>
+            );
+            const aria = c.hint ? `${c.label}. ${c.hint}` : c.label;
+            return (
+              <li key={i}>
+                {c.href ? (
+                  <a href={c.href} title={c.hint} aria-label={aria} className={className}>
+                    {inner}
+                  </a>
+                ) : (
+                  <span title={c.hint} aria-label={aria} className={className}>
+                    {inner}
+                  </span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 
