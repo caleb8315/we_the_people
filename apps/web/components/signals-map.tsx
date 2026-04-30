@@ -116,7 +116,7 @@ export function SignalsMap({
         />
       </div>
       <div className={`overflow-hidden rounded-card border border-ink-100 bg-black/20 ${mapHeightClass}`}>
-        <SignalsMapClient points={filtered} context={context} />
+        <SignalsMapClient points={filtered} allPointsCount={points.length} context={context} />
       </div>
       {filtered.length === 0 && (
         <div className="rounded-card border border-ink-100 bg-paper p-3 text-xs text-ink-500">
