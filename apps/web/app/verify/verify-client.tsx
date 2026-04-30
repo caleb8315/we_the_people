@@ -11,6 +11,7 @@ import type {
 import type { ReaderReport } from '@/lib/reader-report';
 import type { ForensicReport, ForensicFinding } from '@/lib/image-forensics';
 import { Segmented } from '@/components/ui/segmented';
+import { VerifyAnalysis, type VerifyAnalysisData } from '@/components/verify-analysis';
 
 type Kind = 'url' | 'text' | 'image';
 
@@ -28,6 +29,11 @@ interface MatchedSignalLite {
 interface VerifyResponse {
   report: ConfidenceReport;
   reader_report: ReaderReport;
+  /**
+   * Evidence-comparison analysis (April 2026 upgrade). Optional on the
+   * type so older clients reading older API responses still typecheck.
+   */
+  analysis?: VerifyAnalysisData;
   input: {
     kind: Kind;
     canonical_url: string | null;
@@ -441,7 +447,7 @@ function SubmitButton({ loading, onClick }: { loading: boolean; onClick: () => v
 }
 
 function VerifyResult({ data }: { data: VerifyResponse }) {
-  const { reader_report: reader, corroboration } = data;
+  const { reader_report: reader, corroboration, analysis } = data;
   const bandTone = bandToneClasses(reader.band);
   return (
     <section className="space-y-5 rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
@@ -525,6 +531,13 @@ function VerifyResult({ data }: { data: VerifyResponse }) {
           )}
         </div>
       )}
+
+      {/* 3b. April 2026 evidence-comparison panel — ranked sources,
+            extended conflict taxonomy, bias signal (kept separate from
+            confidence), evidence cards with stance, and the four result
+            explanation sections. The legacy reader-report blocks above
+            stay so existing language regression tests keep passing. */}
+      {analysis && <VerifyAnalysis data={analysis} />}
 
       {/* 4. Sources — show who reported what, not just system names. */}
       {reader.source_trace_friendly.length > 0 && (
