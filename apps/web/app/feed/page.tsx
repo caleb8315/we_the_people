@@ -6,6 +6,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { ChipRow } from '@/components/ui/chip-row';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SignalsMap } from '@/components/signals-map';
+import { FeedFreshness } from '@/components/feed-freshness';
 import { logProductEvent } from '@/lib/product-events';
 import { applyMutes, decorateSignals, personalizeSignals, type SignalRowRaw } from '@/lib/signals';
 import { signalGeoPoints, type SignalGeoPoint } from '@/lib/signal-geo';
@@ -111,6 +112,15 @@ export default async function FeedPage({
   const allSignals = ((data ?? []) as Array<SignalRowRaw & { expires_at?: string | null }>).filter(
     (s) => !s.expires_at || s.expires_at > nowIso,
   );
+  // Newest first_seen_at across the queried window. Used by the
+  // freshness indicator at the top of the page so users can see how
+  // recent the data is. We rely on the in-memory list because we
+  // already fetched it; no extra query.
+  const latestFirstSeen = allSignals
+    .map((s) => s.first_seen_at)
+    .filter((iso): iso is string => Boolean(iso))
+    .sort()
+    .pop() ?? null;
   // Apply remaining filters (muted sources, countries) in JS
   const filtered = userId
     ? applyMutes(allSignals, prefs)
@@ -276,6 +286,7 @@ export default async function FeedPage({
               {topic !== 'all' && <> · topic: {topic}</>}
               {minSeverity > 0 && <> · severity {minSeverity}+</>}
             </p>
+            <FeedFreshness latestIso={latestFirstSeen} />
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
             {userId && (
@@ -367,7 +378,7 @@ export default async function FeedPage({
           body={
             mode === 'personalized'
               ? 'Try widening your filters or switching to Global feed.'
-              : 'Ingestion runs hourly. Check back soon.'
+              : 'Sensor ingest runs every 5 minutes; full ingest every 15. Check back shortly.'
           }
           action={
             mode === 'personalized' && userId
