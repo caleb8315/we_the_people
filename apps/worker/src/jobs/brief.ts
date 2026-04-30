@@ -260,9 +260,18 @@ function buildPrompt(kind: 'daily' | 'weekly', items: EnrichedSignal[]): string 
     .map((s, i) => {
       const label = statusShortLabel(s.verification_status as VerificationStatus);
       const topDomains = (s.distinct_domains ?? []).slice(0, 3).join(', ') || 'none';
-      const contra = s.contradictions.length > 0
-        ? `, ${s.contradictions.length} source disagreement${s.contradictions.length === 1 ? '' : 's'}`
-        : '';
+      // Prefer analyzed_conflicts (broader taxonomy + numeric severity)
+      // for the per-signal conflict summary; fall back to the legacy
+      // contradictions count when the row predates the upgrade. This
+      // is the unified path — the prompt never carries both forms.
+      const analyzedNonTrivial =
+        s.analyzed_conflicts?.filter((c) => c.type !== 'insufficient_evidence') ?? [];
+      const contra =
+        analyzedNonTrivial.length > 0
+          ? `, ${analyzedNonTrivial.length} conflict${analyzedNonTrivial.length === 1 ? '' : 's'}`
+          : s.contradictions.length > 0
+            ? `, ${s.contradictions.length} source disagreement${s.contradictions.length === 1 ? '' : 's'}`
+            : '';
       const enriched = s.last_enriched_at ? ', freshly corroborated' : '';
       // April 2026 evidence-comparison upgrade — append the 4-component
       // confidence composite so the model can ground its narrative in
@@ -399,32 +408,34 @@ function renderDeterministic(kind: 'daily' | 'weekly', items: EnrichedSignal[]):
     const domains = domainsList.length > 0
       ? `domains: ${domainsList.join(', ')}${moreDomains}`
       : 'no domains';
-    const contraBadge =
-      s.contradictions.length > 0
-        ? ` ⚠ ${s.contradictions.length} source disagreement${s.contradictions.length === 1 ? '' : 's'}`
-        : '';
-    const freshBadge = s.last_enriched_at ? ' · freshly corroborated' : '';
-    // April 2026 evidence-comparison upgrade — show the composite + the
-    // worst conflict's numeric severity inline so even the LLM-skipped
-    // body carries the structured detail.
-    const compBadge = s.confidence_breakdown
-      ? ` · comparison ${s.confidence_breakdown.composite}/100`
-      : '';
+    // Prefer analyzed_conflicts (broader taxonomy + numeric severity)
+    // for the per-signal conflict badge — only fall back to the legacy
+    // disagreement count when the row predates the upgrade. This avoids
+    // showing both "2 source disagreements" and "framing 65/100" on
+    // the same signal line.
     const worstConflict =
       s.analyzed_conflicts && s.analyzed_conflicts.length > 0
         ? [...s.analyzed_conflicts]
             .filter((c) => c.type !== 'insufficient_evidence')
             .sort((a, b) => b.severity_score - a.severity_score)[0] ?? null
         : null;
-    const worstConflictBadge = worstConflict
-      ? ` · ⚠ ${worstConflict.label.toLowerCase()} ${worstConflict.severity_score}/100`
+    const conflictBadge = worstConflict
+      ? ` ⚠ ${worstConflict.label.toLowerCase()} ${worstConflict.severity_score}/100`
+      : s.contradictions.length > 0
+        ? ` ⚠ ${s.contradictions.length} source disagreement${s.contradictions.length === 1 ? '' : 's'}`
+        : '';
+    const freshBadge = s.last_enriched_at ? ' · freshly corroborated' : '';
+    // April 2026 evidence-comparison upgrade — show the composite so
+    // even the LLM-skipped body carries the structured detail.
+    const compBadge = s.confidence_breakdown
+      ? ` · comparison ${s.confidence_breakdown.composite}/100`
       : '';
     const biasBadge =
       s.bias_report && s.bias_report.has_signal
         ? ` · bias signal: ${s.bias_report.band}`
         : '';
     return (
-      `- **[${s.topic}]** ${s.title} _(severity ${s.severity}, reliability: ${label}, ${sources}, ${domains}${contraBadge}${freshBadge}${compBadge}${worstConflictBadge}${biasBadge})_${url}`
+      `- **[${s.topic}]** ${s.title} _(severity ${s.severity}, reliability: ${label}, ${sources}, ${domains}${conflictBadge}${freshBadge}${compBadge}${biasBadge})_${url}`
     );
   });
   return `### ${kind === 'weekly' ? 'Weekly' : 'Daily'} — key signals\n\n${lines.join('\n')}`;
