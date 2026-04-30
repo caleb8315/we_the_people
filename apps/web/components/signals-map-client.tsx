@@ -51,6 +51,18 @@ function markerIcon(L: typeof Leaflet, color: string) {
   });
 }
 
+function clusterIcon(L: typeof Leaflet, count: number, worstSeverity: number) {
+  const color = pinColor(worstSeverity);
+  const size = count >= 12 ? 34 : count >= 5 ? 30 : 26;
+  return L.divIcon({
+    className: 'osint-map-cluster',
+    html: `<span style="display:inline-flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:999px;background:${color};color:white;border:2px solid #0b0d12;font-weight:700;font-size:11px;box-shadow:0 0 0 1px rgba(255,255,255,.25)">${count}</span>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -8],
+  });
+}
+
 async function fireEvent(eventName: ProductEventName, eventProps: Record<string, unknown>) {
   try {
     await fetch('/api/events', {
@@ -83,13 +95,83 @@ function formatTimeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
+function sourceClassLabel(cls: SignalGeoPoint['source_class']): string {
+  switch (cls) {
+    case 'sensor':
+      return 'Sensor';
+    case 'news':
+      return 'News';
+    case 'social':
+      return 'Social';
+    case 'markets':
+      return 'Market';
+    case 'official':
+      return 'Official';
+    case 'other':
+    default:
+      return 'Other';
+  }
+}
+
+function sourceClassTone(cls: SignalGeoPoint['source_class']): string {
+  switch (cls) {
+    case 'sensor':
+      return 'border-sky-200 text-sky-700';
+    case 'news':
+      return 'border-emerald-200 text-emerald-700';
+    case 'social':
+      return 'border-violet-200 text-violet-700';
+    case 'markets':
+      return 'border-amber-200 text-amber-700';
+    case 'official':
+      return 'border-indigo-200 text-indigo-700';
+    case 'other':
+    default:
+      return 'border-ink-200 text-ink-600';
+  }
+}
+
+function clusterKey(point: SignalGeoPoint): string {
+  // Approximate ~11km buckets to collapse colocated points without
+  // erasing regional distinctions.
+  const latBucket = Math.round(point.lat * 10) / 10;
+  const lonBucket = Math.round(point.lon * 10) / 10;
+  return `${latBucket.toFixed(1)},${lonBucket.toFixed(1)}`;
+}
+
+interface ClusterBucket {
+  lat: number;
+  lon: number;
+  points: SignalGeoPoint[];
+}
+
+function buildClusters(points: SignalGeoPoint[]): ClusterBucket[] {
+  const grouped = new Map<string, ClusterBucket>();
+  for (const p of points) {
+    const key = clusterKey(p);
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.points.push(p);
+      continue;
+    }
+    grouped.set(key, {
+      lat: p.lat,
+      lon: p.lon,
+      points: [p],
+    });
+  }
+  return [...grouped.values()];
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function SignalsMapClient({
   points,
+  allPointsCount,
   context,
 }: {
   points: SignalGeoPoint[];
+  allPointsCount: number;
   context: 'feed' | 'intel';
 }) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
@@ -104,6 +186,12 @@ export function SignalsMapClient({
 
   const exactCount = useMemo(() => points.filter((p) => !p.isApproximate).length, [points]);
   const approxCount = points.length - exactCount;
+  const corroboratedCount = useMemo(
+    () => points.filter((p) => p.verification_status === 'verified').length,
+    [points],
+  );
+  const clusters = useMemo(() => buildClusters(points), [points]);
+  const stackedClusters = useMemo(() => clusters.filter((c) => c.points.length > 1).length, [clusters]);
 
   // Step 1 — initialize the Leaflet map once the dynamic import resolves.
   // Cleanup disposes the map so route-changes and Hot Reload don't leak
@@ -172,48 +260,84 @@ export function SignalsMapClient({
       if (points.length === 0) return;
 
       const bounds = Lmod.latLngBounds([]);
-      for (const point of points) {
-        const icon = markerIcon(Lmod, pinColor(point.severity));
-        const marker = Lmod.marker([point.lat, point.lon], { icon });
+      for (const cluster of clusters) {
+        const sorted = [...cluster.points].sort((a, b) => {
+          if (b.severity !== a.severity) return b.severity - a.severity;
+          return b.source_count - a.source_count;
+        });
+        const primary = sorted[0]!;
+        const icon =
+          cluster.points.length > 1
+            ? clusterIcon(
+                Lmod,
+                cluster.points.length,
+                sorted.reduce((m, p) => (p.severity > m ? p.severity : m), primary.severity),
+              )
+            : markerIcon(Lmod, pinColor(primary.severity));
+        const marker = Lmod.marker([cluster.lat, cluster.lon], { icon });
         const popupRoot = document.createElement('div');
         popupRoot.className = 'min-w-[240px] max-w-[300px] space-y-2 text-sm';
 
-        const timeAgo = point.occurred_at ? formatTimeAgo(point.occurred_at) : null;
-        const sourceLine = point.source_count > 0
-          ? `${point.source_count} source${point.source_count === 1 ? '' : 's'}${point.credible_source_count > 0 ? ` (${point.credible_source_count} established)` : ''}`
+        const timeAgo = primary.occurred_at ? formatTimeAgo(primary.occurred_at) : null;
+        const sourceLine = primary.source_count > 0
+          ? `${primary.source_count} source${primary.source_count === 1 ? '' : 's'}${primary.credible_source_count > 0 ? ` (${primary.credible_source_count} rated)` : ''}`
           : '';
 
-        popupRoot.innerHTML = `
+        if (cluster.points.length > 1) {
+          const listRows = sorted
+            .slice(0, 5)
+            .map(
+              (p) => `<li style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+                <a href="/signal/${encodeURIComponent(p.id)}?from=map&context=${context}" style="font-weight:500;color:#111827;text-decoration:none;display:block;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.title)}</a>
+                <span style="font-size:11px;color:#6b7280;white-space:nowrap">${p.severity}/100</span>
+              </li>`,
+            )
+            .join('');
+          popupRoot.innerHTML = `
           <div class="flex flex-wrap items-center gap-1">
-            <span class="rounded-full border px-2 py-0.5 text-[11px] font-medium ${badgeTone(point.verification_status)}">${escapeHtml(statusLabel(point.verification_status))}</span>
-            <span class="rounded-full border border-ink-200 px-2 py-0.5 text-[11px] text-ink-600">${point.severity}/100</span>
-            ${point.isApproximate ? '<span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700">approx location</span>' : ''}
+            <span class="rounded-full border border-ink-200 px-2 py-0.5 text-[11px] font-medium text-ink-700">${cluster.points.length} signals</span>
+            <span class="rounded-full border px-2 py-0.5 text-[11px] font-medium ${sourceClassTone(primary.source_class)}">${sourceClassLabel(primary.source_class)}</span>
           </div>
-          <p class="font-semibold leading-snug text-ink-900" style="line-height:1.35">${escapeHtml(point.title)}</p>
+          <p class="font-semibold leading-snug text-ink-900" style="line-height:1.35">Cluster at this location</p>
+          <ul style="margin:0;padding-left:0;list-style:none;display:grid;gap:6px">${listRows}</ul>
+          ${cluster.points.length > 5 ? `<p class="text-xs text-ink-500">+${cluster.points.length - 5} more in this cluster</p>` : ''}
+          `;
+        } else {
+          popupRoot.innerHTML = `
+          <div class="flex flex-wrap items-center gap-1">
+            <span class="rounded-full border px-2 py-0.5 text-[11px] font-medium ${badgeTone(primary.verification_status)}">${escapeHtml(statusLabel(primary.verification_status))}</span>
+            <span class="rounded-full border border-ink-200 px-2 py-0.5 text-[11px] text-ink-600">${primary.severity}/100</span>
+            <span class="rounded-full border px-2 py-0.5 text-[11px] font-medium ${sourceClassTone(primary.source_class)}">${sourceClassLabel(primary.source_class)}</span>
+            ${primary.isApproximate ? '<span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700">approx location</span>' : ''}
+          </div>
+          <p class="font-semibold leading-snug text-ink-900" style="line-height:1.35">${escapeHtml(primary.title)}</p>
           <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-ink-500">
-            <span class="capitalize">${escapeHtml(point.topic ?? 'other')}</span>
-            ${point.country_code ? `<span>· ${escapeHtml(point.country_code)}</span>` : ''}
+            <span class="capitalize">${escapeHtml(primary.topic ?? 'other')}</span>
+            ${primary.country_code ? `<span>· ${escapeHtml(primary.country_code)}</span>` : ''}
             ${timeAgo ? `<span>· ${escapeHtml(timeAgo)}</span>` : ''}
           </div>
           ${sourceLine ? `<p class="text-xs text-ink-600">${escapeHtml(sourceLine)}</p>` : ''}
         `;
+        }
         const link = document.createElement('a');
-        link.href = `/signal/${point.id}?from=map&context=${context}`;
+        link.href = `/signal/${primary.id}?from=map&context=${context}`;
         link.className =
           'inline-flex items-center gap-1 rounded-full bg-ink-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-ink-700 transition';
-        link.textContent = 'View full event →';
+        link.textContent = cluster.points.length > 1 ? 'Open top signal →' : 'View full event →';
         link.addEventListener('click', () => {
           void fireEvent('signal_opened_from_map', {
-            signal_id: point.id,
+            signal_id: primary.id,
             context,
-            severity: point.severity,
-            is_approximate: point.isApproximate,
+            severity: primary.severity,
+            is_approximate: primary.isApproximate,
+            source_class: primary.source_class,
+            cluster_size: cluster.points.length,
           });
         });
         popupRoot.appendChild(link);
         marker.bindPopup(popupRoot, { maxWidth: 320 });
         marker.addTo(layer);
-        bounds.extend([point.lat, point.lon]);
+        bounds.extend([cluster.lat, cluster.lon]);
       }
       if (bounds.isValid()) {
         map.fitBounds(bounds.pad(0.2), { animate: false, maxZoom: 8 });
@@ -221,11 +345,24 @@ export function SignalsMapClient({
       void fireEvent('map_filter_changed', {
         context,
         points: points.length,
+        total_points: allPointsCount,
         exact_points: exactCount,
         approximate_points: approxCount,
+        corroborated_points: corroboratedCount,
+        stacked_clusters: stackedClusters,
       });
     });
-  }, [approxCount, context, exactCount, leafletReady, points]);
+  }, [
+    allPointsCount,
+    approxCount,
+    clusters,
+    context,
+    corroboratedCount,
+    exactCount,
+    leafletReady,
+    points,
+    stackedClusters,
+  ]);
 
   // Always render the map container so Leaflet sees a sized element the
   // moment its import resolves. The overlay is stacked on top and fades
@@ -233,7 +370,15 @@ export function SignalsMapClient({
   // the dynamic import failed entirely (e.g. offline, CSP block).
   return (
     <div className="relative h-full w-full">
-      <div ref={mapElementRef} className="h-full w-full" aria-busy={!leafletReady} />
+      <div className="absolute left-2 right-2 top-2 z-[500] flex flex-wrap items-center gap-1.5 rounded-xl border border-ink-100/80 bg-paper/95 p-2 text-[11px] shadow-sm backdrop-blur">
+        <span className="rounded-full border border-ink-100 px-2 py-1 text-[10px] text-ink-500">
+          {points.length} shown · {allPointsCount} total
+        </span>
+        <span className="rounded-full border border-ink-100 px-2 py-1 text-[10px] text-ink-500">
+          {stackedClusters} stacked
+        </span>
+      </div>
+      <div ref={mapElementRef} className="h-full w-full pt-12" aria-busy={!leafletReady} />
       {!leafletReady && !loadError && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-ink-600">
           <span className="inline-flex items-center gap-2">

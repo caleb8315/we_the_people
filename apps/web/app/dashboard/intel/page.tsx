@@ -7,7 +7,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Segmented } from '@/components/ui/segmented';
 import { SignalsMap } from '@/components/signals-map';
 import { decorateSignals, type SignalRowRaw } from '@/lib/signals';
-import { signalGeoPoint, type SignalGeoPoint } from '@/lib/signal-geo';
+import { signalGeoPoints, type SignalGeoPoint } from '@/lib/signal-geo';
 import { logProductEvent } from '@/lib/product-events';
 
 export const metadata = { title: 'Priority Workspace · Crosscheck' };
@@ -64,7 +64,7 @@ export default async function IntelWorkspacePage({
     decorateSignals(sb, overflowRaw.slice(0, 30), { newSince: profile.last_dashboard_visit_at ?? null }),
   ]);
   const view: IntelView = requestedView ?? parseView(String(prefs?.feed_view_preference ?? 'list')) ?? 'list';
-  const geoPoints: SignalGeoPoint[] = prioritized.map((s) => signalGeoPoint(s)).filter((x): x is SignalGeoPoint => Boolean(x));
+  const geoPoints: SignalGeoPoint[] = prioritized.flatMap((s) => signalGeoPoints(s));
 
   const disputedCount = prioritized.reduce((n, s) => n + (s.is_disputed ? 1 : 0), 0);
   const criticalCount = prioritized.filter((s) => s.severity >= 85).length;
