@@ -302,7 +302,6 @@ export async function runIngest(options: IngestOptions = {}): Promise<{
       });
       const mapLocations = buildSignalMapLocations({
         rawGroup,
-        topic,
         countryCode: primary.country_code ?? null,
       });
 
