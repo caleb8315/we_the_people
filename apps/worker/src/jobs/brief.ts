@@ -1,5 +1,12 @@
 import { statusLabel, statusShortLabel } from '@osint/core';
-import type { VerificationStatus } from '@osint/core/types';
+import type {
+  AnalyzedConflict,
+  ConfidenceBreakdown,
+  CorpusBiasReport,
+  RankedSource,
+  ResultExplanation,
+  VerificationStatus,
+} from '@osint/core';
 import { env } from '../lib/env';
 import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
 import { callLlm } from '../lib/llm';
@@ -182,6 +189,15 @@ interface BriefingSignal {
   distinct_domains: string[] | null;
   last_enriched_at: string | null;
   tags: string[] | null;
+  // April 2026 evidence-comparison upgrade. Persisted JSONB blobs from
+  // migration 028 — nullable because rows ingested before the worker
+  // was redeployed will not have analysis attached. Briefing rendering
+  // degrades gracefully when these are missing.
+  ranked_sources: RankedSource[] | null;
+  analyzed_conflicts: AnalyzedConflict[] | null;
+  bias_report: CorpusBiasReport | null;
+  confidence_breakdown: ConfidenceBreakdown | null;
+  result_explanation: ResultExplanation | null;
 }
 
 interface ContradictionRow {
@@ -198,7 +214,7 @@ async function loadCandidates(
   const { data, error } = await sb
     .from('signals')
     .select(
-      'id,title,summary,topic,country_code,severity,confidence,verification_status,url,first_seen_at,source_count,credible_source_count,distinct_domains,last_enriched_at,tags',
+      'id,title,summary,topic,country_code,severity,confidence,verification_status,url,first_seen_at,source_count,credible_source_count,distinct_domains,last_enriched_at,tags,ranked_sources,analyzed_conflicts,bias_report,confidence_breakdown,result_explanation',
     )
     .in('verification_status', ['verified', 'developing'])
     .gte('first_seen_at', since.toISOString())
@@ -248,34 +264,83 @@ function buildPrompt(kind: 'daily' | 'weekly', items: EnrichedSignal[]): string 
         ? `, ${s.contradictions.length} source disagreement${s.contradictions.length === 1 ? '' : 's'}`
         : '';
       const enriched = s.last_enriched_at ? ', freshly corroborated' : '';
+      // April 2026 evidence-comparison upgrade — append the 4-component
+      // confidence composite so the model can ground its narrative in
+      // the same numbers the UI shows. We deliberately keep the line
+      // compact (the LLM has a 350-word ceiling for the whole brief).
+      const breakdown = s.confidence_breakdown
+        ? `, comp=${s.confidence_breakdown.composite}/100 (agree=${s.confidence_breakdown.components.source_agreement.score}, qual=${s.confidence_breakdown.components.source_quality.score}, direct=${s.confidence_breakdown.components.claim_directness.score}, complete=${s.confidence_breakdown.components.evidence_completeness.score})`
+        : '';
       return (
         `${i + 1}. [${s.topic}/${label}] ${s.title} ` +
         `(sev=${s.severity}, ${s.credible_source_count}/${s.source_count} credible sources, ` +
-        `domains: ${topDomains}${contra}${enriched})`
+        `domains: ${topDomains}${contra}${enriched}${breakdown})`
       );
     })
     .join('\n');
 
-  const contradictionsDetail = items
-    .flatMap((s) =>
-      s.contradictions.slice(0, 2).map((c) => ({
-        title: s.title,
-        type: c.type ?? 'unknown',
-        severity: c.severity ?? 'medium',
-        summary: c.summary ?? '',
-      })),
-    )
-    .slice(0, 8);
-
-  const contradictionsBlock =
-    contradictionsDetail.length === 0
+  // Pull the WORST analyzed conflict per signal and present it with its
+  // numeric severity. Falls back to legacy contradictions when the
+  // analyzed_conflicts blob isn't populated yet.
+  const conflictsDetail: Array<{
+    title: string;
+    type: string;
+    severity: string;
+    severity_score: number | null;
+    summary: string;
+  }> = [];
+  for (const s of items) {
+    if (s.analyzed_conflicts && s.analyzed_conflicts.length > 0) {
+      const top = [...s.analyzed_conflicts]
+        .sort((a, b) => b.severity_score - a.severity_score)
+        .filter((c) => c.type !== 'insufficient_evidence')
+        .slice(0, 2);
+      for (const c of top) {
+        conflictsDetail.push({
+          title: s.title,
+          type: c.label,
+          severity: c.severity_band,
+          severity_score: c.severity_score,
+          summary: c.summary,
+        });
+      }
+    } else {
+      for (const c of s.contradictions.slice(0, 2)) {
+        conflictsDetail.push({
+          title: s.title,
+          type: c.type ?? 'unknown',
+          severity: c.severity ?? 'medium',
+          severity_score: null,
+          summary: c.summary ?? '',
+        });
+      }
+    }
+  }
+  const conflictsBlock =
+    conflictsDetail.length === 0
       ? 'None flagged this window.'
-      : contradictionsDetail
-          .map(
-            (d) =>
-              `- [${d.type}/${d.severity}] ${d.title.slice(0, 80)} — ${d.summary.slice(0, 140)}`,
-          )
+      : conflictsDetail
+          .slice(0, 8)
+          .map((d) => {
+            const sev =
+              d.severity_score != null
+                ? `${d.severity}/${d.severity_score}`
+                : d.severity;
+            return `- [${d.type}/${sev}] ${d.title.slice(0, 80)} — ${d.summary.slice(0, 140)}`;
+          })
           .join('\n');
+
+  // Bias spotlight — only surface signals where the corpus-level
+  // bias_report has flagged something material. The brief MUST treat
+  // this as a reading-comprehension cue, not a verdict on the story.
+  const biasSpotlight = items
+    .filter((s) => s.bias_report && s.bias_report.has_signal)
+    .slice(0, 5)
+    .map(
+      (s) =>
+        `- ${s.title.slice(0, 90)} — ${s.bias_report!.band} bias signal (${s.bias_report!.avg_intensity}/100): ${s.bias_report!.summary.slice(0, 140)}`,
+    )
+    .join('\n');
 
   return `
 You are the Crosscheck analyst writing a ${kind} briefing. Crosscheck describes how public
@@ -298,17 +363,21 @@ Hard rules:
 Required structure (use these exact section headings, in order):
 1. **What happened** — neutral one-line description of each top development with the source count (3–5 items).
 2. **What is widely supported** — points where credible outlets agree.
-3. **What is disputed or unclear** — source disagreements, with both sides cited; never pick one.
+3. **What is disputed or unclear** — source disagreements (use the conflict type and severity score where given); never pick a side.
 4. **What changed in the last ${kind === 'weekly' ? 'week' : '24 hours'}** — agreement shifts, new corroboration, new sensor data.
 5. **What to watch next** — concrete, neutral things a reader can check; no predictions, no calls to action.
+6. **Bias signals to keep in mind** — when the bias_report flagged loaded language / one-sided framing / etc., note it as a READING signal (never as a verdict on the story). Skip this section if no bias signals were flagged.
 
-Hard length cap: 350 words total. Group by topic where it makes sense.
+Hard length cap: 350 words total. Group by topic where it makes sense. Bias signals are a SIGNAL, never a verdict — never combine the bias band with the confidence composite.
 
-Signals (format: topic/reliability, with credible/total source count and top domains):
+Signals (format: topic/reliability, source counts, confidence breakdown components):
 ${list}
 
-Source disagreements flagged this window:
-${contradictionsBlock}
+Conflicts flagged this window (extended taxonomy with numeric severity):
+${conflictsBlock}
+
+Bias signals flagged this window (use ONLY in section 6, never as a verdict):
+${biasSpotlight || 'None flagged.'}
 `.trim();
 }
 
@@ -335,8 +404,27 @@ function renderDeterministic(kind: 'daily' | 'weekly', items: EnrichedSignal[]):
         ? ` ⚠ ${s.contradictions.length} source disagreement${s.contradictions.length === 1 ? '' : 's'}`
         : '';
     const freshBadge = s.last_enriched_at ? ' · freshly corroborated' : '';
+    // April 2026 evidence-comparison upgrade — show the composite + the
+    // worst conflict's numeric severity inline so even the LLM-skipped
+    // body carries the structured detail.
+    const compBadge = s.confidence_breakdown
+      ? ` · comparison ${s.confidence_breakdown.composite}/100`
+      : '';
+    const worstConflict =
+      s.analyzed_conflicts && s.analyzed_conflicts.length > 0
+        ? [...s.analyzed_conflicts]
+            .filter((c) => c.type !== 'insufficient_evidence')
+            .sort((a, b) => b.severity_score - a.severity_score)[0] ?? null
+        : null;
+    const worstConflictBadge = worstConflict
+      ? ` · ⚠ ${worstConflict.label.toLowerCase()} ${worstConflict.severity_score}/100`
+      : '';
+    const biasBadge =
+      s.bias_report && s.bias_report.has_signal
+        ? ` · bias signal: ${s.bias_report.band}`
+        : '';
     return (
-      `- **[${s.topic}]** ${s.title} _(severity ${s.severity}, reliability: ${label}, ${sources}, ${domains}${contraBadge}${freshBadge})_${url}`
+      `- **[${s.topic}]** ${s.title} _(severity ${s.severity}, reliability: ${label}, ${sources}, ${domains}${contraBadge}${freshBadge}${compBadge}${worstConflictBadge}${biasBadge})_${url}`
     );
   });
   return `### ${kind === 'weekly' ? 'Weekly' : 'Daily'} — key signals\n\n${lines.join('\n')}`;
