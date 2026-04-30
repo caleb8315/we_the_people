@@ -137,6 +137,90 @@ describe('buildTrustExplanation', () => {
     }
   });
 
+  it('merges analyzed_conflicts (broader taxonomy + numeric severity) into the disputed list and chips', () => {
+    const exp = buildTrustExplanation({
+      report: highReport(),
+      source_count: 5,
+      credible_source_count: 4,
+      contradictions_count: 0,
+      analyzed_conflicts: [
+        {
+          type: 'framing_difference',
+          label: 'Framing difference',
+          summary: 'Reuters describes a military strike; AP describes an accident.',
+          severity_score: 65,
+          severity_band: 'medium',
+          sources: [],
+          origin: 'detector_cause',
+        },
+        {
+          type: 'timeline_mismatch',
+          label: 'Timeline mismatch',
+          summary: 'Sources span more than a day apart.',
+          severity_score: 55,
+          severity_band: 'medium',
+          sources: [],
+          origin: 'timeline',
+        },
+      ],
+    });
+    // The disputed list now references the analyzed conflict + severity.
+    assert.ok(
+      exp.whats_disputed.some((line) => /framing/i.test(line) && /65/.test(line)),
+      'expected disputed list to surface framing_difference with numeric severity',
+    );
+    // The watch-for hint is replaced with the timeline_mismatch upgrade.
+    assert.ok(
+      exp.watch_for && /timeline mismatch/i.test(exp.watch_for),
+      'expected watch_for to upgrade to a timeline_mismatch hint',
+    );
+    // A sharper chip carries the severity score.
+    assert.ok(
+      exp.headline_chips.some((c) => /framing/i.test(c.label) && /65/.test(c.label)),
+      'expected a headline chip with the analyzed-conflict label and severity',
+    );
+  });
+
+  it('exposes a separate bias_hint that NEVER changes the underlying band', () => {
+    const neutral = buildTrustExplanation({
+      report: highReport(),
+      source_count: 4,
+      credible_source_count: 4,
+      contradictions_count: 0,
+      bias_report: null,
+    });
+    const biased = buildTrustExplanation({
+      report: highReport(),
+      source_count: 4,
+      credible_source_count: 4,
+      contradictions_count: 0,
+      bias_report: {
+        pieces: 4,
+        avg_intensity: 70,
+        band: 'strong',
+        per_signal: {
+          loaded_language: 80,
+          one_sided_framing: 60,
+          selective_omission: 40,
+          emotional_tone: 70,
+        },
+        has_signal: true,
+        summary: 'Strong loaded vocabulary detected across the corpus.',
+        disclaimer: 'Bias signals describe how the text is written. They are not a judgement of whether the underlying claim is true.',
+      },
+    });
+    assert.equal(neutral.bias_hint, null);
+    assert.ok(biased.bias_hint, 'expected bias_hint to be populated when has_signal is true');
+    assert.match(biased.bias_hint!, /signal/i);
+    assert.match(biased.bias_hint!, /not a verdict/i);
+    // Critically: the headline summary + chips do not change because of bias.
+    assert.equal(biased.summary, neutral.summary);
+    assert.deepEqual(
+      biased.headline_chips.map((c) => c.label),
+      neutral.headline_chips.map((c) => c.label),
+    );
+  });
+
   it('isPlainTrustSafe rejects absolute-truth phrasing', () => {
     assert.equal(isPlainTrustSafe('This is true and AI verified.'), false);
     assert.equal(isPlainTrustSafe('This is false; debunked by experts.'), false);
