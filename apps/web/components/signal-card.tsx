@@ -1,9 +1,14 @@
 import Link from 'next/link';
 import { statusLabel } from '@osint/core';
 import type {
+  AnalyzedConflict,
   ConfidenceBand,
+  ConfidenceBreakdown,
   ConfidenceReport,
+  CorpusBiasReport,
   PhysicalEvidence,
+  RankedSource,
+  RankedSourceSummary,
   TrustExplanation,
 } from '@osint/core';
 import {
@@ -51,6 +56,13 @@ export interface SignalRow {
   trust_explanation?: TrustExplanation;
   physical_evidence?: PhysicalEvidence | null;
   contradictions_inline?: ContradictionInline[];
+  // April 2026 evidence-comparison upgrade. The decorate path always
+  // populates these (persisted-or-computed), but we keep them optional
+  // on the row type so unit tests / older callers can omit them.
+  ranked_sources?: RankedSource[];
+  analyzed_conflicts?: AnalyzedConflict[];
+  bias_report?: CorpusBiasReport;
+  confidence_breakdown?: ConfidenceBreakdown;
 }
 
 const PHYSICAL_EVIDENCE_TOPICS = new Set(['war', 'disaster', 'climate']);
@@ -197,6 +209,21 @@ export function SignalCard({ s }: { s: SignalRow }) {
             <PhysicalEvidenceBlock pe={s.physical_evidence} />
           )}
 
+          {/* April 2026 evidence-comparison strip — at-a-glance source
+              mix, top conflict severity, and a bias signal chip. The
+              chip is colour-tinted but explicitly labelled "signal" so
+              it never reads as a verdict. Hidden when the row is from
+              an old un-decorated path (no analyzed_conflicts) so we
+              never render an empty strip. */}
+          {(s.ranked_sources && s.ranked_sources.length > 0) && (
+            <ComparisonStrip
+              ranked={s.ranked_sources}
+              conflicts={s.analyzed_conflicts ?? []}
+              bias={s.bias_report ?? null}
+              breakdown={s.confidence_breakdown ?? null}
+            />
+          )}
+
           {/* Meta + CTA row */}
           <div className="mt-4 flex items-center justify-between gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-400 sm:text-[12px]">
@@ -319,6 +346,121 @@ function PhysicalEvidenceBlock({ pe }: { pe: PhysicalEvidence }) {
       </ul>
     </div>
   );
+}
+
+/**
+ * At-a-glance comparison strip for the feed card. Three chips:
+ *   1. Source mix (primaries / officials / rated outlets)
+ *   2. Worst conflict (when any) with numeric severity
+ *   3. Bias signal (always with the "signal" qualifier)
+ * Plus an optional confidence-breakdown sparkline on the right edge.
+ */
+function ComparisonStrip({
+  ranked,
+  conflicts,
+  bias,
+  breakdown,
+}: {
+  ranked: RankedSource[];
+  conflicts: AnalyzedConflict[];
+  bias: CorpusBiasReport | null;
+  breakdown: ConfidenceBreakdown | null;
+}) {
+  const mix = computeMixSummary(ranked);
+  const worstConflict = conflicts
+    .filter((c) => c.type !== 'insufficient_evidence')
+    .sort((a, b) => b.severity_score - a.severity_score)[0] ?? null;
+  const showBias = bias && bias.has_signal;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-1.5 rounded-xl border border-ink-100 bg-canvas-50 px-2.5 py-2 text-[11px]">
+      <span className="font-semibold uppercase tracking-wider text-ink-500">
+        Comparison
+      </span>
+      <span aria-hidden="true" className="text-ink-300">·</span>
+      <span className="text-ink-600">{mix}</span>
+      {worstConflict && (
+        <>
+          <span aria-hidden="true" className="text-ink-300">·</span>
+          <span
+            className={`rounded-full px-2 py-0.5 font-medium ${conflictChipClass(worstConflict.severity_band)}`}
+            title={worstConflict.summary}
+          >
+            {conflictLabel(worstConflict)} {worstConflict.severity_score}/100
+          </span>
+        </>
+      )}
+      {showBias && bias && (
+        <>
+          <span aria-hidden="true" className="text-ink-300">·</span>
+          <span
+            className={`rounded-full px-2 py-0.5 font-medium ${biasChipClass(bias.band)}`}
+            title={bias.summary}
+          >
+            Bias signal · {bias.band}
+          </span>
+        </>
+      )}
+      {breakdown && (
+        <span className="ml-auto text-ink-500">
+          {breakdown.composite}/100 confidence
+        </span>
+      )}
+    </div>
+  );
+}
+
+function computeMixSummary(ranked: RankedSource[]): string {
+  const primaries = ranked.filter((r) => r.role === 'primary').length;
+  const officials = ranked.filter((r) => r.role === 'official').length;
+  const rated = ranked.filter(
+    (r) => r.is_credible && r.role !== 'primary' && r.role !== 'official',
+  ).length;
+  const total = ranked.length;
+  const parts: string[] = [];
+  if (primaries > 0) parts.push(`${primaries} primary`);
+  if (officials > 0) parts.push(`${officials} official`);
+  if (rated > 0) parts.push(`${rated} rated`);
+  if (parts.length === 0) parts.push(`${total} source${total === 1 ? '' : 's'}`);
+  return parts.join(' · ');
+}
+
+function conflictLabel(c: AnalyzedConflict): string {
+  switch (c.type) {
+    case 'direct_contradiction':
+      return 'Contradiction';
+    case 'framing_difference':
+      return 'Framing';
+    case 'timeline_mismatch':
+      return 'Timeline';
+    case 'missing_context':
+      return 'Missing context';
+    case 'insufficient_evidence':
+      return 'Thin';
+  }
+}
+
+function conflictChipClass(band: 'low' | 'medium' | 'high'): string {
+  switch (band) {
+    case 'high':
+      return 'bg-danger-100 text-danger-700';
+    case 'medium':
+      return 'bg-amber-100 text-amber-800';
+    case 'low':
+      return 'bg-ink-100 text-ink-600';
+  }
+}
+
+function biasChipClass(band: 'neutral' | 'low' | 'moderate' | 'strong'): string {
+  switch (band) {
+    case 'strong':
+      return 'bg-amber-100 text-amber-800';
+    case 'moderate':
+      return 'bg-amber-50 text-amber-700';
+    case 'low':
+      return 'bg-ink-100 text-ink-600';
+    case 'neutral':
+      return 'bg-emerald-50 text-emerald-700';
+  }
 }
 
 function FeedbackIndicator({ fb }: { fb: { helpful: number; unclear: number; inaccurate: number; total: number } }) {

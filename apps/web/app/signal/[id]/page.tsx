@@ -1,20 +1,36 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
+  analyzeConflicts,
+  buildConfidenceBreakdown,
   buildConfidenceReport,
+  buildEvidenceCards,
+  buildResultExplanation,
   buildTrustExplanation,
+  detectCorpusBias,
   physicalEvidencePhrase,
+  rankSources,
   statusDescription,
   statusLabel,
+  summarizeConflicts,
+  summarizeEvidenceCards,
+  summarizeRankedSources,
+  type AnalyzedConflict,
   type ConfidenceBand,
+  type ConfidenceBreakdown,
   type ConfidenceReport,
+  type CorpusBiasReport,
   type DetectedContradiction,
+  type EvidenceCard,
   type EvidenceItem,
   type PhysicalEvidence,
+  type RankedSource,
+  type ResultExplanation,
   type TrustExplanation,
   type VerificationStatus,
 } from '@osint/core';
 import { getAdminSupabase } from '@/lib/supabase-server';
+import { VerifyAnalysis, type VerifyAnalysisData } from '@/components/verify-analysis';
 import { Badge } from '@/components/ui/badge';
 import { SeverityMeter } from '@/components/ui/severity-meter';
 import { Disclosure } from '@/components/ui/disclosure';
@@ -129,6 +145,12 @@ export default async function SignalPage({ params }: PageProps) {
     complex_signal: isComplexSignal,
     title: signal.title,
   });
+
+  // April 2026 evidence-comparison upgrade — pull the persisted analysis
+  // off the row when present, otherwise compute it on the fly. The signal
+  // detail page is authoritative because it has the FULL evidence and
+  // contradictions list, so even the on-the-fly result is high quality.
+  const analysisData = resolveSignalAnalysis(signal, evidenceItems, contradictionItems);
   return (
     <article className="space-y-4 sm:space-y-5">
       {/* Reader-first header: what happened → what we think about it →
@@ -216,6 +238,16 @@ export default async function SignalPage({ params }: PageProps) {
       </header>
 
 
+
+      {/* April 2026 evidence-comparison panel — same component the
+          /verify page uses. Adds: ranked sources with rationale,
+          extended conflict taxonomy with numeric severity, bias signal
+          (kept separate from the verdict), evidence cards with stance,
+          confidence breakdown, and the four result explanation
+          sections. Pulled from the persisted JSONB columns when the
+          worker has populated them; otherwise computed live from the
+          full evidence + contradictions list. */}
+      <VerifyAnalysis data={analysisData} />
 
       <Disclosure id="why-shown" title="Why it’s shown" defaultOpen={true}>
         <ul className="space-y-2 text-sm text-ink-600">
@@ -497,6 +529,89 @@ export default async function SignalPage({ params }: PageProps) {
       </Disclosure>
     </article>
   );
+}
+
+/**
+ * Read the persisted evidence-comparison analysis off the signal row,
+ * or compute it on the fly when older rows lack the persisted JSONB
+ * blobs (analysis_version === null). The compute path uses the FULL
+ * evidence + contradictions list this page already loads, so it's
+ * lossless compared to the worker's pre-computed version.
+ */
+function resolveSignalAnalysis(
+  signal: any,
+  evidence: EvidenceItem[],
+  contradictions: DetectedContradiction[],
+): VerifyAnalysisData {
+  if (
+    signal?.analysis_version != null &&
+    signal.ranked_sources &&
+    signal.analyzed_conflicts &&
+    signal.bias_report &&
+    signal.evidence_cards &&
+    signal.confidence_breakdown &&
+    signal.result_explanation
+  ) {
+    return {
+      ranked_sources: signal.ranked_sources as RankedSource[],
+      ranked_summary: summarizeRankedSources(signal.ranked_sources as RankedSource[]),
+      conflicts: signal.analyzed_conflicts as AnalyzedConflict[],
+      conflict_summary: summarizeConflicts(signal.analyzed_conflicts as AnalyzedConflict[]),
+      bias: signal.bias_report as CorpusBiasReport,
+      evidence_cards: signal.evidence_cards as EvidenceCard[],
+      cards_summary: summarizeEvidenceCards(signal.evidence_cards as EvidenceCard[]),
+      confidence_breakdown: signal.confidence_breakdown as ConfidenceBreakdown,
+      explanation: signal.result_explanation as ResultExplanation,
+    };
+  }
+  // Compute live. Pure / deterministic / LLM-free / network-free, so
+  // safe to run on every render of an un-migrated signal.
+  const ranked = rankSources({ evidence, anchor_url: signal?.url ?? null });
+  const ranked_summary = summarizeRankedSources(ranked);
+  const conflicts = analyzeConflicts({
+    contradictions,
+    evidence,
+    claim_title: signal?.title,
+    claim_text: signal?.summary ?? null,
+  });
+  const conflict_summary = summarizeConflicts(conflicts);
+  const evidence_cards = buildEvidenceCards({ evidence, ranked, contradictions });
+  const cards_summary = summarizeEvidenceCards(evidence_cards);
+  const bias = detectCorpusBias(
+    evidence.map((e) => `${e.title ?? ''} ${e.excerpt ?? ''}`),
+  );
+  const confidence_breakdown = buildConfidenceBreakdown({
+    ranked,
+    ranked_summary,
+    conflicts,
+    conflict_summary,
+    cards_summary,
+    has_anchor: Boolean(signal?.url),
+    is_text_only: false,
+    cap_at_medium: false,
+  });
+  const explanation = buildResultExplanation({
+    band: confidence_breakdown.band,
+    breakdown: confidence_breakdown,
+    ranked_summary,
+    conflicts,
+    conflict_summary,
+    cards_summary,
+    has_anchor: Boolean(signal?.url),
+    is_text_only: false,
+    is_social: false,
+  });
+  return {
+    ranked_sources: ranked,
+    ranked_summary,
+    conflicts,
+    conflict_summary,
+    bias,
+    evidence_cards,
+    cards_summary,
+    confidence_breakdown,
+    explanation,
+  };
 }
 
 function bandDotClass(band: ConfidenceBand): string {
