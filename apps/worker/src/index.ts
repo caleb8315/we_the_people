@@ -1,7 +1,7 @@
 import { runIngest } from './jobs/ingest';
 import { runBriefing } from './jobs/brief';
 import { runAlerts } from './jobs/alert';
-import { runEmailBriefings } from './jobs/email-briefings';
+import { runUserNotifications } from './jobs/email-briefings';
 import { runBackfill } from './jobs/backfill';
 import { runDevelop } from './jobs/develop';
 import { runMaintenance } from './jobs/maintenance';
@@ -39,7 +39,7 @@ async function main() {
       return;
     case 'notifications':
     case 'email':
-      await runEmailBriefings();
+      await runUserNotifications();
       return;
     case 'backfill': {
       const hoursBack = Number(arg ?? '48');
