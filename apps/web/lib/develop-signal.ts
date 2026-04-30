@@ -460,6 +460,7 @@ function inferOriginFromEvidence(e: EvidenceItem): SourceId | 'tracked_events' |
   if (
     sid === 'reddit' ||
     sid === 'bluesky' ||
+    sid === 'polymarket' ||
     sid === 'wikipedia' ||
     sid === 'gdelt' ||
     sid === 'sensors'
@@ -470,6 +471,7 @@ function inferOriginFromEvidence(e: EvidenceItem): SourceId | 'tracked_events' |
   if (!domain) return null;
   if (domain.endsWith('reddit.com')) return 'reddit';
   if (domain.endsWith('bsky.app') || domain.endsWith('bsky.social')) return 'bluesky';
+  if (domain.endsWith('polymarket.com')) return 'polymarket';
   if (domain.endsWith('wikipedia.org')) return 'wikipedia';
   if (domain.endsWith('usgs.gov') || domain.endsWith('nasa.gov') || domain.endsWith('noaa.gov')) {
     return 'sensors';

@@ -18,6 +18,7 @@ import type { DetectedContradiction, EvidenceItem, PhysicalEvidence } from '@osi
 import { SOURCE_NAMES, type SourceId, type SourceQuery, type SourceResult } from './types';
 import { searchWeb } from './web';
 import { searchReddit, searchBluesky } from './social';
+import { searchPolymarket } from './markets';
 import { searchWikipedia, searchGdelt } from './reference';
 import { searchSensors } from './sensors';
 import { searchTrackedEvents, type MatchedSignal, type TrackedEventsResult } from './tracked-events';
@@ -62,6 +63,7 @@ export async function runLiveCorroboration(
     ['web', searchWeb(q)],
     ['reddit', searchReddit(q)],
     ['bluesky', searchBluesky(q)],
+    ['polymarket', searchPolymarket(q)],
     ['wikipedia', searchWikipedia(q)],
     ['gdelt', searchGdelt(q)],
     ['sensors', searchSensors(q)],

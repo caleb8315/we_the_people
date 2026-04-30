@@ -149,33 +149,33 @@ function bandSummary(
       return 'Different outlets are reporting different things about important parts of this story.';
     case 'high':
       if (credible >= 4) {
-        return `${credible} independent outlets on our trusted-source list are all reporting this.`;
+        return `${credible} independent rated outlets are all reporting this.`;
       }
-      return 'Multiple independent outlets on our trusted-source list are reporting the same thing.';
+      return 'Multiple independent rated outlets are reporting the same thing.';
     case 'medium':
       if (credible >= 2) {
         return others > 0
-          ? `${total} sources are reporting this (${credible} on our trusted list) — story is still developing.`
-          : `${credible} trusted outlets are reporting this — the story is still developing.`;
+          ? `${total} sources are reporting this (${credible} rated outlets) — story is still developing.`
+          : `${credible} rated outlets are reporting this — the story is still developing.`;
       }
       if (credible === 1) {
         return others > 0
-          ? `${total} sources are reporting this — one is on our trusted list, the others we haven\u2019t rated. Judge each on its own merits.`
-          : 'One trusted outlet is reporting this — watching for independent confirmation.';
+          ? `${total} sources are reporting this — one rated outlet and ${others} unrated source${others === 1 ? '' : 's'}. Judge each on its own merits.`
+          : 'One rated outlet is reporting this — watching for independent confirmation.';
       }
       // credible === 0 but volume floor fired (5+ sources agree across tiers).
-      return `${total} independent sources are reporting this. None are on our trusted-source list yet, so read them and judge each on its merits.`;
+      return `${total} independent sources are reporting this. None are rated yet, so read them and judge each on its merits.`;
     case 'low':
       if (total === 0) {
         return 'We haven\u2019t been able to find any reporting on this yet.';
       }
       // Neutral framing: tell the reader what we found, not a verdict on the
       // sources themselves. Curated credibility lists miss independent
-      // reporting all the time — saying "not established newsrooms" is itself
+      // reporting all the time — saying "not major newsrooms" is itself
       // a bias, not a neutral signal.
       return total === 1
         ? 'We\u2019ve only found one source for this so far. Look at it yourself and watch for others.'
-        : `${total} sources are reporting this, but none are on our trusted-source list yet. Read them and judge for yourself.`;
+        : `${total} sources are reporting this, but none are rated yet. Read them and judge for yourself.`;
   }
 }
 
@@ -191,7 +191,7 @@ function buildBullets(band: ConfidenceBand, input: ConfidenceInputs): string[] {
   // Always lead with corroboration shape when we have something to say.
   //
   // Important: don't disparage non-credible sources. "Credible" here just
-  // means "on our curated trusted-source list". Plenty of independent /
+  // means "on our rated-outlet list". Plenty of independent /
   // regional / specialist outlets aren't on that list but still produce
   // real reporting. Describe what we see; don't editorialise.
   if (source_count > 0) {
@@ -199,22 +199,22 @@ function buildBullets(band: ConfidenceBand, input: ConfidenceInputs): string[] {
     if (credible_source_count >= 2) {
       bullets.push(
         others > 0
-          ? `${source_count} sources are reporting this — ${credible_source_count} on our trusted list plus ${others} we haven\u2019t rated.`
-          : `${credible_source_count} outlets on our trusted-source list are reporting the same event.`,
+          ? `${source_count} sources are reporting this — ${credible_source_count} rated outlets plus ${others} unrated source${others === 1 ? '' : 's'}.`
+          : `${credible_source_count} rated outlets are reporting the same event.`,
       );
     } else if (credible_source_count === 1) {
       bullets.push(
         others > 0
-          ? `${source_count} sources are reporting this. One is on our trusted list; the other ${others === 1 ? 'source is' : `${others} are`} unrated — judge each on its own merits.`
-          : 'One outlet on our trusted list is reporting this — still watching for independent confirmation.',
+          ? `${source_count} sources are reporting this. One is a rated outlet; the other ${others === 1 ? 'source is' : `${others} are`} unrated — judge each on its own merits.`
+          : 'One rated outlet is reporting this — still watching for independent confirmation.',
       );
     } else if (source_count >= 5) {
       bullets.push(
-        `${source_count} independent sources are reporting this. None are on our trusted-source list yet — read them yourself before trusting specifics.`,
+        `${source_count} independent sources are reporting this. None are rated yet — read them yourself before trusting specifics.`,
       );
     } else if (source_count >= 2) {
       bullets.push(
-        `${source_count} sources are reporting this. None have been rated against our trusted-source list yet.`,
+        `${source_count} sources are reporting this. None have been rated yet.`,
       );
     } else {
       bullets.push('Only one source is reporting this so far.');
@@ -370,7 +370,7 @@ export function buildConfidenceReport(input: ConfidenceInputs): ConfidenceReport
   //   2. Volume floor (tier-agnostic) — if many independent sources are all
   //      reporting the same thing with no detected disagreement, that IS
   //      meaningful corroboration even when none of them match our curated
-  //      "established outlet" list. Dismissing 9 independent sources because
+  //      "rated-outlet" list. Dismissing 9 independent sources because
   //      none are on the Tier-1 list is itself a form of editorial bias.
   //      Threshold: 5+ total sources → at least `medium`. We do NOT promote
   //      tier-agnostic volume to `high` — reaching `high` still requires

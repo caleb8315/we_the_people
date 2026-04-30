@@ -139,7 +139,6 @@ export default async function SignalPage({ params }: PageProps) {
       : []),
     { href: '#all-evidence', label: `All evidence (${evidenceCount})` },
   ];
-
   return (
     <article className="space-y-5 sm:space-y-6">
       {/* Reader-first header: what happened → what we think about it →
@@ -162,7 +161,7 @@ export default async function SignalPage({ params }: PageProps) {
           )}
           <Badge
             variant={signal.verification_status}
-            title="Reliability label — how well this event is corroborated across credible sources."
+            title="Reliability label — how well this event is corroborated across independently-rated sources."
           >
             {statusLabel(signal.verification_status)}
           </Badge>
@@ -284,7 +283,7 @@ export default async function SignalPage({ params }: PageProps) {
                 </a>
                 <div className="text-xs text-ink-400">
                   {prettyOutletName(t.domain)} · {t.domain}
-                  {t.is_credible && <span className="ml-1.5 text-amber-600">· trusted list</span>}
+                  {t.is_credible && <span className="ml-1.5 text-amber-600">· rated outlet</span>}
                   {t.published_at ? ` · ${new Date(t.published_at).toLocaleString()}` : ''}
                 </div>
               </div>
@@ -317,7 +316,7 @@ export default async function SignalPage({ params }: PageProps) {
             <ScoreRow
               label="Evidence strength"
               value={signal.evidence_strength_score}
-              hint="USGS / NASA-EONET sensor matches plus 4+ credible outlets."
+              hint="USGS / NASA-EONET sensor matches plus 4+ rated outlets."
             />
             <ScoreRow
               label="Narrative divergence"
@@ -477,7 +476,7 @@ export default async function SignalPage({ params }: PageProps) {
                   className="flex items-start gap-3 rounded-xl border border-ink-100 bg-canvas-50 p-3"
                 >
                   <Badge variant={e.is_credible ? 'verified' : 'neutral'} withIcon={false}>
-                    {e.is_credible ? 'Trusted list' : 'Unrated'}
+                    {e.is_credible ? 'Rated outlet' : 'Unrated'}
                   </Badge>
                   <div className="min-w-0 flex-1">
                     <a
@@ -614,8 +613,8 @@ function bottomLineForSignal(
   isComplexSignal: boolean,
 ): string {
   // Guiding principle: describe what we found; don't editorialise about the
-  // sources. "Trusted-source list" is shorthand for a curated list of
-  // outlets — useful, but not the only measure of whether reporting is real.
+  // sources. "Rated outlets" is shorthand for a curated list of outlets —
+  // useful, but not the only measure of whether reporting is real.
   if (contradictionsCount > 0) {
     return 'Sources disagree on important details. Read both sides carefully before sharing specific claims.';
   }
@@ -624,13 +623,13 @@ function bottomLineForSignal(
   }
   switch (band) {
     case 'high':
-      return 'Multiple outlets on our trusted-source list are independently reporting this. The basic shape of the event is well-supported.';
+      return 'Multiple independently-rated outlets are reporting this. The basic shape of the event is well-supported.';
     case 'medium':
       if (credibleSourceCount === 0 && sourceCount >= 5) {
-        return `${sourceCount} independent sources are reporting this, but none are on our trusted-source list yet. Check the evidence below — real reporting often breaks outside the major outlets.`;
+        return `${sourceCount} independent sources are reporting this, but none are from rated outlets yet. Check the evidence below — reporting often breaks in many places first.`;
       }
       if (credibleSourceCount === 1) {
-        return 'One outlet on our trusted-source list has this, along with other unrated sources. Promising, but check each one before trusting specifics.';
+        return 'One rated outlet has this, along with other unrated sources. Promising, but check each one before trusting specifics.';
       }
       return 'This is still developing. The basic shape looks real, but specific claims need more corroboration.';
     case 'contested':
@@ -642,7 +641,7 @@ function bottomLineForSignal(
       if (sourceCount === 1) {
         return 'We\u2019ve only found one source so far. Read it directly, check who wrote it, and watch for others picking it up.';
       }
-      return `${sourceCount} sources are reporting this, but we haven\u2019t been able to rate any of them against our trusted-source list yet. Read them yourself before treating any specifics as confirmed.`;
+      return `${sourceCount} sources are reporting this, but none are from rated outlets yet. Read them yourself before treating any specifics as confirmed.`;
   }
 }
 
@@ -670,6 +669,8 @@ function liveDiscoveryLabel(discoveredVia: string | null | undefined): string | 
       return 'Found live · sensor network';
     case 'tracked_events':
       return 'Found live · tracked events';
+    case 'polymarket':
+      return 'Found live · Polymarket';
     default:
       return 'Found live';
   }
@@ -900,6 +901,7 @@ function TrustHero({
   explanation: TrustExplanation;
   bottomLine: string;
 }) {
+  const unratedSourceCount = Math.max(0, totalSourceCount - credibleSourceCount);
   return (
     <section className={`mt-4 rounded-2xl border p-4 sm:p-5 ${bandTone.wrap}`}>
       {/* Verdict line. */}
@@ -912,7 +914,7 @@ function TrustHero({
           {bottomLineLabelForBand(band)}
         </p>
         <span className="ml-auto text-[11px] text-ink-500">
-          {credibleSourceCount} of {totalSourceCount} on trusted list
+          {credibleSourceCount} rated · {unratedSourceCount} unrated
         </span>
       </div>
       <p className="mt-2.5 text-[15px] leading-relaxed text-ink sm:text-base">

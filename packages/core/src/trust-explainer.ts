@@ -144,7 +144,7 @@ function buildSummary(input: TrustExplanationInput): string {
   switch (report.band) {
     case 'high':
       return input.credible_source_count >= 4
-        ? `${input.credible_source_count} independent outlets on our trusted-source list are all reporting this.`
+        ? `${input.credible_source_count} independently rated outlets are all reporting this.`
         : 'A lot of independent reporting supports the basic shape of this event.';
     case 'medium':
       return input.syndicated
@@ -170,20 +170,20 @@ function buildWhy(input: TrustExplanationInput): string[] {
     if (input.credible_source_count >= 2) {
       out.push(
         others > 0
-          ? `${input.source_count} sources are reporting this — ${input.credible_source_count} from outlets on our trusted-source list, plus ${others} we have not rated yet.`
-          : `${input.credible_source_count} outlets on our trusted-source list are independently reporting the same event.`,
+          ? `${input.source_count} sources are reporting this — ${input.credible_source_count} from rated outlets, plus ${others} we have not rated yet.`
+          : `${input.credible_source_count} rated outlets are independently reporting the same event.`,
       );
     } else if (input.credible_source_count === 1) {
       out.push(
-        'One outlet on our trusted-source list is reporting this. Watching for independent confirmation from others.',
+        'One rated outlet is reporting this. Watching for independent confirmation from others.',
       );
     } else if (input.source_count >= 5) {
       out.push(
-        `${input.source_count} independent sources are reporting this. None are on our trusted-source list yet — read them yourself before relying on specifics.`,
+        `${input.source_count} independent sources are reporting this. None are rated yet — read them yourself before relying on specifics.`,
       );
     } else if (input.source_count >= 2) {
       out.push(
-        `${input.source_count} sources are reporting this so far, but none have been rated against our trusted-source list yet.`,
+        `${input.source_count} sources are reporting this so far, but none have been rated yet.`,
       );
     } else {
       out.push('Only one source is reporting this so far. That is not enough to judge reliability.');
@@ -331,11 +331,11 @@ function buildHeadlineChips(input: TrustExplanationInput): TrustHeadlineChip[] {
     });
   }
   if (input.credible_source_count >= 4) {
-    chips.push({ label: `${input.credible_source_count} trusted outlets agree`, tone: 'support' });
+    chips.push({ label: `${input.credible_source_count} rated outlets agree`, tone: 'support' });
   } else if (input.credible_source_count >= 2) {
-    chips.push({ label: `${input.credible_source_count} trusted outlets`, tone: 'support' });
+    chips.push({ label: `${input.credible_source_count} rated outlets`, tone: 'support' });
   } else if (input.source_count >= 5 && input.credible_source_count === 0) {
-    chips.push({ label: `${input.source_count} sources, none trusted-list`, tone: 'caution' });
+    chips.push({ label: `${input.source_count} sources, none rated yet`, tone: 'caution' });
   } else if (input.source_count <= 1) {
     chips.push({ label: 'Single source', tone: 'caution' });
   }
@@ -365,11 +365,11 @@ function buildWhatsSupported(input: TrustExplanationInput): string[] {
   if (credible >= 2) {
     out.push(
       others > 0
-        ? `${credible} trusted outlets and ${others} other source${others === 1 ? '' : 's'} all describe the same event.`
-        : `${credible} trusted outlets all describe the same event.`,
+        ? `${credible} rated outlets and ${others} other source${others === 1 ? '' : 's'} all describe the same event.`
+        : `${credible} rated outlets all describe the same event.`,
     );
   } else if (credible === 1 && total > 1) {
-    out.push(`One trusted outlet plus ${total - 1} other source${total - 1 === 1 ? '' : 's'} describe the same event.`);
+    out.push(`One rated outlet plus ${total - 1} other source${total - 1 === 1 ? '' : 's'} describe the same event.`);
   } else if (total >= 5) {
     out.push(`${total} independent sources describe the same event.`);
   } else if (total >= 2) {

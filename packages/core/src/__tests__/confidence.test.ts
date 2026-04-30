@@ -195,11 +195,11 @@ describe('buildConfidenceReport', () => {
       physical_evidence: null,
     });
     assert.equal(report.band, 'high');
-    assert.match(report.summary, /6 independent outlets on our trusted-source list/);
+    assert.match(report.summary, /6 independent rated outlets/);
     assert.doesNotMatch(report.summary, /Limited evidence|enough independent reporting/i);
   });
 
-  it('floors band to `medium` when 2-3 credible outlets are present and no label exists', () => {
+  it('floors band to `medium` when 2-3 rated outlets are present and no label exists', () => {
     const report = buildConfidenceReport({
       verification_status: 'developing',
       reliability_score: null,
@@ -214,7 +214,7 @@ describe('buildConfidenceReport', () => {
       physical_evidence: null,
     });
     assert.equal(report.band, 'medium');
-    assert.match(report.summary, /2 (trusted outlets|on our trusted list)/);
+    assert.match(report.summary, /2 rated outlets/);
   });
 
   it('floors band to `medium` on volume alone when 5+ unrated sources agree (bias guard)', () => {

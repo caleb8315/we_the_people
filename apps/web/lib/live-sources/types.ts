@@ -23,6 +23,7 @@ export type SourceId =
   | 'web'
   | 'reddit'
   | 'bluesky'
+  | 'polymarket'
   | 'wikipedia'
   | 'gdelt'
   | 'sensors';
@@ -82,6 +83,7 @@ export const SOURCE_NAMES: Record<SourceId, string> = {
   web: 'Web search',
   reddit: 'Reddit',
   bluesky: 'Bluesky',
+  polymarket: 'Polymarket',
   wikipedia: 'Wikipedia',
   gdelt: 'GDELT global news',
   sensors: 'Sensor networks',

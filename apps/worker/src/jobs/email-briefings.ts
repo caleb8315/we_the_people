@@ -173,7 +173,7 @@ function buildUserBriefingHtml(input: {
       const domains = (s.distinct_domains ?? []).slice(0, 3).join(', ');
       const sourcesLine = total > 0
         ? `${total} source${total === 1 ? '' : 's'}` +
-          (credible > 0 ? ` (${credible} on trusted list)` : '') +
+          (credible > 0 ? ` (${credible} rated outlet${credible === 1 ? '' : 's'})` : '') +
           (domains ? ` — ${escapeHtml(domains)}` : '')
         : '';
       const fresh = s.last_enriched_at
@@ -201,7 +201,7 @@ function buildUserBriefingHtml(input: {
       <ul style="padding-left:18px">${cards || '<li>No high-priority signals matched your current topics today.</li>'}</ul>
       <p style="color:#666;font-size:12px">
         Labels describe how many independent sources are reporting each signal and how many match our
-        trusted-source list. They are not claims of factual truth. This briefing is generated per
+        rated-outlet set. They are not claims of factual truth. This briefing is generated per
         account; your preferences and AI state are isolated.
       </p>
     </div>

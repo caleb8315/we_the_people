@@ -495,7 +495,7 @@ function VerifyResult({ data }: { data: VerifyResponse }) {
                   <span className="text-ink-500">
                     {' '}&mdash; {corroboration.matched_signal.source_count} source{corroboration.matched_signal.source_count === 1 ? '' : 's'} on file
                     {corroboration.matched_signal.credible_source_count > 0 && (
-                      <>, {corroboration.matched_signal.credible_source_count} established</>
+                      <>, {corroboration.matched_signal.credible_source_count} rated</>
                     )}
                   </span>
                 )}
@@ -556,7 +556,7 @@ function VerifyResult({ data }: { data: VerifyResponse }) {
                     )}
                     <p className="text-xs text-ink-400">
                       {t.domain}
-                      {t.is_credible && <span className="ml-1.5 text-emerald-600">&#10003; Established outlet</span>}
+                      {t.is_credible && <span className="ml-1.5 text-emerald-600">&#10003; Rated source</span>}
                     </p>
                   </div>
                 </li>
@@ -760,19 +760,19 @@ function friendlyBandLabel(band: string): string {
 
 function summarizeMixNatural(mix: {
   total: number;
-  established_outlets: number;
+  rated_outlets: number;
   social_posts: number;
   sensor_events: number;
   reference_hits: number;
 }): string {
   if (mix.total === 0) return 'no sources found yet';
   const parts: string[] = [];
-  if (mix.established_outlets > 0) {
+  if (mix.rated_outlets > 0) {
     parts.push(
-      `${mix.established_outlets} established outlet${mix.established_outlets === 1 ? '' : 's'}`,
+      `${mix.rated_outlets} rated outlet${mix.rated_outlets === 1 ? '' : 's'}`,
     );
   }
-  const unrated = Math.max(0, mix.total - mix.established_outlets - mix.social_posts - mix.sensor_events - mix.reference_hits);
+  const unrated = Math.max(0, mix.total - mix.rated_outlets - mix.social_posts - mix.sensor_events - mix.reference_hits);
   if (unrated > 0) parts.push(`${unrated} other source${unrated === 1 ? '' : 's'}`);
   if (mix.social_posts > 0) parts.push(`${mix.social_posts} social post${mix.social_posts === 1 ? '' : 's'}`);
   if (mix.sensor_events > 0) parts.push(`${mix.sensor_events} sensor reading${mix.sensor_events === 1 ? '' : 's'}`);
