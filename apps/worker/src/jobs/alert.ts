@@ -1,4 +1,9 @@
 import { canAlert, statusLabel } from '@osint/core/verification';
+import type {
+  AnalyzedConflict,
+  ConfidenceBreakdown,
+  CorpusBiasReport,
+} from '@osint/core';
 import type { VerificationStatus } from '@osint/core/types';
 import { env } from '../lib/env';
 import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
@@ -23,7 +28,7 @@ export async function runAlerts(): Promise<{ sent: number }> {
   const { data, error } = await sb
     .from('signals')
     .select(
-      'id, title, summary, severity, verification_status, topic, country_code, url, first_seen_at, source_id, source_count, credible_source_count, distinct_domains, last_enriched_at',
+      'id, title, summary, severity, verification_status, topic, country_code, url, first_seen_at, source_id, source_count, credible_source_count, distinct_domains, last_enriched_at, analyzed_conflicts, bias_report, confidence_breakdown',
     )
     .gte('first_seen_at', since)
     .gte('severity', 80)
@@ -120,6 +125,16 @@ export async function runAlerts(): Promise<{ sent: number }> {
         ? 'Freshly corroborated in the latest live-search pass.'
         : null;
 
+      // April 2026 evidence-comparison upgrade — surface the upgraded
+      // analysis directly in the alert body so the user can decide
+      // whether to act on a contested or bias-flagged story without
+      // opening the signal page first.
+      const analysisLines = renderAlertAnalysisLines(
+        (signal as any).analyzed_conflicts as AnalyzedConflict[] | null,
+        (signal as any).bias_report as CorpusBiasReport | null,
+        (signal as any).confidence_breakdown as ConfidenceBreakdown | null,
+      );
+
       const notification = await createUserNotification(sb, {
         userId: pref.user_id,
         type: 'priority_alert',
@@ -132,6 +147,7 @@ export async function runAlerts(): Promise<{ sent: number }> {
           `Reliability: ${reliability}`,
           `Sources: ${sourcesLine}`,
           freshLine,
+          ...analysisLines,
           `Country: ${String(signal.country_code ?? '-')}`,
           signal.summary ?? 'No summary provided.',
           signal.url ? `Source: ${signal.url}` : null,
@@ -180,11 +196,19 @@ export async function runAlerts(): Promise<{ sent: number }> {
     const total = s.source_count ?? 0;
     const sourcesPart = total > 0 ? `sources: ${credible}/${total} credible` : 'sources: corroboration pending';
     const freshPart = s.last_enriched_at ? ' · freshly corroborated' : '';
+    // Same upgraded analysis snippet for the operator broadcast — keeps
+    // ops triage consistent with what the user notification body shows.
+    const analysisLines = renderAlertAnalysisLines(
+      (s as any).analyzed_conflicts as AnalyzedConflict[] | null,
+      (s as any).bias_report as CorpusBiasReport | null,
+      (s as any).confidence_breakdown as ConfidenceBreakdown | null,
+    );
+    const analysisPart = analysisLines.length > 0 ? '\n' + analysisLines.join('\n') : '';
     const ok = await sendOperatorTelegram(
       [
         `🟡 PRIORITY · ${s.topic?.toUpperCase() ?? 'EVENT'}`,
         `${s.title}`,
-        `severity=${s.severity} · reliability: ${reliability} · ${sourcesPart}${freshPart} · ${s.country_code ?? '—'}`,
+        `severity=${s.severity} · reliability: ${reliability} · ${sourcesPart}${freshPart} · ${s.country_code ?? '—'}${analysisPart}`,
         s.url ?? '',
       ].join('\n'),
     );
@@ -200,6 +224,46 @@ export async function runAlerts(): Promise<{ sent: number }> {
   });
   console.log(`[alert] operator_sent=${sent}/${candidates.length} user_sent=${userSent}`);
   return { sent: sent + userSent };
+}
+
+/**
+ * Compose the upgraded-analysis lines for the alert body. Returns 0–3
+ * lines depending on what's present:
+ *
+ *   - confidence breakdown composite (always when populated)
+ *   - worst conflict with numeric severity (when any non-trivial conflict)
+ *   - bias signal band (only when the corpus bias report has_signal)
+ *
+ * The bias line ALWAYS carries the "signal" qualifier so an alert
+ * recipient never misreads it as a verdict on the underlying story.
+ */
+function renderAlertAnalysisLines(
+  conflicts: AnalyzedConflict[] | null,
+  bias: CorpusBiasReport | null,
+  breakdown: ConfidenceBreakdown | null,
+): string[] {
+  const lines: string[] = [];
+  if (breakdown) {
+    lines.push(
+      `Comparison confidence: ${breakdown.composite}/100 (${breakdown.band})`,
+    );
+  }
+  if (conflicts && conflicts.length > 0) {
+    const worst = [...conflicts]
+      .filter((c) => c.type !== 'insufficient_evidence')
+      .sort((a, b) => b.severity_score - a.severity_score)[0];
+    if (worst) {
+      lines.push(
+        `Conflict flagged: ${worst.label} (severity ${worst.severity_score}/100) — ${worst.summary.slice(0, 140)}`,
+      );
+    }
+  }
+  if (bias && bias.has_signal) {
+    lines.push(
+      `Bias signal: ${bias.band} (${bias.avg_intensity}/100) — read this story carefully, but the bias score is a SIGNAL, not a verdict.`,
+    );
+  }
+  return lines;
 }
 
 async function sendOperatorTelegram(text: string): Promise<boolean> {
