@@ -7,7 +7,7 @@ public preview URL you can use for testing.
 
 - A GitHub account linked to you (GitHub may require email confirmation before it lets you push to `main`). This is GitHub's own account check, unrelated to how the OSINT Platform scores reliability.
 - Supabase project with the production URL and keys (Project settings -> API).
-- Optional: Gemini + Groq API keys, Resend API key + a confirmed sender domain (or use `onboarding@resend.dev` for testing).
+- Optional: Gemini + Groq API keys and a Telegram bot/channel for operator alerts.
 
 ## Step 1: Import the repo
 
@@ -37,11 +37,9 @@ Strongly recommended:
 
 Optional (per-feature):
 
-- `RESEND_API_KEY` and `BRIEFING_FROM_EMAIL` - email briefings and alerts.
-  - For testing without a domain: use `onboarding@resend.dev`.
 - `USER_DAILY_CHAT_LIMIT` = 10
 - `USER_DAILY_PRIORITY_ALERT_LIMIT` = 5
-- `USER_DAILY_BRIEFING_EMAIL_LIMIT` = 1
+- `USER_DAILY_BRIEFING_NOTIFICATION_LIMIT` = 1
 - `USER_DAILY_BRIEFING_CALL_LIMIT` = 2
 - `MAX_DAILY_LLM_CALLS*` - LLM budget caps.
 - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_OPERATOR_CHAT_ID` - operator alert channel.
@@ -108,8 +106,6 @@ In GitHub -> Settings -> Secrets and variables -> Actions, add:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `GEMINI_API_KEY`
 - `GROQ_API_KEY`
-- `RESEND_API_KEY`
-- `BRIEFING_FROM_EMAIL`
 - `WORKER_SHARED_SECRET`
 - `USER_DAILY_*` vars
 - Any other values you set in Vercel.
@@ -119,7 +115,7 @@ The workflows under `.github/workflows/` will then run on schedule:
 - `ingest.yml` hourly
 - `briefing.yml` daily + weekly
 - `alerts.yml` every 30 min
-- `email-briefings.yml` daily
+- `email-briefings.yml` daily (writes in-app daily notifications)
 - `develop.yml` every 2 hours
 - `maintenance.yml` nightly
 

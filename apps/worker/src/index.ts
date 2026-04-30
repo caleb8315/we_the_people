@@ -1,7 +1,7 @@
 import { runIngest } from './jobs/ingest';
 import { runBriefing } from './jobs/brief';
 import { runAlerts } from './jobs/alert';
-import { runEmailBriefings } from './jobs/email-briefings';
+import { runUserNotifications } from './jobs/email-briefings';
 import { runBackfill } from './jobs/backfill';
 import { runDevelop } from './jobs/develop';
 import { runMaintenance } from './jobs/maintenance';
@@ -13,7 +13,7 @@ import { runMaintenance } from './jobs/maintenance';
  *   tsx src/index.ts brief
  *   tsx src/index.ts brief weekly
  *   tsx src/index.ts alert
- *   tsx src/index.ts email
+ *   tsx src/index.ts email                  # creates in-app daily notifications
  *   tsx src/index.ts backfill                 # 48h window, live
  *   tsx src/index.ts backfill 24              # 24h window, live
  *   tsx src/index.ts backfill 48 --dry-run    # 48h window, no writes
@@ -37,8 +37,9 @@ async function main() {
     case 'alert':
       await runAlerts();
       return;
+    case 'notifications':
     case 'email':
-      await runEmailBriefings();
+      await runUserNotifications();
       return;
     case 'backfill': {
       const hoursBack = Number(arg ?? '48');
@@ -80,7 +81,7 @@ async function main() {
     }
     default:
       console.error(
-        `unknown command: ${cmd}. use: ingest | brief [weekly] | alert | email | backfill [hours] [--dry-run] [--limit=N] | develop [--dry-run] [--max=N] [--cooldown=MIN] [--window=HRS] | maintenance [--dry-run] [--usage-days=N] [--signal-hours=N]`,
+        `unknown command: ${cmd}. use: ingest | brief [weekly] | alert | notifications (or email alias) | backfill [hours] [--dry-run] [--limit=N] | develop [--dry-run] [--max=N] [--cooldown=MIN] [--window=HRS] | maintenance [--dry-run] [--usage-days=N] [--signal-hours=N]`,
       );
       process.exit(2);
   }

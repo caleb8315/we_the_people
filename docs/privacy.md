@@ -18,7 +18,8 @@ This mirrors the in-app `/privacy` page. Update both in sync.
 
 ## How we use data
 
-- Your email is used for authentication and, if enabled, briefing delivery.
+- Your email is used for authentication.
+- Daily briefings and alerts are delivered in-app via the Notifications surface.
 - Preferences personalize *your* feed, briefings, and alert behavior.
 - Feedback and telemetry help us tune ranking, onboarding, and low-noise defaults.
 - Verification submissions are stored so you can revisit your results.
@@ -27,7 +28,7 @@ This mirrors the in-app `/privacy` page. Update both in sync.
 
 - We never sell personal data.
 - We never share identifiable data except with processors needed to run the service.
-- Current processors include **Supabase** (database/auth), **Cloudflare/Vercel** (hosting and edge delivery), and optional service integrations such as **Resend/Brevo**, **Gemini**, **Groq**, **Firecrawl**, and **Brave** when those features are enabled.
+- Current processors include **Supabase** (database/auth), **Cloudflare/Vercel** (hosting and edge delivery), and optional service integrations such as **Gemini**, **Groq**, **Firecrawl**, and **Brave** when those features are enabled.
 
 ## Retention
 

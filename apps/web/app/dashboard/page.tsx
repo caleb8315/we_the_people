@@ -30,7 +30,7 @@ export default async function DashboardPage() {
     sb
       .from('preferences')
       .select(
-        'topics, muted_sources, muted_topics, countries_of_focus, min_alert_severity, feed_mode_preference, briefing_frequency_preference, alert_intensity_preference, max_alerts_per_day_preference',
+        'topics, muted_sources, muted_topics, countries_of_focus, min_alert_severity, feed_mode_preference, briefing_frequency_preference, notifications_enabled, alert_intensity_preference, max_alerts_per_day_preference',
       )
       .eq('user_id', auth.user.id)
       .maybeSingle(),
@@ -199,6 +199,10 @@ export default async function DashboardPage() {
             <dl className="mt-3 space-y-1 text-xs text-ink-500">
               <FocusRow label="Feed mode" value={prefs?.feed_mode_preference ?? 'personalized'} />
               <FocusRow label="Briefings" value={prefs?.briefing_frequency_preference ?? 'daily'} />
+              <FocusRow
+                label="Notifications"
+                value={prefs?.notifications_enabled === false ? 'off' : 'on'}
+              />
               <FocusRow label="Alert intensity" value={prefs?.alert_intensity_preference ?? 'critical_only'} />
             </dl>
             <Link href="/settings" className="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline">

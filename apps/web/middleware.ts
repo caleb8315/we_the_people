@@ -13,7 +13,7 @@ export async function middleware(request: NextRequest) {
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const supabaseConfigured = !!url && !!anon;
 
-  const protectedPrefixes = ['/settings', '/ops', '/dashboard', '/onboarding'];
+  const protectedPrefixes = ['/settings', '/ops', '/dashboard', '/onboarding', '/notifications'];
   const isProtectedRoute = protectedPrefixes.some((p) =>
     request.nextUrl.pathname.startsWith(p),
   );

@@ -14,7 +14,7 @@ const PrefBody = z.object({
   muted_sources: z.array(z.string().max(64)).max(64).optional(),
   muted_topics: z.array(TopicEnum).max(8).optional(),
   countries_of_focus: z.array(z.string().length(2)).max(32).optional(),
-  email_briefings: z.boolean().optional(),
+  notifications_enabled: z.boolean().optional(),
   alerts_enabled: z.boolean().optional(),
   min_alert_severity: z.number().int().min(0).max(100).optional(),
   weather_lat: z.number().min(-90).max(90).nullable().optional(),
@@ -64,9 +64,6 @@ export async function PUT(req: Request) {
   }
 
   const normalized = { ...parsed.data };
-  if (normalized.briefing_frequency_preference === 'off') {
-    normalized.email_briefings = false;
-  }
   const row = { user_id: auth.user.id, updated_at: new Date().toISOString(), ...normalized };
   const { error } = await sb.from('preferences').upsert(row, { onConflict: 'user_id' });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

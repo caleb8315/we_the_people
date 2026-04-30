@@ -27,6 +27,7 @@ export function NavBarClient({
     { href: '/feed', label: 'Feed' },
     { href: '/verify', label: 'Verify' },
     { href: '/briefings', label: 'Briefings' },
+    ...(signedIn ? [{ href: '/notifications', label: 'Notifications' }] : []),
     ...(signedIn ? [{ href: '/dashboard', label: 'Dashboard' }] : []),
   ];
 

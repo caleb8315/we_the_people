@@ -5,7 +5,11 @@ export type UserLimitBucket = 'ai_chat' | 'priority_alert' | 'daily_briefing' | 
 export const USER_DAILY_LIMITS: Record<UserLimitBucket, number> = {
   ai_chat: Number(process.env.USER_DAILY_CHAT_LIMIT ?? 10),
   priority_alert: Number(process.env.USER_DAILY_PRIORITY_ALERT_LIMIT ?? 5),
-  daily_briefing: Number(process.env.USER_DAILY_BRIEFING_EMAIL_LIMIT ?? 1),
+  daily_briefing: Number(
+    process.env.USER_DAILY_BRIEFING_NOTIFICATION_LIMIT ??
+      process.env.USER_DAILY_BRIEFING_EMAIL_LIMIT ??
+      1,
+  ),
   briefing_call: Number(process.env.USER_DAILY_BRIEFING_CALL_LIMIT ?? 2),
 };
 
@@ -15,7 +19,9 @@ export function userDailyLimitsFromEnv(
   return {
     ai_chat: Number(input.USER_DAILY_CHAT_LIMIT ?? 10),
     priority_alert: Number(input.USER_DAILY_PRIORITY_ALERT_LIMIT ?? 5),
-    daily_briefing: Number(input.USER_DAILY_BRIEFING_EMAIL_LIMIT ?? 1),
+    daily_briefing: Number(
+      input.USER_DAILY_BRIEFING_NOTIFICATION_LIMIT ?? input.USER_DAILY_BRIEFING_EMAIL_LIMIT ?? 1,
+    ),
     briefing_call: Number(input.USER_DAILY_BRIEFING_CALL_LIMIT ?? 2),
   };
 }
