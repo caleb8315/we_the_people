@@ -34,10 +34,6 @@ import { VerifyAnalysis, type VerifyAnalysisData } from '@/components/verify-ana
 import { Badge } from '@/components/ui/badge';
 import { SeverityMeter } from '@/components/ui/severity-meter';
 import { Disclosure } from '@/components/ui/disclosure';
-import {
-  formatContradictionInline,
-  formatContradictionType,
-} from '@/lib/contradictions-display';
 import { SignalFeedbackButtons } from '@/components/signal-feedback';
 import { DevelopStoryButton } from '@/components/develop-story';
 import { prettyOutletName } from '@/lib/reader-report';
@@ -134,6 +130,15 @@ export default async function SignalPage({ params }: PageProps) {
     isComplexSignal,
   );
 
+  // April 2026 evidence-comparison upgrade — pull the persisted analysis
+  // off the row when present, otherwise compute it on the fly. The signal
+  // detail page is authoritative because it has the FULL evidence and
+  // contradictions list, so even the on-the-fly result is high quality.
+  const analysisData = resolveSignalAnalysis(signal, evidenceItems, contradictionItems);
+
+  // Build the trust explanation AFTER the analysis so we can fold the
+  // broader conflict taxonomy + numeric severity + bias signal into the
+  // existing trust hero without rendering a duplicate panel below.
   const trustExplanation: TrustExplanation = buildTrustExplanation({
     report,
     source_count: signal.source_count ?? 0,
@@ -144,13 +149,10 @@ export default async function SignalPage({ params }: PageProps) {
     syndicated: detectSyndicatedRepetition(evidence ?? []),
     complex_signal: isComplexSignal,
     title: signal.title,
+    analyzed_conflicts: analysisData.conflicts,
+    bias_report: analysisData.bias,
+    confidence_breakdown: analysisData.confidence_breakdown,
   });
-
-  // April 2026 evidence-comparison upgrade — pull the persisted analysis
-  // off the row when present, otherwise compute it on the fly. The signal
-  // detail page is authoritative because it has the FULL evidence and
-  // contradictions list, so even the on-the-fly result is high quality.
-  const analysisData = resolveSignalAnalysis(signal, evidenceItems, contradictionItems);
   return (
     <article className="space-y-4 sm:space-y-5">
       {/* Reader-first header: what happened → what we think about it →
@@ -266,20 +268,21 @@ export default async function SignalPage({ params }: PageProps) {
         </ul>
       </Disclosure>
 
-      <Disclosure
-        id="source-disagreement"
-        title={`Source disagreement (${contradictionsCount})`}
-        defaultOpen={false}
-        tone={contradictionsCount > 0 ? 'danger' : isComplexSignal ? 'warn' : 'neutral'}
-        badge={
-          contradictionsCount > 0
-            ? <Badge variant="disputed">Sources disagree</Badge>
-            : isComplexSignal
-              ? <Badge variant="muted" withIcon={false}>Detection skipped</Badge>
-              : undefined
-        }
-      >
-        {isComplexSignal ? (
+      {/* Source-disagreement detail moved into the unified
+          <VerifyAnalysis> panel above (Conflict analysis card). The
+          panel surfaces the broader taxonomy + numeric severity, plus
+          links each conflict back to the involved sources. We keep
+          a small fallback note here only when detection was SKIPPED
+          (signal too complex) — that's an editorially important
+          message and lives nowhere else. */}
+      {isComplexSignal && (
+        <Disclosure
+          id="source-disagreement"
+          title="Source-disagreement detection skipped"
+          defaultOpen={false}
+          tone="warn"
+          badge={<Badge variant="muted" withIcon={false}>Detection skipped</Badge>}
+        >
           <div className="text-sm text-ink-600 space-y-2">
             <p>
               Source-disagreement detection was skipped for this signal because it exceeded the
@@ -293,61 +296,8 @@ export default async function SignalPage({ params }: PageProps) {
               This is a cost- and performance-safety rail, not an editorial decision.
             </p>
           </div>
-        ) : contradictionsCount === 0 ? (
-          <p className="text-sm text-ink-500">No source disagreements are currently flagged for this signal.</p>
-        ) : (
-          <>
-            <p className="text-xs text-ink-500">
-              A public claim and observed reporting appear to disagree on a material detail. We surface the mismatch
-              and the underlying sources — we do not accuse anyone and we make no finding of fact.
-            </p>
-            <DisputeReadingGuide types={contradictionItems.map((c) => c.type)} />
-            <ul className="mt-3 space-y-3 text-sm">
-              {(contradictions ?? []).map((c: any) => {
-                const meta = (c.metadata ?? {}) as Record<string, any>;
-                const a = meta.a as { source?: string } | undefined;
-                const b = meta.b as { source?: string } | undefined;
-                const assertion = meta.assertion as { source?: string } | undefined;
-                const observation = meta.observation as { source?: string } | undefined;
-                const pair =
-                  a?.source && b?.source
-                    ? `${a.source} vs ${b.source}`
-                    : assertion?.source && observation?.source
-                      ? `${assertion.source} vs ${observation.source}`
-                      : null;
-                return (
-                  <li key={c.id} className="rounded-xl border border-ink-100 bg-canvas-50 p-3">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Badge variant="disputed" withIcon={false}>
-                        {formatContradictionType(c.type)}
-                      </Badge>
-                      <Badge
-                        variant={
-                          c.severity === 'high'
-                            ? 'disputed'
-                            : c.severity === 'medium'
-                              ? 'developing'
-                              : 'neutral'
-                        }
-                        withIcon={false}
-                      >
-                        severity: {c.severity ?? 'medium'}
-                      </Badge>
-                      {pair && (
-                        <span className="text-[11px] font-mono text-ink-400">{pair}</span>
-                      )}
-                    </div>
-                    <p className="mt-2 text-ink-700">{c.summary ?? c.claim}</p>
-                    <p className="mt-1 text-[12px] text-ink-500">
-                      Inline: {formatContradictionInline(c)}
-                    </p>
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )}
-      </Disclosure>
+        </Disclosure>
+      )}
 
       {/* Source trace — friendly role labels + pretty outlet names, no
           jargon like `[primary]`. The full evidence list is further down. */}
@@ -1060,6 +1010,19 @@ function TrustHero({
         </p>
       )}
 
+      {/* Bias-signal hint — strictly separate from the verdict, always
+          carries the "signal not a verdict" qualifier. Rendered INSIDE
+          the trust hero so a reader sees it next to the verdict and
+          knows the band did not move because of it. */}
+      {explanation.bias_hint && (
+        <p className="mt-2 rounded-xl border border-ink-100 bg-canvas-50 px-3 py-2 text-[13px] text-ink-600">
+          <span className="mr-1.5 font-semibold uppercase tracking-wider text-ink-500 text-[10px]">
+            Bias signal
+          </span>
+          {explanation.bias_hint}
+        </p>
+      )}
+
       {/* Action row — the AI shortcut + the deterministic learn-more
           pills. Putting them together tells the user that the analyst
           and the methodology page are continuations of THIS surface. */}
@@ -1167,50 +1130,6 @@ function bottomLineLabelForBand(band: ConfidenceBand): string {
     case 'contested':
       return 'SOURCES DISAGREE';
   }
-}
-
-/**
- * Plain-English dispute reading guide.
- *
- * When a signal has detected contradictions, this block tells the
- * reader HOW to inspect the disagreement without picking a winner.
- * It is fully deterministic — driven only by the contradiction type
- * mix on the signal — so it never invents new claims about either
- * side. AI capability 6 in the AI trust platform plan covers turning
- * this into an LLM-assisted reading guide; this is the deterministic
- * baseline that ships first.
- */
-function DisputeReadingGuide({ types }: { types: Array<string> }) {
-  const unique = new Set(types);
-  const items: string[] = [];
-  if (unique.has('cause_conflict')) {
-    items.push('Read the official statement and the local reporting separately. The cause is what is most disputed — note who claims what, and what evidence they offer.');
-  }
-  if (unique.has('numeric_conflict')) {
-    items.push('Compare the numbers across sources. Note when each source published, and whether later updates revised earlier figures.');
-  }
-  if (unique.has('presence_conflict')) {
-    items.push('One side reports activity that the other does not. Look for the underlying observation (sensor, eyewitness, statement) before treating either as settled.');
-  }
-  if (items.length === 0) {
-    items.push('Read the cited reports side by side before sharing specifics. Look for the original observation behind each claim.');
-  }
-  items.push('If the dispute is about cause or motive, treat that part as unsettled — even when the underlying event itself is well-supported.');
-  return (
-    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2.5">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700">
-        How to read this dispute
-      </p>
-      <ul className="mt-1.5 space-y-1 text-[13px] text-ink-700">
-        {items.map((item, i) => (
-          <li key={i} className="flex gap-2">
-            <span aria-hidden="true" className="mt-[6px] h-1 w-1 shrink-0 rounded-full bg-amber-500" />
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
 }
 
 /**
