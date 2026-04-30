@@ -143,9 +143,9 @@ function buildSummary(input: TrustExplanationInput): string {
   }
   switch (report.band) {
     case 'high':
-      return input.credible_source_count >= 4
-        ? `${input.credible_source_count} independently rated outlets are all reporting this.`
-        : 'A lot of independent reporting supports the basic shape of this event.';
+      return input.source_count >= 4
+        ? `${input.source_count} independent sources are all reporting the same event.`
+        : 'Multiple independent sources support the basic shape of this event.';
     case 'medium':
       return input.syndicated
         ? 'Several articles repeat the same wire report — that is useful coverage, but it is not the same as many independent confirmations.'
@@ -166,24 +166,17 @@ function buildWhy(input: TrustExplanationInput): string[] {
   // Lead with corroboration shape (mirrors the existing confidence
   // bullets but in slightly friendlier language).
   if (input.source_count > 0) {
-    const others = Math.max(0, input.source_count - input.credible_source_count);
-    if (input.credible_source_count >= 2) {
+    if (input.source_count >= 5) {
       out.push(
-        others > 0
-          ? `${input.source_count} sources are reporting this — ${input.credible_source_count} from rated outlets, plus ${others} we have not rated yet.`
-          : `${input.credible_source_count} rated outlets are independently reporting the same event.`,
+        `${input.source_count} independent sources are reporting this across multiple outlets.`,
       );
-    } else if (input.credible_source_count === 1) {
+    } else if (input.source_count >= 3) {
       out.push(
-        'One rated outlet is reporting this. Watching for independent confirmation from others.',
+        `${input.source_count} sources are reporting this, and the core event description is broadly consistent.`,
       );
-    } else if (input.source_count >= 5) {
+    } else if (input.source_count === 2) {
       out.push(
-        `${input.source_count} independent sources are reporting this. None are rated yet — read them yourself before relying on specifics.`,
-      );
-    } else if (input.source_count >= 2) {
-      out.push(
-        `${input.source_count} sources are reporting this so far, but none have been rated yet.`,
+        'Two sources are reporting this so far. Helpful signal, but still early.',
       );
     } else {
       out.push('Only one source is reporting this so far. That is not enough to judge reliability.');
@@ -330,12 +323,8 @@ function buildHeadlineChips(input: TrustExplanationInput): TrustHeadlineChip[] {
       href: '#source-disagreement',
     });
   }
-  if (input.credible_source_count >= 4) {
-    chips.push({ label: `${input.credible_source_count} rated outlets agree`, tone: 'support' });
-  } else if (input.credible_source_count >= 2) {
-    chips.push({ label: `${input.credible_source_count} rated outlets`, tone: 'support' });
-  } else if (input.source_count >= 5 && input.credible_source_count === 0) {
-    chips.push({ label: `${input.source_count} sources, none rated yet`, tone: 'caution' });
+  if (input.source_count >= 2) {
+    chips.push({ label: `${input.source_count} sources reporting`, tone: 'support' });
   } else if (input.source_count <= 1) {
     chips.push({ label: 'Single source', tone: 'caution' });
   }
@@ -359,18 +348,8 @@ function buildHeadlineChips(input: TrustExplanationInput): TrustHeadlineChip[] {
  */
 function buildWhatsSupported(input: TrustExplanationInput): string[] {
   const out: string[] = [];
-  const credible = input.credible_source_count;
   const total = input.source_count;
-  const others = Math.max(0, total - credible);
-  if (credible >= 2) {
-    out.push(
-      others > 0
-        ? `${credible} rated outlets and ${others} other source${others === 1 ? '' : 's'} all describe the same event.`
-        : `${credible} rated outlets all describe the same event.`,
-    );
-  } else if (credible === 1 && total > 1) {
-    out.push(`One rated outlet plus ${total - 1} other source${total - 1 === 1 ? '' : 's'} describe the same event.`);
-  } else if (total >= 5) {
+  if (total >= 5) {
     out.push(`${total} independent sources describe the same event.`);
   } else if (total >= 2) {
     out.push(`${total} sources describe the same event.`);

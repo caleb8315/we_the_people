@@ -608,13 +608,12 @@ function roleChipClass(role: 'primary' | 'corroborating' | 'conflicting' | 'sens
 function bottomLineForSignal(
   band: ConfidenceBand,
   sourceCount: number,
-  credibleSourceCount: number,
+  _credibleSourceCount: number,
   contradictionsCount: number,
   isComplexSignal: boolean,
 ): string {
-  // Guiding principle: describe what we found; don't editorialise about the
-  // sources. "Rated outlets" is shorthand for a curated list of outlets —
-  // useful, but not the only measure of whether reporting is real.
+  // Guiding principle: describe all-source corroboration shape, not a
+  // source-tier verdict.
   if (contradictionsCount > 0) {
     return 'Sources disagree on important details. Read both sides carefully before sharing specific claims.';
   }
@@ -623,13 +622,12 @@ function bottomLineForSignal(
   }
   switch (band) {
     case 'high':
-      return 'Multiple independently-rated outlets are reporting this. The basic shape of the event is well-supported.';
+      return sourceCount >= 2
+        ? `${sourceCount} independent sources are reporting this. The basic shape of the event is well-supported.`
+        : 'Multiple independent sources are reporting this. The basic shape of the event is well-supported.';
     case 'medium':
-      if (credibleSourceCount === 0 && sourceCount >= 5) {
-        return `${sourceCount} independent sources are reporting this, but none are from rated outlets yet. Check the evidence below — reporting often breaks in many places first.`;
-      }
-      if (credibleSourceCount === 1) {
-        return 'One rated outlet has this, along with other unrated sources. Promising, but check each one before trusting specifics.';
+      if (sourceCount >= 5) {
+        return `${sourceCount} independent sources are reporting this. Promising, but check each one before trusting specifics.`;
       }
       return 'This is still developing. The basic shape looks real, but specific claims need more corroboration.';
     case 'contested':
@@ -641,7 +639,7 @@ function bottomLineForSignal(
       if (sourceCount === 1) {
         return 'We\u2019ve only found one source so far. Read it directly, check who wrote it, and watch for others picking it up.';
       }
-      return `${sourceCount} sources are reporting this, but none are from rated outlets yet. Read them yourself before treating any specifics as confirmed.`;
+      return `${sourceCount} sources are reporting this. Read them yourself before treating any specifics as confirmed.`;
   }
 }
 
@@ -888,7 +886,6 @@ function TrustHero({
   signalId,
   band,
   bandTone,
-  credibleSourceCount,
   totalSourceCount,
   explanation,
   bottomLine,
@@ -896,12 +893,10 @@ function TrustHero({
   signalId: string;
   band: ConfidenceBand;
   bandTone: { wrap: string; label: string };
-  credibleSourceCount: number;
   totalSourceCount: number;
   explanation: TrustExplanation;
   bottomLine: string;
 }) {
-  const unratedSourceCount = Math.max(0, totalSourceCount - credibleSourceCount);
   return (
     <section className={`mt-4 rounded-2xl border p-4 sm:p-5 ${bandTone.wrap}`}>
       {/* Verdict line. */}
@@ -914,7 +909,7 @@ function TrustHero({
           {bottomLineLabelForBand(band)}
         </p>
         <span className="ml-auto text-[11px] text-ink-500">
-          {credibleSourceCount} rated · {unratedSourceCount} unrated
+          {totalSourceCount} source{totalSourceCount === 1 ? '' : 's'}
         </span>
       </div>
       <p className="mt-2.5 text-[15px] leading-relaxed text-ink sm:text-base">
