@@ -87,7 +87,7 @@ export function DevelopStoryButton({
 
   return (
     <section className="rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">
             Keep developing this story
@@ -111,7 +111,7 @@ export function DevelopStoryButton({
           type="button"
           onClick={run}
           disabled={loading}
-          className="inline-flex min-h-[44px] shrink-0 items-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(245,158,11,0.55)] transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-ink-200 disabled:text-ink-500 disabled:shadow-none"
+          className="inline-flex min-h-[44px] w-full shrink-0 items-center justify-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(245,158,11,0.55)] transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-ink-200 disabled:text-ink-500 disabled:shadow-none md:w-auto"
         >
           {loading ? <>Searching&hellip;</> : <>Find more sources now</>}
         </button>

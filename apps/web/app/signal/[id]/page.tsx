@@ -129,6 +129,16 @@ export default async function SignalPage({ params }: PageProps) {
     complex_signal: isComplexSignal,
     title: signal.title,
   });
+  const guidedFlowSteps: Array<{ href: string; label: string }> = [
+    { href: '#why-shown', label: 'Why this signal is shown' },
+    { href: '#sources', label: `Sources (${report.source_trace.length})` },
+    { href: '#source-disagreement', label: `Source disagreement (${contradictionsCount})` },
+    ...(physicalEvidence ? [{ href: '#physical-evidence', label: 'Physical evidence' }] : []),
+    ...(signal.reliability_score != null
+      ? [{ href: '#advanced-reliability', label: 'Advanced reliability' }]
+      : []),
+    { href: '#all-evidence', label: `All evidence (${evidenceCount})` },
+  ];
 
   return (
     <article className="space-y-5 sm:space-y-6">
@@ -227,10 +237,28 @@ export default async function SignalPage({ params }: PageProps) {
         lastEnrichedAt={lastEnrichedAt}
         canForce={canForce}
       />
+      <GuidedFlowNav steps={guidedFlowSteps} />
+
+      <Disclosure id="why-shown" title="Why it’s shown" defaultOpen={true}>
+        <ul className="space-y-2 text-sm text-ink-600">
+          <li>
+            This signal groups {signal.source_count} reports across {(signal.distinct_domains ?? []).length} distinct
+            domains.
+          </li>
+          <li>
+            Reliability label: <strong>{statusLabel(signal.verification_status)}</strong>.{' '}
+            {statusDescription(signal.verification_status)}
+          </li>
+          <li>
+            Severity is an analyst heuristic (0–100). Both are descriptive of the reporting, not
+            predictive of outcomes.
+          </li>
+        </ul>
+      </Disclosure>
 
       {/* Source trace — friendly role labels + pretty outlet names, no
           jargon like `[primary]`. The full evidence list is further down. */}
-      <Disclosure title={`Sources (${report.source_trace.length})`} defaultOpen={true}>
+      <Disclosure id="sources" title={`Sources (${report.source_trace.length})`} defaultOpen={false}>
         <p className="text-xs text-ink-500">
           The sources that drove the verdict above, grouped by how they relate to the event.
         </p>
@@ -265,25 +293,9 @@ export default async function SignalPage({ params }: PageProps) {
         </ul>
       </Disclosure>
 
-      <Disclosure title="Why it’s shown" defaultOpen={false}>
-        <ul className="space-y-2 text-sm text-ink-600">
-          <li>
-            This signal groups {signal.source_count} reports across {(signal.distinct_domains ?? []).length} distinct
-            domains.
-          </li>
-          <li>
-            Reliability label: <strong>{statusLabel(signal.verification_status)}</strong>.{' '}
-            {statusDescription(signal.verification_status)}
-          </li>
-          <li>
-            Severity is an analyst heuristic (0–100). Both are descriptive of the reporting, not
-            predictive of outcomes.
-          </li>
-        </ul>
-      </Disclosure>
-
       {signal.reliability_score != null && (
         <Disclosure
+          id="advanced-reliability"
           title={`Advanced: reliability score (${signal.reliability_score}/100)`}
           defaultOpen={false}
         >
@@ -404,7 +416,7 @@ export default async function SignalPage({ params }: PageProps) {
         <Disclosure
           id="physical-evidence"
           title={`Physical evidence · ${physicalEvidence.status.replace('_', ' ')}`}
-          defaultOpen={true}
+          defaultOpen={false}
         >
           <p className="text-xs text-ink-500">{physicalEvidencePhrase(physicalEvidence)}</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -452,7 +464,7 @@ export default async function SignalPage({ params }: PageProps) {
         </Disclosure>
       )}
 
-      <Disclosure id="all-evidence" title={`All evidence (${evidenceCount})`} defaultOpen={evidenceCount > 0}>
+      <Disclosure id="all-evidence" title={`All evidence (${evidenceCount})`} defaultOpen={false}>
         {evidenceCount === 0 ? (
           <p className="text-sm text-ink-400">No evidence rows yet.</p>
         ) : (
@@ -511,6 +523,41 @@ function bandDotClass(band: ConfidenceBand): string {
     case 'low':
       return 'bg-ink-300';
   }
+}
+
+function GuidedFlowNav({
+  steps,
+}: {
+  steps: Array<{ href: string; label: string }>;
+}) {
+  return (
+    <nav
+      aria-label="Signal detail flow"
+      className="rounded-card border border-ink-100 bg-paper p-4 shadow-card sm:p-5"
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-500">
+        Follow this flow
+      </p>
+      <ol className="mt-2 space-y-1.5">
+        {steps.map((step, index) => (
+          <li key={step.href}>
+            <a
+              href={step.href}
+              className="group flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-sm text-ink-600 transition hover:bg-canvas-50 hover:text-ink"
+            >
+              <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-ink-200 bg-canvas-50 text-[11px] font-semibold text-ink-500 group-hover:border-amber-200 group-hover:bg-amber-50 group-hover:text-amber-700">
+                {index + 1}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{step.label}</span>
+              <span aria-hidden="true" className="text-ink-300 group-hover:text-amber-500">
+                →
+              </span>
+            </a>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
 }
 
 /** Colours for the hero verdict callout — mirrors the same helper the
