@@ -215,6 +215,78 @@ describe('buildTrustExplanation', () => {
     }
   });
 
+  it('does not call sources "independent" when the syndication flag is set', () => {
+    // The user-visible bug: when syndicated=true the card was saying
+    // "10 independent sources describe the same event" AND "Several
+    // articles repeat the same wire copy" at the same time. Those say
+    // opposite things. This test pins the fix in place.
+    const exp = buildTrustExplanation({
+      report: highReport(),
+      source_count: 10,
+      credible_source_count: 0,
+      contradictions_count: 0,
+      syndicated: true,
+    });
+    const allLines = [
+      exp.summary,
+      ...exp.why_bullets,
+      ...exp.whats_supported,
+      ...exp.whats_disputed,
+      ...exp.whats_unclear,
+      exp.watch_for ?? '',
+      ...exp.headline_chips.map((c) => c.label),
+    ].join(' \u2502 ');
+    assert.ok(
+      !/\bindependent\s+sources?\b/i.test(allLines),
+      `Syndicated explanation must NOT claim "independent sources". Got: ${allLines}`,
+    );
+    assert.ok(
+      /republish|same article|carrying|running the same/i.test(allLines),
+      'Syndicated explanation should describe republishing in plain English',
+    );
+  });
+
+  it('uses plain language instead of industry jargon ("wire copy", "wire report")', () => {
+    const exp = buildTrustExplanation({
+      report: highReport(),
+      source_count: 8,
+      credible_source_count: 0,
+      contradictions_count: 0,
+      syndicated: true,
+    });
+    const allLines = [
+      exp.summary,
+      ...exp.why_bullets,
+      ...exp.whats_supported,
+      ...exp.whats_disputed,
+      ...exp.whats_unclear,
+      exp.watch_for ?? '',
+      ...exp.headline_chips.map((c) => c.label),
+    ].join(' \u2502 ');
+    assert.ok(
+      !/\bwire\s+(copy|copies|report)\b/i.test(allLines),
+      `Syndicated explanation should not use industry jargon "wire copy/copies/report". Got: ${allLines}`,
+    );
+    assert.ok(
+      !/\bsyndicat/i.test(allLines),
+      `User-facing copy should not use the word "syndicated". Got: ${allLines}`,
+    );
+  });
+
+  it('chip labels carry tooltip hints so jargon-y or short labels can self-explain', () => {
+    const exp = buildTrustExplanation({
+      report: highReport(),
+      source_count: 8,
+      credible_source_count: 0,
+      contradictions_count: 0,
+      syndicated: true,
+    });
+    const sameArticle = exp.headline_chips.find((c) => /republished|same article/i.test(c.label));
+    assert.ok(sameArticle, 'expected a "same article republished" chip when syndicated');
+    assert.ok(typeof sameArticle!.hint === 'string' && sameArticle!.hint.length > 0,
+      'jargon-y chip must carry a hint');
+  });
+
   it('produces a suggested chat prompt grounded in the signal title', () => {
     const exp = buildTrustExplanation({
       report: contestedReport(),
