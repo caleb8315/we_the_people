@@ -25,7 +25,13 @@
     "./social": "./src/social.ts",
     "./media": "./src/media.ts",
     "./ai-provider": "./src/ai-provider.ts",
-    "./trust-explainer": "./src/trust-explainer.ts"
+    "./trust-explainer": "./src/trust-explainer.ts",
+    "./source-ranking": "./src/source-ranking.ts",
+    "./conflict-analysis": "./src/conflict-analysis.ts",
+    "./bias": "./src/bias.ts",
+    "./evidence-cards": "./src/evidence-cards.ts",
+    "./confidence-breakdown": "./src/confidence-breakdown.ts",
+    "./result-explanation": "./src/result-explanation.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

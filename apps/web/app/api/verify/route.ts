@@ -14,6 +14,15 @@ import {
   isSocialUrl,
   reliabilityPublicLabel,
   computeReliabilityScores,
+  rankSources,
+  summarizeRankedSources,
+  analyzeConflicts,
+  summarizeConflicts,
+  detectCorpusBias,
+  buildEvidenceCards,
+  summarizeEvidenceCards,
+  buildConfidenceBreakdown,
+  buildResultExplanation,
 } from '@osint/core';
 import type {
   ConfidenceReport,
@@ -22,6 +31,15 @@ import type {
   SocialProvenance,
   LinkProvenance,
   ImageProvenance,
+  RankedSource,
+  RankedSourceSummary,
+  AnalyzedConflict,
+  ConflictSummary,
+  CorpusBiasReport,
+  EvidenceCard,
+  EvidenceCardSummary,
+  ConfidenceBreakdown,
+  ResultExplanation,
 } from '@osint/core';
 import { getAdminSupabase, getServerSupabase } from '@/lib/supabase-server';
 import { getClientKey, limit } from '@/lib/rate-limit';
@@ -79,6 +97,28 @@ type VerifyResponse = {
    * report for everything user-facing.
    */
   reader_report: ReaderReport;
+  /**
+   * April 2026 upgrade — evidence comparison platform layer.
+   * Adds: ranked sources with rationale, an extended conflict taxonomy
+   * with numeric severity, a bias signal layer, evidence cards with
+   * stance, a 4-component confidence breakdown, and the four result
+   * explanation sections (why this result, what would resolve this,
+   * what sources agree on, what sources disagree on).
+   *
+   * The original `report` and `reader_report` shapes are unchanged so
+   * existing callers keep working — `analysis` is purely additive.
+   */
+  analysis: {
+    ranked_sources: RankedSource[];
+    ranked_summary: RankedSourceSummary;
+    conflicts: AnalyzedConflict[];
+    conflict_summary: ConflictSummary;
+    bias: CorpusBiasReport;
+    evidence_cards: EvidenceCard[];
+    cards_summary: EvidenceCardSummary;
+    confidence_breakdown: ConfidenceBreakdown;
+    explanation: ResultExplanation;
+  };
   input: {
     kind: 'url' | 'text' | 'image';
     canonical_url: string | null;
@@ -305,6 +345,56 @@ export async function POST(req: Request) {
   // Silence unused-confidence lint while still asserting the heuristic matches.
   void heuristicConfidence(decision.source_count, decision.credible_source_count);
 
+  // April 2026 evidence comparison upgrade. Each layer is additive and
+  // pure — none of these rewrite the legacy `report`/`reader_report`.
+  const ranked = rankSources({
+    evidence: mergedEvidence,
+    anchor_url: canonical_url ?? body.url ?? null,
+  });
+  const rankedSummary = summarizeRankedSources(ranked);
+  const analyzedConflicts = analyzeConflicts({
+    contradictions: corroboration.contradictions,
+    evidence: mergedEvidence,
+    claim_title: title,
+    claim_text: body.text ?? null,
+  });
+  const conflictSummary = summarizeConflicts(analyzedConflicts);
+  const evidenceCards = buildEvidenceCards({
+    evidence: mergedEvidence,
+    ranked,
+    contradictions: corroboration.contradictions,
+  });
+  const cardsSummary = summarizeEvidenceCards(evidenceCards);
+
+  // Bias is a SIGNAL, not a verdict — keep it strictly out of the
+  // confidence breakdown so the score above never moves because of
+  // tone alone.
+  const corpusBias = detectCorpusBias(
+    mergedEvidence.map((e) => `${e.title ?? ''} ${e.excerpt ?? ''}`),
+  );
+
+  const breakdown = buildConfidenceBreakdown({
+    ranked,
+    ranked_summary: rankedSummary,
+    conflicts: analyzedConflicts,
+    conflict_summary: conflictSummary,
+    cards_summary: cardsSummary,
+    has_anchor: Boolean(canonical_url),
+    is_text_only: body.kind === 'text',
+    cap_at_medium: capMedium,
+  });
+  const resultExplanation = buildResultExplanation({
+    band: report.band,
+    breakdown,
+    ranked_summary: rankedSummary,
+    conflicts: analyzedConflicts,
+    conflict_summary: conflictSummary,
+    cards_summary: cardsSummary,
+    has_anchor: Boolean(canonical_url),
+    is_text_only: body.kind === 'text',
+    is_social: Boolean(social),
+  });
+
   // Persist when the user is authenticated. Anonymous readers still get a
   // full confidence report back — we just don't retain a history row.
   let verification_id: string | null = null;
@@ -390,6 +480,17 @@ export async function POST(req: Request) {
   const response: VerifyResponse = {
     report,
     reader_report: readerReport,
+    analysis: {
+      ranked_sources: ranked,
+      ranked_summary: rankedSummary,
+      conflicts: analyzedConflicts,
+      conflict_summary: conflictSummary,
+      bias: corpusBias,
+      evidence_cards: evidenceCards,
+      cards_summary: cardsSummary,
+      confidence_breakdown: breakdown,
+      explanation: resultExplanation,
+    },
     input: {
       kind: body.kind,
       canonical_url,

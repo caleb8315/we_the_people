@@ -4,7 +4,8 @@ import { getServerSupabase } from '@/lib/supabase-server';
 import { AccessRequestForm } from '@/components/access-request-form';
 
 export const metadata = {
-  title: 'Crosscheck — see where reporting agrees, conflicts, and lacks evidence',
+  title:
+    'Crosscheck — compare sources, see where they agree, where they conflict, and where bias may be shaping the story',
 };
 
 const TOPIC_TILES: Array<{ label: string; slug: string; tile: string; kicker: string }> = [
@@ -34,16 +35,17 @@ export default async function LandingPage() {
     <div className="space-y-8 sm:space-y-12">
       <section>
         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">
-          Source consistency
+          Evidence comparison platform
         </p>
         <h1 className="mt-3 max-w-3xl text-[40px] font-semibold leading-[1.05] tracking-tight text-ink sm:text-[56px]">
-          let&apos;s find out <br className="hidden sm:block" />
-          <span className="text-ink-500">what the world actually agrees on.</span>
+          Compare sources. <br className="hidden sm:block" />
+          <span className="text-ink-500">See where they agree, conflict, and shape the narrative.</span>
         </h1>
         <p className="mt-5 max-w-2xl text-base text-ink-500 sm:text-lg">
-          Crosscheck reads public reporting and open sensor networks, clusters them by event, and
-          shows three things for each: how sources agree, where they conflict, and which pieces of
-          evidence are still missing.
+          Crosscheck is not a truth detector. It is an evidence comparison platform that ranks
+          sources, classifies their disagreements, surfaces bias signals separately from the
+          verdict, and explains every score so you can decide what is supported, what is disputed,
+          and where bias may be shaping the story.
         </p>
 
         {/* Search-like CTA row matching the reference's rounded input + filter button. */}
@@ -193,23 +195,27 @@ export default async function LandingPage() {
         </ul>
       </section>
 
-      {/* What you get — feature trio, now on the light canvas. */}
+      {/* What you get — feature quartet, now on the light canvas. */}
       <section>
         <h2 className="text-xl font-semibold tracking-tight text-ink sm:text-2xl">
           What Crosscheck gives you
         </h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Feature
-            title="Agreement"
-            body="Cluster public reports by event and show how many independent credible sources are telling the same story."
+            title="Comparison"
+            body="Rank every source by credibility, directness, recency, and independence — with a short rationale for why each one ranks where it does."
           />
           <Feature
-            title="Conflicts"
-            body="Surface numeric mismatches, cause disagreements, and presence vs. absence discrepancies — with direct citations."
+            title="Conflicts, classified"
+            body="Distinguish direct contradiction, framing differences, timeline mismatches, missing context, and insufficient evidence — each with a numeric severity score."
           />
           <Feature
-            title="Evidence gaps"
-            body="Report when seismic, satellite, or weather-service sensor data supports a claim, and just as clearly when it doesn't."
+            title="Bias as a signal"
+            body="Detect loaded language, one-sided framing, selective-omission cues, and emotional tone — kept strictly separate from the truth/comparison verdict."
+          />
+          <Feature
+            title="Transparency"
+            body="Every confidence score breaks down into source agreement, source quality, claim directness, and evidence completeness — with a 'Why this result?' section."
           />
         </div>
       </section>
