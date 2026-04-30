@@ -86,17 +86,15 @@ export function SignalCard({ s }: { s: SignalRow }) {
   const inline = (s.contradictions_inline ?? []).slice(0, 3);
   const disputed = s.is_disputed ?? (s.contradictions_count ?? 0) > 0;
   const showEvidenceBlock = PHYSICAL_EVIDENCE_TOPICS.has(s.topic ?? '');
-  const hasExpandableDetails =
-    Boolean(s.trust_explanation?.watch_for) ||
-    isComplexSignal ||
-    inline.length > 0 ||
-    (showEvidenceBlock && Boolean(s.physical_evidence));
 
   const tileClass = TOPIC_TILE[s.topic ?? ''] ?? 'tile-default';
   const glyph = TOPIC_GLYPH[s.topic ?? ''] ?? '◎';
 
   return (
-    <article className="group overflow-hidden rounded-card border border-ink-100 bg-paper shadow-card transition hover:shadow-card-hover">
+    <Link
+      href={`/signal/${s.id}`}
+      className="group block overflow-hidden rounded-card border border-ink-100 bg-paper shadow-card transition hover:shadow-card-hover focus-visible:border-amber-400"
+    >
       <div className="flex flex-col sm:flex-row">
         {/* Topic tile — acts as the "image" in the reference's Travel Package
             cards. On mobile it's a full-width band; on desktop it's a
@@ -114,10 +112,8 @@ export function SignalCard({ s }: { s: SignalRow }) {
 
         <div className="min-w-0 flex-1 p-4 sm:p-5">
           {/* Event title first — the thing the reader is here to see. */}
-          <h3 className="text-[18px] font-semibold leading-snug tracking-tight text-ink clamp-2 sm:text-[20px]">
-            <Link href={`/signal/${s.id}`} className="transition hover:text-ink-700 focus-visible:underline">
-              {s.title}
-            </Link>
+          <h3 className="text-[18px] font-semibold leading-snug tracking-tight text-ink clamp-2 group-hover:text-ink-700 sm:text-[20px]">
+            {s.title}
           </h3>
           {s.summary && (
             <p className="mt-1.5 text-[14px] leading-relaxed text-ink-500 clamp-2 sm:text-[15px]">
@@ -148,66 +144,57 @@ export function SignalCard({ s }: { s: SignalRow }) {
             </div>
           )}
 
-          {hasExpandableDetails && (
-            <details className="mt-3 rounded-xl border border-ink-100 bg-canvas-50 px-3 py-2">
-              <summary className="cursor-pointer list-none text-[12px] font-semibold uppercase tracking-wider text-ink-500 [&::-webkit-details-marker]:hidden">
-                Expand details
-              </summary>
-              <div className="mt-2.5 space-y-2.5">
-                {/* Compact "Watch for" line — appears only when the explainer
-                    has a hint to give (contested cause, single-source story,
-                    syndicated wire repetition). Keeps low-confidence cards
-                    honest without adding chrome to every signal. */}
-                {s.trust_explanation?.watch_for && (
-                  <p className="flex items-start gap-1.5 text-[12.5px] text-amber-800 sm:text-[13px]">
-                    <span
-                      aria-hidden="true"
-                      className="mt-[3px] inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
-                    />
-                    <span className="clamp-2">
-                      <span className="font-semibold uppercase tracking-wider text-amber-700 text-[10px]">
-                        Watch for
-                      </span>{' '}
-                      {s.trust_explanation.watch_for}
-                    </span>
-                  </p>
-                )}
+          {/* Compact "Watch for" line — appears only when the explainer
+              has a hint to give (contested cause, single-source story,
+              syndicated wire repetition). Keeps low-confidence cards
+              honest without adding chrome to every signal. */}
+          {s.trust_explanation?.watch_for && (
+            <p className="mt-2 flex items-start gap-1.5 text-[12.5px] text-amber-800 sm:text-[13px]">
+              <span
+                aria-hidden="true"
+                className="mt-[3px] inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+              />
+              <span className="clamp-2">
+                <span className="font-semibold uppercase tracking-wider text-amber-700 text-[10px]">
+                  Watch for
+                </span>{' '}
+                {s.trust_explanation.watch_for}
+              </span>
+            </p>
+          )}
 
-                {isComplexSignal && (
-                  <div className="rounded-xl border border-ink-100 bg-canvas-100 px-3 py-2 text-[12px] text-ink-500">
-                    Source-disagreement detection was skipped (over inline limit). Open the signal page
-                    to review evidence directly.
-                  </div>
-                )}
+          {isComplexSignal && (
+            <div className="mt-3 rounded-xl border border-ink-100 bg-canvas-100 px-3 py-2 text-[12px] text-ink-500">
+              Source-disagreement detection was skipped (over inline limit). Open the signal page
+              to review evidence directly.
+            </div>
+          )}
 
-                {!isComplexSignal && inline.length > 0 && (
-                  <div className="rounded-xl border border-danger-200 bg-danger-50 px-3 py-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-danger-700">
-                      Key differences detected
-                    </p>
-                    <ul className="mt-1.5 space-y-0.5 text-[13px] text-ink-700">
-                      {inline.map((c, i) => (
-                        <li key={i} className="clamp-1">
-                          <span aria-hidden="true" className="text-danger-500">
-                            •
-                          </span>{' '}
-                          {formatContradictionInline(c)}
-                        </li>
-                      ))}
-                    </ul>
-                    {(s.contradictions_count ?? 0) > inline.length && (
-                      <p className="mt-1 text-[11px] text-danger-600">
-                        +{(s.contradictions_count ?? 0) - inline.length} more on the signal page
-                      </p>
-                    )}
-                  </div>
-                )}
+          {!isComplexSignal && inline.length > 0 && (
+            <div className="mt-3 rounded-xl border border-danger-200 bg-danger-50 px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-danger-700">
+                Key differences detected
+              </p>
+              <ul className="mt-1.5 space-y-0.5 text-[13px] text-ink-700">
+                {inline.map((c, i) => (
+                  <li key={i} className="clamp-1">
+                    <span aria-hidden="true" className="text-danger-500">
+                      •
+                    </span>{' '}
+                    {formatContradictionInline(c)}
+                  </li>
+                ))}
+              </ul>
+              {(s.contradictions_count ?? 0) > inline.length && (
+                <p className="mt-1 text-[11px] text-danger-600">
+                  +{(s.contradictions_count ?? 0) - inline.length} more on the signal page
+                </p>
+              )}
+            </div>
+          )}
 
-                {showEvidenceBlock && s.physical_evidence && (
-                  <PhysicalEvidenceBlock pe={s.physical_evidence} />
-                )}
-              </div>
-            </details>
+          {showEvidenceBlock && s.physical_evidence && (
+            <PhysicalEvidenceBlock pe={s.physical_evidence} />
           )}
 
           {/* Meta + CTA row */}
@@ -240,10 +227,9 @@ export function SignalCard({ s }: { s: SignalRow }) {
               <RelativeTime iso={s.occurred_at ?? s.first_seen_at} />
               {(s as any).community_feedback?.total > 0 && <FeedbackIndicator fb={(s as any).community_feedback} />}
             </div>
-            <Link
-              href={`/signal/${s.id}`}
-              aria-label={`Open signal ${s.title}`}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white shadow-[0_6px_16px_-4px_rgba(245,158,11,0.55)] transition hover:bg-amber-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+            <span
+              aria-hidden="true"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white shadow-[0_6px_16px_-4px_rgba(245,158,11,0.55)] transition group-hover:bg-amber-600"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -257,11 +243,11 @@ export function SignalCard({ s }: { s: SignalRow }) {
                 <path d="M5 12h14" />
                 <path d="m13 5 7 7-7 7" />
               </svg>
-            </Link>
+            </span>
           </div>
         </div>
       </div>
-    </article>
+    </Link>
   );
 }
 
