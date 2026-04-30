@@ -1,9 +1,14 @@
 import Link from 'next/link';
 import { statusLabel } from '@osint/core';
 import type {
+  AnalyzedConflict,
   ConfidenceBand,
+  ConfidenceBreakdown,
   ConfidenceReport,
+  CorpusBiasReport,
   PhysicalEvidence,
+  RankedSource,
+  RankedSourceSummary,
   TrustExplanation,
 } from '@osint/core';
 import {
@@ -51,6 +56,13 @@ export interface SignalRow {
   trust_explanation?: TrustExplanation;
   physical_evidence?: PhysicalEvidence | null;
   contradictions_inline?: ContradictionInline[];
+  // April 2026 evidence-comparison upgrade. The decorate path always
+  // populates these (persisted-or-computed), but we keep them optional
+  // on the row type so unit tests / older callers can omit them.
+  ranked_sources?: RankedSource[];
+  analyzed_conflicts?: AnalyzedConflict[];
+  bias_report?: CorpusBiasReport;
+  confidence_breakdown?: ConfidenceBreakdown;
 }
 
 const PHYSICAL_EVIDENCE_TOPICS = new Set(['war', 'disaster', 'climate']);
@@ -170,31 +182,53 @@ export function SignalCard({ s }: { s: SignalRow }) {
             </div>
           )}
 
-          {!isComplexSignal && inline.length > 0 && (
-            <div className="mt-3 rounded-xl border border-danger-200 bg-danger-50 px-3 py-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-danger-700">
-                Key differences detected
-              </p>
-              <ul className="mt-1.5 space-y-0.5 text-[13px] text-ink-700">
-                {inline.map((c, i) => (
-                  <li key={i} className="clamp-1">
-                    <span aria-hidden="true" className="text-danger-500">
-                      •
-                    </span>{' '}
-                    {formatContradictionInline(c)}
-                  </li>
-                ))}
-              </ul>
-              {(s.contradictions_count ?? 0) > inline.length && (
-                <p className="mt-1 text-[11px] text-danger-600">
-                  +{(s.contradictions_count ?? 0) - inline.length} more on the signal page
-                </p>
-              )}
-            </div>
-          )}
+          {/* Key differences — prefer the upgraded analyzed_conflicts
+              (broader taxonomy, numeric severity) when the decorate
+              path attached them. Falls back to the legacy contradiction
+              inline block for old rows or when only insufficient_evidence
+              fired (which we don't surface as a "difference"). */}
+          {!isComplexSignal && (s.analyzed_conflicts && s.analyzed_conflicts.length > 0
+            ? renderAnalyzedDifferences(s.analyzed_conflicts)
+            : inline.length > 0 && (
+                <div className="mt-3 rounded-xl border border-danger-200 bg-danger-50 px-3 py-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-danger-700">
+                    Key differences detected
+                  </p>
+                  <ul className="mt-1.5 space-y-0.5 text-[13px] text-ink-700">
+                    {inline.map((c, i) => (
+                      <li key={i} className="clamp-1">
+                        <span aria-hidden="true" className="text-danger-500">
+                          •
+                        </span>{' '}
+                        {formatContradictionInline(c)}
+                      </li>
+                    ))}
+                  </ul>
+                  {(s.contradictions_count ?? 0) > inline.length && (
+                    <p className="mt-1 text-[11px] text-danger-600">
+                      +{(s.contradictions_count ?? 0) - inline.length} more on the signal page
+                    </p>
+                  )}
+                </div>
+              ))}
 
           {showEvidenceBlock && s.physical_evidence && (
             <PhysicalEvidenceBlock pe={s.physical_evidence} />
+          )}
+
+          {/* April 2026 comparison strip — source mix and bias signal.
+              Conflict info lives in the differences block above (which
+              prefers analyzed_conflicts when populated), so this strip
+              focuses on what the differences block can't show: the
+              ranked source mix and the corpus-level bias signal. The
+              bias chip is always tagged "signal" so it never reads as
+              a verdict. */}
+          {(s.ranked_sources && s.ranked_sources.length > 0) && (
+            <ComparisonStrip
+              ranked={s.ranked_sources}
+              bias={s.bias_report ?? null}
+              breakdown={s.confidence_breakdown ?? null}
+            />
           )}
 
           {/* Meta + CTA row */}
@@ -319,6 +353,134 @@ function PhysicalEvidenceBlock({ pe }: { pe: PhysicalEvidence }) {
       </ul>
     </div>
   );
+}
+
+/**
+ * Render the upgraded "Key differences detected" block using the
+ * analyzed_conflicts taxonomy. This replaces the legacy 3-type inline
+ * list when the decorate path has attached the broader analysis.
+ */
+function renderAnalyzedDifferences(conflicts: AnalyzedConflict[]) {
+  const visible = conflicts
+    .filter((c) => c.type !== 'insufficient_evidence')
+    .sort((a, b) => b.severity_score - a.severity_score)
+    .slice(0, 3);
+  if (visible.length === 0) return null;
+  const remaining = conflicts.length - visible.length;
+  return (
+    <div className="mt-3 rounded-xl border border-danger-200 bg-danger-50 px-3 py-2">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-danger-700">
+        Key differences detected
+      </p>
+      <ul className="mt-1.5 space-y-0.5 text-[13px] text-ink-700">
+        {visible.map((c, i) => (
+          <li key={i} className="clamp-1">
+            <span aria-hidden="true" className="text-danger-500">
+              •
+            </span>{' '}
+            <span className="font-semibold text-ink-800">
+              {conflictLabel(c)} {c.severity_score}/100:
+            </span>{' '}
+            {c.summary}
+          </li>
+        ))}
+      </ul>
+      {remaining > 0 && (
+        <p className="mt-1 text-[11px] text-danger-600">
+          +{remaining} more on the signal page
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * At-a-glance comparison strip for the feed card. Two chips:
+ *   1. Source mix (primaries / officials / rated outlets)
+ *   2. Bias signal (always with the "signal" qualifier)
+ * Plus a confidence-breakdown number on the right edge. Conflict info
+ * is rendered separately in the differences block above so we don't
+ * stack the same data twice.
+ */
+function ComparisonStrip({
+  ranked,
+  bias,
+  breakdown,
+}: {
+  ranked: RankedSource[];
+  bias: CorpusBiasReport | null;
+  breakdown: ConfidenceBreakdown | null;
+}) {
+  const mix = computeMixSummary(ranked);
+  const showBias = bias && bias.has_signal;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-1.5 rounded-xl border border-ink-100 bg-canvas-50 px-2.5 py-2 text-[11px]">
+      <span className="font-semibold uppercase tracking-wider text-ink-500">
+        Comparison
+      </span>
+      <span aria-hidden="true" className="text-ink-300">·</span>
+      <span className="text-ink-600">{mix}</span>
+      {showBias && bias && (
+        <>
+          <span aria-hidden="true" className="text-ink-300">·</span>
+          <span
+            className={`rounded-full px-2 py-0.5 font-medium ${biasChipClass(bias.band)}`}
+            title={bias.summary}
+          >
+            Bias signal · {bias.band}
+          </span>
+        </>
+      )}
+      {breakdown && (
+        <span className="ml-auto text-ink-500">
+          {breakdown.composite}/100 confidence
+        </span>
+      )}
+    </div>
+  );
+}
+
+function computeMixSummary(ranked: RankedSource[]): string {
+  const primaries = ranked.filter((r) => r.role === 'primary').length;
+  const officials = ranked.filter((r) => r.role === 'official').length;
+  const rated = ranked.filter(
+    (r) => r.is_credible && r.role !== 'primary' && r.role !== 'official',
+  ).length;
+  const total = ranked.length;
+  const parts: string[] = [];
+  if (primaries > 0) parts.push(`${primaries} primary`);
+  if (officials > 0) parts.push(`${officials} official`);
+  if (rated > 0) parts.push(`${rated} rated`);
+  if (parts.length === 0) parts.push(`${total} source${total === 1 ? '' : 's'}`);
+  return parts.join(' · ');
+}
+
+function conflictLabel(c: AnalyzedConflict): string {
+  switch (c.type) {
+    case 'direct_contradiction':
+      return 'Contradiction';
+    case 'framing_difference':
+      return 'Framing';
+    case 'timeline_mismatch':
+      return 'Timeline';
+    case 'missing_context':
+      return 'Missing context';
+    case 'insufficient_evidence':
+      return 'Thin';
+  }
+}
+
+function biasChipClass(band: 'neutral' | 'low' | 'moderate' | 'strong'): string {
+  switch (band) {
+    case 'strong':
+      return 'bg-amber-100 text-amber-800';
+    case 'moderate':
+      return 'bg-amber-50 text-amber-700';
+    case 'low':
+      return 'bg-ink-100 text-ink-600';
+    case 'neutral':
+      return 'bg-emerald-50 text-emerald-700';
+  }
 }
 
 function FeedbackIndicator({ fb }: { fb: { helpful: number; unclear: number; inaccurate: number; total: number } }) {

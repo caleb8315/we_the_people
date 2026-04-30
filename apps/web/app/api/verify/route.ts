@@ -414,6 +414,23 @@ export async function POST(req: Request) {
         provenance_tags: provenanceWarnings.slice(0, 10),
         confidence_band: report.band,
         confidence_report: report,
+        // April 2026 evidence-comparison upgrade — persist the upgraded
+        // analysis blob (migration 028) so historical verifications can
+        // be re-rendered with the upgraded panel without re-running the
+        // live-corroboration fan-out. analysis_version is bumped in
+        // lockstep with the worker's ANALYSIS_VERSION constant.
+        analysis: {
+          ranked_sources: ranked,
+          ranked_summary: rankedSummary,
+          conflicts: analyzedConflicts,
+          conflict_summary: conflictSummary,
+          bias: corpusBias,
+          evidence_cards: evidenceCards,
+          cards_summary: cardsSummary,
+          confidence_breakdown: breakdown,
+          explanation: resultExplanation,
+        },
+        analysis_version: 1,
         status: 'ready',
       })
       .select('id')

@@ -1,11 +1,16 @@
 import {
+  analyzeConflicts,
   assessPhysicalEvidence,
+  buildConfidenceBreakdown,
+  buildEvidenceCards,
   buildReliabilitySummary,
+  buildResultExplanation,
   classifyTopic,
   clusterItems,
   computeExpiry,
   computeReliabilityScores,
   decideVerification,
+  detectCorpusBias,
   detectInconsistenciesWithLimits,
   extractClaimsFromEvidence,
   extractDomain,
@@ -14,8 +19,12 @@ import {
   isCredibleDomain,
   MAX_CLAIMS_PER_SIGNAL,
   MAX_SOURCES_PER_SIGNAL,
+  rankSources,
   registerDynamicCredibleDomains,
   reliabilityPublicLabel,
+  summarizeConflicts,
+  summarizeEvidenceCards,
+  summarizeRankedSources,
 } from '@osint/core';
 // makeDedupeKey uses `node:crypto` and therefore lives OUTSIDE the
 // browser-safe barrel above. Import it from the subpath so no client
@@ -45,6 +54,14 @@ import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
  * magnitude-5 quake or a tornado warning surfaces in well under a
  * minute, instead of waiting for the next 15-minute full ingest.
  */
+/**
+ * Schema version for the evidence-comparison analysis JSONB blobs we
+ * persist on each signal row (migration 028). Bump this whenever any
+ * analysis module changes its output shape so the develop-story
+ * endpoint and the lazy-recompute path know which signals to refresh.
+ */
+export const ANALYSIS_VERSION = 1;
+
 export const FAST_LANE_ADAPTER_IDS = [
   'usgs-quakes',
   'nasa-eonet',
@@ -305,6 +322,52 @@ export async function runIngest(options: IngestOptions = {}): Promise<{
         countryCode: primary.country_code ?? null,
       });
 
+      // April 2026 evidence-comparison upgrade — every signal lands with
+      // its analysis pre-computed so feed cards, signal pages,
+      // briefings, and alerts can read it directly from the DB without
+      // re-running the modules on every render. The modules are pure /
+      // deterministic / LLM-free / network-free so this is essentially
+      // free CPU on top of the existing per-group work.
+      const ranked = rankSources({ evidence });
+      const rankedSummary = summarizeRankedSources(ranked);
+      const analyzedConflicts = analyzeConflicts({
+        contradictions,
+        evidence,
+        claim_title: primary.title,
+        claim_text: primary.summary ?? null,
+      });
+      const conflictSummary = summarizeConflicts(analyzedConflicts);
+      const evidenceCards = buildEvidenceCards({
+        evidence,
+        ranked,
+        contradictions,
+      });
+      const cardsSummary = summarizeEvidenceCards(evidenceCards);
+      const corpusBias = detectCorpusBias(
+        evidence.map((e) => `${e.title ?? ''} ${e.excerpt ?? ''}`),
+      );
+      const confidenceBreakdown = buildConfidenceBreakdown({
+        ranked,
+        ranked_summary: rankedSummary,
+        conflicts: analyzedConflicts,
+        conflict_summary: conflictSummary,
+        cards_summary: cardsSummary,
+        has_anchor: false,
+        is_text_only: false,
+        cap_at_medium: false,
+      });
+      const resultExplanation = buildResultExplanation({
+        band: confidenceBreakdown.band,
+        breakdown: confidenceBreakdown,
+        ranked_summary: rankedSummary,
+        conflicts: analyzedConflicts,
+        conflict_summary: conflictSummary,
+        cards_summary: cardsSummary,
+        has_anchor: false,
+        is_text_only: false,
+        is_social: false,
+      });
+
       // Compose signal tags. Each tag is a compact, machine-readable flag
       // that the UI and ops tooling can filter on. `complex_signal` is the
       // Phase-7 marker: contradiction detection was deliberately skipped
@@ -339,6 +402,17 @@ export async function runIngest(options: IngestOptions = {}): Promise<{
         // Phase-3 user-facing contract (migration 016).
         reliability_label: reliabilityLabelPublic,
         reliability_summary: reliabilitySummary,
+        // April 2026 evidence-comparison upgrade (migration 028). The
+        // analysis blobs are persisted alongside the signal so the feed,
+        // signal page, briefings, and alerts can render them directly
+        // without re-running the analysis modules on every render.
+        ranked_sources: ranked,
+        analyzed_conflicts: analyzedConflicts,
+        bias_report: corpusBias,
+        evidence_cards: evidenceCards,
+        confidence_breakdown: confidenceBreakdown,
+        result_explanation: resultExplanation,
+        analysis_version: ANALYSIS_VERSION,
         raw_data: {
           decision_log: decision.decision_log,
           group_size: rawGroup.length,

@@ -32,17 +32,26 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  analyzeConflicts,
+  buildConfidenceBreakdown,
+  buildEvidenceCards,
   buildReliabilitySummary,
+  buildResultExplanation,
   computeExpiry,
   computeReliabilityScores,
   decideVerification,
+  detectCorpusBias,
   detectInconsistenciesWithLimits,
   extractClaimsFromEvidence,
   heuristicConfidence,
   heuristicSeverity,
   MAX_CLAIMS_PER_SIGNAL,
   MAX_SOURCES_PER_SIGNAL,
+  rankSources,
   reliabilityPublicLabel,
+  summarizeConflicts,
+  summarizeEvidenceCards,
+  summarizeRankedSources,
   type DetectedContradiction,
   type EvidenceItem,
   type PhysicalEvidence,
@@ -56,6 +65,14 @@ import { extractKeywords } from './verify-corroboration';
 
 /** Default cooldown between automatic enrichments for the same signal. */
 export const DEFAULT_ENRICHMENT_COOLDOWN_MS = 5 * 60 * 1000;
+
+/**
+ * Schema version for the persisted evidence-comparison analysis blobs
+ * (migration 028). Must stay in sync with `ANALYSIS_VERSION` in the
+ * worker (`apps/worker/src/jobs/ingest.ts`). When the analysis-module
+ * shapes change in a backwards-incompatible way, bump both.
+ */
+export const ANALYSIS_VERSION = 1;
 
 export interface DevelopSignalOptions {
   /** Bypass the cooldown check. The UI "Develop now" button sets this. */
@@ -348,6 +365,50 @@ export async function developSignal(
     },
   };
 
+  // April 2026 evidence-comparison upgrade — re-compute the analysis on
+  // the freshly merged corpus so the persisted blobs are kept in sync
+  // with what we've just scored. Same modules the ingest worker calls;
+  // pure / deterministic / LLM-free / network-free.
+  const ranked = rankSources({ evidence: mergedEvidence, anchor_url: signal.url ?? null });
+  const rankedSummary = summarizeRankedSources(ranked);
+  const analyzedConflicts = analyzeConflicts({
+    contradictions: mergedContradictions,
+    evidence: mergedEvidence,
+    claim_title: signal.title,
+    claim_text: signal.summary ?? null,
+  });
+  const conflictSummary = summarizeConflicts(analyzedConflicts);
+  const evidenceCards = buildEvidenceCards({
+    evidence: mergedEvidence,
+    ranked,
+    contradictions: mergedContradictions,
+  });
+  const cardsSummary = summarizeEvidenceCards(evidenceCards);
+  const corpusBias = detectCorpusBias(
+    mergedEvidence.map((e) => `${e.title ?? ''} ${e.excerpt ?? ''}`),
+  );
+  const confidenceBreakdown = buildConfidenceBreakdown({
+    ranked,
+    ranked_summary: rankedSummary,
+    conflicts: analyzedConflicts,
+    conflict_summary: conflictSummary,
+    cards_summary: cardsSummary,
+    has_anchor: Boolean(signal.url),
+    is_text_only: false,
+    cap_at_medium: false,
+  });
+  const resultExplanation = buildResultExplanation({
+    band: confidenceBreakdown.band,
+    breakdown: confidenceBreakdown,
+    ranked_summary: rankedSummary,
+    conflicts: analyzedConflicts,
+    conflict_summary: conflictSummary,
+    cards_summary: cardsSummary,
+    has_anchor: Boolean(signal.url),
+    is_text_only: false,
+    is_social: false,
+  });
+
   const { error: updateErr } = await sb
     .from('signals')
     .update({
@@ -365,6 +426,15 @@ export async function developSignal(
       evidence_strength_score: reliability.evidence_strength_score,
       reliability_label: reliabilityLabelPublic,
       reliability_summary: reliabilitySummary,
+      // Persist the upgraded analysis (migration 028). Bumping
+      // ANALYSIS_VERSION in the worker keeps both surfaces in sync.
+      ranked_sources: ranked,
+      analyzed_conflicts: analyzedConflicts,
+      bias_report: corpusBias,
+      evidence_cards: evidenceCards,
+      confidence_breakdown: confidenceBreakdown,
+      result_explanation: resultExplanation,
+      analysis_version: ANALYSIS_VERSION,
       expires_at: computeExpiry(severity, (signal.topic ?? 'other') as string, status),
       last_enriched_at: now,
       last_seen_at: now,

@@ -22,6 +22,10 @@
 
 import type { ConfidenceBand, ConfidenceReport } from './confidence';
 import type { PhysicalEvidence } from './evidence';
+import type { AnalyzedConflict } from './conflict-analysis';
+import type { CorpusBiasReport } from './bias';
+import type { ConfidenceBreakdown } from './confidence-breakdown';
+import type { RankedSourceSummary } from './source-ranking';
 
 export interface TrustExplanationInput {
   report: ConfidenceReport;
@@ -37,6 +41,19 @@ export interface TrustExplanationInput {
   complex_signal?: boolean;
   /** A friendly title for the explanation header (signal title). */
   title?: string;
+  /**
+   * Optional April-2026 evidence-comparison analysis. When passed in, the
+   * explainer enriches its existing chips, watch-for hint, and disputed
+   * section with the broader conflict taxonomy (framing / timeline /
+   * missing context / insufficient evidence) and a strictly-separate
+   * bias signal. The ConfidenceReport-driven verdict is unchanged — bias
+   * NEVER moves the trust band, by design. When the optional inputs are
+   * omitted (legacy callers) the explainer behaves exactly as before.
+   */
+  analyzed_conflicts?: AnalyzedConflict[];
+  bias_report?: CorpusBiasReport | null;
+  confidence_breakdown?: ConfidenceBreakdown | null;
+  ranked_summary?: RankedSourceSummary | null;
 }
 
 export interface TrustLearnMoreLink {
@@ -78,6 +95,13 @@ export interface TrustExplanation {
   whats_unclear: string[];
   /** A short suggested chat-prompt the reader can ask the AI analyst. */
   suggested_prompt: string;
+  /**
+   * Optional bias-signal hint, populated only when a bias report was
+   * passed in AND the bias scorer flagged something material. Always
+   * carries the "signal not a verdict" qualifier in the rendered text,
+   * and is never combined into the trust band.
+   */
+  bias_hint: string | null;
 }
 
 /** Phrases that absolutely must not appear in user-facing trust copy. */
@@ -115,6 +139,17 @@ export function buildTrustExplanation(
   const disputed = buildWhatsDisputed(input, contraTypes).map(safeOrNull).filter(isString);
   const unclear = buildWhatsUnclear(input).map(safeOrNull).filter(isString);
   const prompt = buildSuggestedPrompt(input, contraTypes);
+  const biasHint = buildBiasHint(input.bias_report ?? null);
+
+  // April 2026 evidence-comparison upgrade — when the caller passes in
+  // analyzed_conflicts, fold the broader taxonomy + numeric severity
+  // into the disputed list and the headline chips. The ConfidenceReport
+  // band is NOT recomputed here; we only enrich the strings + chips so
+  // existing callers (signal page trust hero, feed card verdict
+  // callout) get the same reading benefit without a separate panel.
+  const enrichedDisputed = mergeAnalyzedIntoDisputed(disputed, input.analyzed_conflicts);
+  const enrichedChips = mergeAnalyzedIntoChips(chips, input.analyzed_conflicts);
+  const enrichedWatch = mergeAnalyzedIntoWatch(watch, input.analyzed_conflicts);
 
   // Defensive guard: strip any string that contains a forbidden phrase.
   // We never want a future tweak to accidentally smuggle a truth claim
@@ -125,14 +160,106 @@ export function buildTrustExplanation(
   return {
     summary: safeSummary,
     why_bullets: safeWhy.slice(0, 3),
-    watch_for: watch ? stripIfForbidden(watch) : null,
+    watch_for: enrichedWatch ? stripIfForbidden(enrichedWatch) : null,
     learn_more: learnMore,
-    headline_chips: chips,
+    headline_chips: enrichedChips,
     whats_supported: supported.slice(0, 3),
-    whats_disputed: disputed.slice(0, 3),
+    whats_disputed: enrichedDisputed.slice(0, 3),
     whats_unclear: unclear.slice(0, 3),
     suggested_prompt: prompt,
+    bias_hint: biasHint ? stripIfForbidden(biasHint) : null,
   };
+}
+
+// ─── analyzed-conflicts + bias merge helpers ───────────────────────────────
+
+const ANALYZED_LABEL: Record<string, string> = {
+  direct_contradiction: 'numbers / what is happening',
+  framing_difference: 'cause or attribution',
+  timeline_mismatch: 'when the event occurred',
+  missing_context: 'specific actors / numbers in the claim',
+  insufficient_evidence: 'whether there is enough to compare yet',
+};
+
+function mergeAnalyzedIntoDisputed(
+  existing: string[],
+  conflicts: AnalyzedConflict[] | undefined,
+): string[] {
+  if (!conflicts || conflicts.length === 0) return existing;
+  const out: string[] = [...existing];
+  // Pull at most two highest-severity non-trivial conflicts and add a
+  // line for each that we don't already cover.
+  const top = [...conflicts]
+    .filter((c) => c.type !== 'insufficient_evidence')
+    .sort((a, b) => b.severity_score - a.severity_score)
+    .slice(0, 2);
+  for (const c of top) {
+    const label = ANALYZED_LABEL[c.type] ?? 'material details';
+    const line = `Conflict (${c.label.toLowerCase()}, severity ${c.severity_score}/100): ${truncate(c.summary, 160)}`;
+    if (!out.some((l) => l.toLowerCase().includes(label.toLowerCase()))) {
+      out.unshift(line);
+    } else {
+      out.unshift(line);
+    }
+  }
+  return out;
+}
+
+function mergeAnalyzedIntoChips(
+  existing: TrustHeadlineChip[],
+  conflicts: AnalyzedConflict[] | undefined,
+): TrustHeadlineChip[] {
+  if (!conflicts || conflicts.length === 0) return existing;
+  const worst = [...conflicts]
+    .filter((c) => c.type !== 'insufficient_evidence')
+    .sort((a, b) => b.severity_score - a.severity_score)[0];
+  if (!worst) return existing;
+  // If there's already a 'dispute'-toned chip, replace its label with a
+  // sharper one carrying the numeric severity. Otherwise prepend a new
+  // chip so the conflict shows up at the top of the strip.
+  const sharper: TrustHeadlineChip = {
+    label: `${worst.label} ${worst.severity_score}/100`,
+    tone: worst.severity_band === 'high' ? 'dispute' : 'caution',
+    href: '#source-disagreement',
+    hint: worst.summary,
+  };
+  const idx = existing.findIndex((c) => c.tone === 'dispute');
+  if (idx >= 0) {
+    const out = [...existing];
+    out[idx] = sharper;
+    return out;
+  }
+  return [sharper, ...existing].slice(0, 4);
+}
+
+function mergeAnalyzedIntoWatch(
+  existing: string | null,
+  conflicts: AnalyzedConflict[] | undefined,
+): string | null {
+  if (!conflicts || conflicts.length === 0) return existing;
+  const timeline = conflicts.find((c) => c.type === 'timeline_mismatch');
+  const missing = conflicts.find((c) => c.type === 'missing_context');
+  // Promote the most actionable upgrade-class conflict into the
+  // glanceable "watch for" hint, since these are the ones a reader can
+  // act on. We only override an EXISTING watch line when we have a
+  // sharper one to give.
+  if (timeline) {
+    return `Timeline mismatch (severity ${timeline.severity_score}/100) — sources span more than a day apart, so the corpus may be mixing different incidents.`;
+  }
+  if (missing) {
+    return `Specific details from the claim are not corroborated by any source we found (severity ${missing.severity_score}/100). Verify those details before sharing.`;
+  }
+  return existing;
+}
+
+function buildBiasHint(bias: CorpusBiasReport | null): string | null {
+  if (!bias || !bias.has_signal) return null;
+  return `Bias signal: ${bias.band} (${bias.avg_intensity}/100). ${bias.summary} This is a reading-comprehension cue, not a verdict on the underlying claim.`;
+}
+
+function truncate(s: string, max: number): string {
+  if (!s) return '';
+  return s.length <= max ? s : s.slice(0, max - 1).trimEnd() + '…';
 }
 
 const FALLBACK_SUMMARY =
