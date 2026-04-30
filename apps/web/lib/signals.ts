@@ -1,10 +1,26 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  analyzeConflicts,
+  buildConfidenceBreakdown,
   buildConfidenceReport,
+  buildEvidenceCards,
+  buildResultExplanation,
   buildTrustExplanation,
+  detectCorpusBias,
+  rankSources,
+  summarizeConflicts,
+  summarizeEvidenceCards,
+  summarizeRankedSources,
+  type AnalyzedConflict,
+  type ConfidenceBreakdown,
   type ConfidenceReport,
+  type CorpusBiasReport,
+  type DetectedContradiction,
+  type EvidenceCard,
   type EvidenceItem,
   type PhysicalEvidence,
+  type RankedSource,
+  type ResultExplanation,
   type TrustExplanation,
   type VerificationStatus,
 } from '@osint/core';
@@ -38,6 +54,17 @@ export interface SignalRowRaw {
   // Phase-3 user-facing label contract (migration 016).
   reliability_label?: 'LIKELY_ACCURATE' | 'UNCLEAR' | 'LIKELY_UNRELIABLE' | null;
   reliability_summary?: string | null;
+  // April 2026 evidence-comparison upgrade (migration 028). All seven
+  // columns are NULLABLE — rows ingested before the upgrade will have
+  // `analysis_version === null`, in which case `decorateSignals`
+  // computes the analysis on the fly from the available evidence.
+  ranked_sources?: RankedSource[] | null;
+  analyzed_conflicts?: AnalyzedConflict[] | null;
+  bias_report?: CorpusBiasReport | null;
+  evidence_cards?: EvidenceCard[] | null;
+  confidence_breakdown?: ConfidenceBreakdown | null;
+  result_explanation?: ResultExplanation | null;
+  analysis_version?: number | null;
 }
 
 export interface CommunityFeedback {
@@ -58,6 +85,18 @@ export interface DecoratedSignal extends SignalRowRaw {
   confidence_report: ConfidenceReport;
   trust_explanation: TrustExplanation;
   community_feedback: CommunityFeedback;
+  // April 2026 evidence-comparison upgrade. Always populated on the
+  // decorated row — either lifted from the persisted JSONB columns
+  // (when the worker has analysis_version set) or computed on the fly
+  // from the available evidence + contradictions.
+  ranked_sources: RankedSource[];
+  analyzed_conflicts: AnalyzedConflict[];
+  bias_report: CorpusBiasReport;
+  evidence_cards: EvidenceCard[];
+  confidence_breakdown: ConfidenceBreakdown;
+  result_explanation: ResultExplanation;
+  /** True when the analysis was lifted from the DB; false when computed live. */
+  analysis_persisted: boolean;
 }
 
 const INLINE_CONTRADICTIONS_PER_SIGNAL = 3;
@@ -255,6 +294,7 @@ export async function decorateSignals(
       complex_signal: isComplex,
       title: s.title,
     });
+    const analysis = resolveAnalysis(s, evidenceForReport, contradictionsForReport);
     return {
       ...s,
       contradictions_count: count,
@@ -267,8 +307,116 @@ export async function decorateSignals(
       confidence_report,
       trust_explanation,
       community_feedback: feedbackBySignal.get(s.id) ?? { helpful: 0, unclear: 0, inaccurate: 0, total: 0 },
+      ranked_sources: analysis.ranked_sources,
+      analyzed_conflicts: analysis.analyzed_conflicts,
+      bias_report: analysis.bias_report,
+      evidence_cards: analysis.evidence_cards,
+      confidence_breakdown: analysis.confidence_breakdown,
+      result_explanation: analysis.result_explanation,
+      analysis_persisted: analysis.persisted,
     };
   });
+}
+
+/**
+ * Read the persisted evidence-comparison analysis off the row, or fall
+ * back to computing it on the fly from the available evidence + the
+ * legacy contradiction list.
+ *
+ * The fallback path is the same code the worker runs, so feed cards
+ * for signals ingested before migration 028 ran still get the upgraded
+ * surface — they just pay the (cheap) compute cost on render. Once the
+ * develop-story endpoint or the next ingest pass touches the row, the
+ * analysis is persisted and the fallback isn't needed any more.
+ */
+function resolveAnalysis(
+  s: SignalRowRaw,
+  evidence: EvidenceItem[],
+  contradictions: DetectedContradiction[],
+): {
+  ranked_sources: RankedSource[];
+  analyzed_conflicts: AnalyzedConflict[];
+  bias_report: CorpusBiasReport;
+  evidence_cards: EvidenceCard[];
+  confidence_breakdown: ConfidenceBreakdown;
+  result_explanation: ResultExplanation;
+  persisted: boolean;
+} {
+  if (
+    s.analysis_version != null &&
+    s.ranked_sources &&
+    s.analyzed_conflicts &&
+    s.bias_report &&
+    s.evidence_cards &&
+    s.confidence_breakdown &&
+    s.result_explanation
+  ) {
+    return {
+      ranked_sources: s.ranked_sources,
+      analyzed_conflicts: s.analyzed_conflicts,
+      bias_report: s.bias_report,
+      evidence_cards: s.evidence_cards,
+      confidence_breakdown: s.confidence_breakdown,
+      result_explanation: s.result_explanation,
+      persisted: true,
+    };
+  }
+  return computeAnalysisOnTheFly(s, evidence, contradictions);
+}
+
+function computeAnalysisOnTheFly(
+  s: SignalRowRaw,
+  evidence: EvidenceItem[],
+  contradictions: DetectedContradiction[],
+) {
+  const ranked = rankSources({ evidence, anchor_url: s.url ?? null });
+  const ranked_summary = summarizeRankedSources(ranked);
+  const analyzedConflicts = analyzeConflicts({
+    contradictions,
+    evidence,
+    claim_title: s.title,
+    claim_text: s.summary ?? null,
+  });
+  const conflict_summary = summarizeConflicts(analyzedConflicts);
+  const evidence_cards = buildEvidenceCards({
+    evidence,
+    ranked,
+    contradictions,
+  });
+  const cards_summary = summarizeEvidenceCards(evidence_cards);
+  const bias_report = detectCorpusBias(
+    evidence.map((e) => `${e.title ?? ''} ${e.excerpt ?? ''}`),
+  );
+  const confidence_breakdown = buildConfidenceBreakdown({
+    ranked,
+    ranked_summary,
+    conflicts: analyzedConflicts,
+    conflict_summary,
+    cards_summary,
+    has_anchor: Boolean(s.url),
+    is_text_only: false,
+    cap_at_medium: false,
+  });
+  const result_explanation = buildResultExplanation({
+    band: confidence_breakdown.band,
+    breakdown: confidence_breakdown,
+    ranked_summary,
+    conflicts: analyzedConflicts,
+    conflict_summary,
+    cards_summary,
+    has_anchor: Boolean(s.url),
+    is_text_only: false,
+    is_social: false,
+  });
+  return {
+    ranked_sources: ranked,
+    analyzed_conflicts: analyzedConflicts,
+    bias_report,
+    evidence_cards,
+    confidence_breakdown,
+    result_explanation,
+    persisted: false,
+  };
 }
 
 const TRACE_EVIDENCE_PER_SIGNAL = 8;
