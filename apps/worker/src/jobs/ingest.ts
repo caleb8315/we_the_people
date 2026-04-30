@@ -30,7 +30,40 @@ import { buildSignalMapLocations } from '../lib/map-locations';
 import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
 
 /**
- * Ingest job — runs on GH Actions cron (hourly):
+ * Adapter ids for the "fast lane" sensor pass.
+ *
+ * These sources are:
+ *   - low-latency in their underlying upstream (USGS publishes new
+ *     quakes within seconds, NOAA pushes alerts in real time, SWPC
+ *     updates space-weather alerts continuously, CISA KEV updates on
+ *     active exploitation, NASA EONET updates on natural events);
+ *   - free with extremely generous request budgets (no rate-limit risk
+ *     when polled every few minutes);
+ *   - cheap to ingest (no LLM call, no extra fan-out).
+ *
+ * The fast-lane workflow runs every 5 minutes against this set so a
+ * magnitude-5 quake or a tornado warning surfaces in well under a
+ * minute, instead of waiting for the next 15-minute full ingest.
+ */
+export const FAST_LANE_ADAPTER_IDS = [
+  'usgs-quakes',
+  'nasa-eonet',
+  'noaa-alerts',
+  'swpc-alerts',
+  'cisa-kev',
+];
+
+export interface IngestOptions {
+  /**
+   * When true, only run the FAST_LANE_ADAPTER_IDS subset. Used by the
+   * sensors workflow to keep cost bounded while polling every 5 min.
+   */
+  fastLane?: boolean;
+}
+
+/**
+ * Ingest job — runs on GH Actions cron (every 15 min by default,
+ * every 5 min for the fast-lane sensors workflow):
  *   1. Fetch from every enabled source in parallel (adapter-per-source).
  *   2. Group items by dedupe key (so 5 outlets on same story collapse).
  *   3. Score severity + confidence heuristically (no LLM).
@@ -38,7 +71,7 @@ import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
  *   5. Upsert signals + evidence atomically.
  *   6. Detect source disagreements and write them to `contradictions`.
  */
-export async function runIngest(): Promise<{
+export async function runIngest(options: IngestOptions = {}): Promise<{
   fetched: number;
   signals: number;
   evidence: number;
@@ -47,8 +80,16 @@ export async function runIngest(): Promise<{
   const runId = await startEngineRun('ingest');
   const errors: string[] = [];
 
-  const adapters = await loadAdapters();
-  console.log(`[ingest] starting — ${adapters.length} adapters enabled`);
+  let adapters = await loadAdapters();
+  if (options.fastLane) {
+    const fastSet = new Set(FAST_LANE_ADAPTER_IDS);
+    adapters = adapters.filter((a) => fastSet.has(a.id));
+    console.log(
+      `[ingest] fast-lane mode — ${adapters.length} sensor adapters (${[...fastSet].join(', ')})`,
+    );
+  } else {
+    console.log(`[ingest] starting — ${adapters.length} adapters enabled`);
+  }
 
   // Load DB-driven credible domains so sources with credibility >= 60
   // count toward corroboration even if they're not in the hardcoded list.

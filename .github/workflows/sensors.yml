@@ -1,0 +1,46 @@
+name: Sensors fast lane
+
+# Polls only the low-latency sensor adapters (USGS earthquakes, NASA EONET
+# natural events, NOAA weather alerts, SWPC space-weather alerts, CISA KEV
+# active-exploitation list). All five are free with very generous request
+# budgets, so a 5-minute cadence is well within fair-use.
+#
+# The full ingest workflow (every 15 minutes) still re-runs all adapters
+# including these five — this fast lane just shortens the publish-to-feed
+# latency for the events readers care most about (quakes, severe weather,
+# active exploits).
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  # We keep the same group as the main ingest so the two workflows don't
+  # race on the same `sources` rows. `cancel-in-progress: true` means a
+  # newer fast-lane run will preempt an older one, which is fine because
+  # adapters re-fetch from source on every run.
+  group: ingest
+  cancel-in-progress: true
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # No LLM keys — the fast lane is intentionally LLM-free. Sensor
+      # signals are deterministic, so reliability scoring works without
+      # any model call. This keeps the fast-lane workflow zero-cost
+      # even at 12 runs/hour.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run --workspace apps/worker ingest:fast

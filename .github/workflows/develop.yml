@@ -6,15 +6,20 @@ name: Develop signals
 # web app's /api/signal/:id/develop endpoint, so Firecrawl / Brave /
 # Bluesky creds stay on the web side only.
 #
-# Cadence: every 2 hours at :37 (offset from ingest at :17).
+# Cadence: every 30 minutes at :07 / :37 (offset from ingest's */15).
 # Per run: up to 8 stale signals by default, spaced 6s apart.
 # This is the "automatic enrichment" path — see the note in
 # apps/worker/src/jobs/develop.ts for why we don't enrich every signal
 # at ingest time.
+#
+# 30 minutes was chosen so that a developing single-source story has a
+# realistic shot at being corroborated within an hour of first
+# surfacing. The endpoint is rate-limited per-signal (cooldown) so
+# bumping the schedule does not cause repeat work for fresh enrichments.
 
 on:
   schedule:
-    - cron: '37 */2 * * *'
+    - cron: '7,37 * * * *'
   workflow_dispatch:
     inputs:
       max:

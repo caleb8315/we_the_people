@@ -9,7 +9,8 @@ import { runMaintenance } from './jobs/maintenance';
 /**
  * CLI dispatcher. Invoked by GitHub Actions with a single command plus
  * optional arguments:
- *   tsx src/index.ts ingest
+ *   tsx src/index.ts ingest                   # full ingest (every 15 min)
+ *   tsx src/index.ts ingest --fast            # fast-lane sensors only (every 5 min)
  *   tsx src/index.ts brief
  *   tsx src/index.ts brief weekly
  *   tsx src/index.ts alert
@@ -28,9 +29,11 @@ const [cmd, arg] = args;
 
 async function main() {
   switch (cmd) {
-    case 'ingest':
-      await runIngest();
+    case 'ingest': {
+      const fastLane = args.includes('--fast') || args.includes('--fast-lane');
+      await runIngest({ fastLane });
       return;
+    }
     case 'brief':
       await runBriefing(arg === 'weekly' ? 'weekly' : 'daily');
       return;
@@ -81,7 +84,7 @@ async function main() {
     }
     default:
       console.error(
-        `unknown command: ${cmd}. use: ingest | brief [weekly] | alert | notifications (or email alias) | backfill [hours] [--dry-run] [--limit=N] | develop [--dry-run] [--max=N] [--cooldown=MIN] [--window=HRS] | maintenance [--dry-run] [--usage-days=N] [--signal-hours=N]`,
+        `unknown command: ${cmd}. use: ingest [--fast] | brief [weekly] | alert | notifications (or email alias) | backfill [hours] [--dry-run] [--limit=N] | develop [--dry-run] [--max=N] [--cooldown=MIN] [--window=HRS] | maintenance [--dry-run] [--usage-days=N] [--signal-hours=N]`,
       );
       process.exit(2);
   }

@@ -1,13 +1,22 @@
 name: Ingest
 
 on:
+  # Every 15 minutes. Free-tier APIs (GDELT, USGS, NASA EONET, NOAA,
+  # Reddit, RSS feeds) all comfortably allow this cadence; dedupe is
+  # content-keyed so re-fetching the same articles is cheap.
+  # GitHub's free-tier cron drifts by 5–15 minutes during peak hours,
+  # so the effective cadence is closer to 15–30 minutes — still 2-4x
+  # faster than the previous hourly run.
   schedule:
-    - cron: '17 * * * *'   # hourly, offset from briefing
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 concurrency:
   group: ingest
-  cancel-in-progress: false
+  # Newer ingests are more useful than older ones in flight; cancelling
+  # an old run shaves end-to-end latency without losing data because
+  # adapters re-fetch from source on the next run.
+  cancel-in-progress: true
 
 jobs:
   run:

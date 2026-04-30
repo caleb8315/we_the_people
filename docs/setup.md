@@ -98,10 +98,11 @@ Optional repo **variables** for budget tuning:
 
 Workflows provided:
 
-- [`.github/workflows/ingest.yml`](../.github/workflows/ingest.yml) — hourly
+- [`.github/workflows/sensors.yml`](../.github/workflows/sensors.yml) — every 5 minutes (USGS / NASA EONET / NOAA / SWPC / CISA-KEV fast lane, LLM-free)
+- [`.github/workflows/ingest.yml`](../.github/workflows/ingest.yml) — every 15 minutes (full adapter set)
+- [`.github/workflows/develop.yml`](../.github/workflows/develop.yml) — every 30 minutes (live corroboration fan-out for stale developing signals)
+- [`.github/workflows/alerts.yml`](../.github/workflows/alerts.yml) — every 30 minutes (high-severity push)
 - [`.github/workflows/briefing.yml`](../.github/workflows/briefing.yml) — daily + weekly
-- [`.github/workflows/alerts.yml`](../.github/workflows/alerts.yml) — every 30 minutes
-- [`.github/workflows/develop.yml`](../.github/workflows/develop.yml) — scheduled story enrichment
 - [`.github/workflows/maintenance.yml`](../.github/workflows/maintenance.yml) — nightly retention cleanup
 - [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — typecheck, lint, and tests on push/PR
 

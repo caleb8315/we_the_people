@@ -6,6 +6,7 @@
   "main": "src/index.ts",
   "scripts": {
     "ingest": "tsx src/index.ts ingest",
+    "ingest:fast": "tsx src/index.ts ingest --fast",
     "brief": "tsx src/index.ts brief",
     "alert": "tsx src/index.ts alert",
     "notifications": "tsx src/index.ts notifications",
