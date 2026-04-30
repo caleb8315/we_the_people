@@ -17,6 +17,7 @@ const LINKS = [
   { href: '/dashboard', label: 'Home', icon: HomeIcon, authedOnly: true },
   { href: '/', label: 'Home', icon: HomeIcon, anonOnly: true },
   { href: '/feed', label: 'Feed', icon: FeedIcon },
+  { href: '/notifications', label: 'Alerts', icon: BellIcon, authedOnly: true },
   { href: '/verify', label: 'Verify', icon: VerifyIcon },
   { href: '/settings', label: 'Profile', icon: ProfileIcon, authedOnly: true },
   { href: '/login', label: 'Profile', icon: ProfileIcon, anonOnly: true },
@@ -109,6 +110,15 @@ function VerifyIcon() {
     <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 3 4 6v6c0 4.5 3.3 8.3 8 9 4.7-.7 8-4.5 8-9V6l-8-3z" />
       <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+function BellIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 17h5l-1.4-1.4a2 2 0 0 1-.6-1.4V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
+      <path d="M9 17a3 3 0 0 0 6 0" />
     </svg>
   );
 }

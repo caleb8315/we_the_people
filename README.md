@@ -38,7 +38,7 @@ osint-platform/
 │                         reliability / contradictions / label / evidence
 │                         contracts)
 ├── .github/workflows/    Scheduled jobs: ingest, briefing, alert,
-│                         email-briefings, develop (story enrichment),
+│                         user-notifications, develop (story enrichment),
 │                         backfill
 ├── docs/                 Architecture, security, privacy, runbooks,
 │                         migration-plan.md
@@ -51,7 +51,7 @@ osint-platform/
 - **Supabase** Postgres + Auth + Storage (anon + service role)
 - **GitHub Actions** for cron ingestion, briefing, backfill
 - **Gemini / Groq** for LLM enrichment (daily hard caps, strictly opt-in)
-- **Resend** optional for email briefings (optional Telegram operator channel)
+- In-app notifications for user briefings and priority alerts
 
 ## Quick start
 
@@ -84,7 +84,7 @@ npm run backfill -- 48 --dry-run
 ## What Crosscheck does
 
 - Event feed with source citations, reliability labels, and confidence bands
-- Daily personal briefing (in-app + optional email)
+- Daily personal briefing (in-app notifications)
 - Priority alerts with user-configurable topics
 - Source toggles, topic filters, and per-account AI analyst sessions
 - Per-signal **source disagreement** breakdowns (numeric / cause / presence)

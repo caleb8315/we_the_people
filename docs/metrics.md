@@ -6,7 +6,7 @@ What we measure and how we read it. All metrics computable from Supabase directl
 
 1. **Useful-alert ratio** — `feedback.kind = 'useful'` / total feedback rows in the past 7 days.
 2. **Weekly retained users** — `auth.users` with ≥ 1 action (feedback, preferences save, login) in both the current and previous 7-day window.
-3. **Briefing engagement** — distinct users who opened a briefing in the last 7 days / distinct users with `email_briefings = true`.
+3. **Briefing engagement** — distinct users who opened a briefing in the last 7 days / distinct users with `notifications_enabled = true`.
 
 ## Operational metrics
 

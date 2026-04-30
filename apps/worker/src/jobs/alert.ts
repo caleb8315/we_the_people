@@ -4,15 +4,15 @@ import { env } from '../lib/env';
 import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
 import { consumeUserDailyLimit } from '../lib/daily-limits';
 import { logProductEvent } from '../lib/product-events';
+import { createUserNotification } from '../lib/user-notifications';
 
 /**
  * Alert job — runs every N minutes.
  *
  * MVP policy: the worker sends operator/admin notifications when a
  * "priority" signal appears (severity >= 80, corroborated or developing).
- * Per-user push alerts are opt-in and delivered via email (Resend) using
- * user preferences. This file implements the operator channel; per-user
- * push is wired up with email delivery in a later phase.
+ * Per-user alerts are opt-in and written to in-app notifications using
+ * user preferences.
  */
 export async function runAlerts(): Promise<{ sent: number }> {
   const runId = await startEngineRun('alert');
@@ -43,23 +43,15 @@ export async function runAlerts(): Promise<{ sent: number }> {
   let userSent = 0;
   const errors: string[] = [];
 
-  const [{ data: prefsRows }, usersRes] = await Promise.all([
-    sb
-      .from('preferences')
-      .select(
-        'user_id, alerts_enabled, min_alert_severity, muted_sources, muted_topics, topics, alert_intensity_preference, max_alerts_per_day_preference',
-      )
-      .eq('alerts_enabled', true),
-    sb.auth.admin.listUsers({ page: 1, perPage: 1000 }),
-  ]);
-  const usersById = new Map<string, string>();
-  for (const u of usersRes.data?.users ?? []) {
-    if (u.email) usersById.set(u.id, u.email);
-  }
+  const { data: prefsRows } = await sb
+    .from('preferences')
+    .select(
+      'user_id, alerts_enabled, notifications_enabled, min_alert_severity, muted_sources, muted_topics, topics, alert_intensity_preference, max_alerts_per_day_preference',
+    )
+    .eq('alerts_enabled', true)
+    .eq('notifications_enabled', true);
 
   for (const pref of prefsRows ?? []) {
-    const email = usersById.get(pref.user_id);
-    if (!email) continue;
     const localDailyCap = Math.max(1, Math.min(5, Number(pref.max_alerts_per_day_preference ?? 3)));
     const intensity = String(pref.alert_intensity_preference ?? 'critical_only');
 
@@ -105,21 +97,58 @@ export async function runAlerts(): Promise<{ sent: number }> {
         await sb.from('alert_deliveries').insert({
           signal_id: signal.id,
           user_id: pref.user_id,
-          email,
+          email: null,
           status: 'skipped',
           error: `daily alert cap reached (${cap.limit}/day)`,
         });
         break;
       }
 
-      const ok = await sendUserAlertEmail({
-        to: email,
-        from: e.BRIEFING_FROM_EMAIL,
-        apiKey: e.RESEND_API_KEY,
-        signal,
+      const reliability = statusLabel(signal.verification_status as VerificationStatus);
+      const credible = signal.credible_source_count ?? 0;
+      const total = signal.source_count ?? 0;
+      const domains = (signal.distinct_domains ?? []).slice(0, 3);
+      const moreDomains = (signal.distinct_domains ?? []).length - domains.length;
+      const sourcesLine =
+        total > 0
+          ? `${credible}/${total} credible` +
+            (domains.length > 0
+              ? ` · ${domains.join(', ')}${moreDomains > 0 ? ` + ${moreDomains} more` : ''}`
+              : '')
+          : 'Corroboration in progress';
+      const freshLine = signal.last_enriched_at
+        ? 'Freshly corroborated in the latest live-search pass.'
+        : null;
+
+      const notification = await createUserNotification(sb, {
+        userId: pref.user_id,
+        type: 'priority_alert',
+        title: `Priority alert · ${signal.title.slice(0, 120)}`,
+        summary: `${String(signal.topic ?? 'other')} · severity ${signal.severity} · ${reliability}`,
+        body: [
+          `${signal.title}`,
+          `Topic: ${String(signal.topic ?? 'other')}`,
+          `Severity: ${signal.severity}/100`,
+          `Reliability: ${reliability}`,
+          `Sources: ${sourcesLine}`,
+          freshLine,
+          `Country: ${String(signal.country_code ?? '-')}`,
+          signal.summary ?? 'No summary provided.',
+          signal.url ? `Source: ${signal.url}` : null,
+        ]
+          .filter(Boolean)
+          .join('\n'),
+        signalId: signal.id,
+        data: {
+          signal_id: signal.id,
+          severity: signal.severity,
+          topic: signal.topic ?? 'other',
+          verification_status: signal.verification_status,
+          source_url: signal.url ?? null,
+        },
       });
-      if (!ok.ok) {
-        errors.push(ok.error ?? 'unknown alert email error');
+      if (!notification.ok) {
+        errors.push(notification.error ?? 'unknown alert notification error');
       } else {
         userSent++;
         localSent++;
@@ -138,9 +167,9 @@ export async function runAlerts(): Promise<{ sent: number }> {
       await sb.from('alert_deliveries').insert({
         signal_id: signal.id,
         user_id: pref.user_id,
-        email,
-        status: ok.ok ? 'sent' : 'failed',
-        error: ok.ok ? null : ok.error?.slice(0, 500),
+        email: null,
+        status: notification.ok ? 'sent' : 'failed',
+        error: notification.ok ? null : notification.error?.slice(0, 500),
       });
     }
   }
@@ -191,90 +220,6 @@ async function sendOperatorTelegram(text: string): Promise<boolean> {
     console.warn('[alert] telegram failed:', (err as Error).message);
     return false;
   }
-}
-
-async function sendUserAlertEmail(input: {
-  to: string;
-  from?: string;
-  apiKey?: string;
-  signal: {
-    title: string;
-    summary: string | null;
-    topic: string | null;
-    severity: number;
-    verification_status: string;
-    country_code: string | null;
-    url: string | null;
-    source_count?: number | null;
-    credible_source_count?: number | null;
-    distinct_domains?: string[] | null;
-    last_enriched_at?: string | null;
-  };
-}): Promise<{ ok: boolean; error?: string }> {
-  if (!input.from || !input.apiKey) {
-    return { ok: false, error: 'email config missing (BRIEFING_FROM_EMAIL/RESEND_API_KEY)' };
-  }
-  const reliability = statusLabel(input.signal.verification_status as VerificationStatus);
-  const credible = input.signal.credible_source_count ?? 0;
-  const total = input.signal.source_count ?? 0;
-  const domains = (input.signal.distinct_domains ?? []).slice(0, 3);
-  const moreDomains = (input.signal.distinct_domains ?? []).length - domains.length;
-  const sourcesLine =
-    total > 0
-      ? `${credible}/${total} credible sources` +
-        (domains.length > 0
-          ? ` — ${domains.map(escapeHtml).join(', ')}${moreDomains > 0 ? ` + ${moreDomains} more` : ''}`
-          : '')
-      : 'Sources still being corroborated';
-  const freshLine = input.signal.last_enriched_at
-    ? '<p style="color:#92400e;font-size:12px;margin:4px 0">Freshly corroborated — additional sources surfaced in our latest live-search pass.</p>'
-    : '';
-  const html = `
-    <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.5;color:#111">
-      <h2>Priority alert: ${escapeHtml(input.signal.title)}</h2>
-      <p><strong>Topic:</strong> ${escapeHtml(String(input.signal.topic ?? 'other'))}</p>
-      <p><strong>Severity:</strong> ${input.signal.severity} / 100</p>
-      <p><strong>Reliability:</strong> ${escapeHtml(reliability)}</p>
-      <p><strong>Sources:</strong> ${escapeHtml(sourcesLine)}</p>
-      ${freshLine}
-      <p><strong>Country:</strong> ${escapeHtml(input.signal.country_code ?? '-')}</p>
-      <p>${escapeHtml(input.signal.summary ?? 'No summary provided.')}</p>
-      ${input.signal.url ? `<p><a href="${escapeHtml(input.signal.url)}">Open source link</a></p>` : ''}
-      <p style="font-size:12px;color:#666">
-        Reliability reflects how many independent credible sources are reporting this signal, not a claim
-        of factual truth. Source counts update as our live-search fan-out (web + Reddit + Bluesky +
-        GDELT + sensors) finds more coverage. Beta limit: up to 5 priority alerts/day per user.
-      </p>
-    </div>
-  `;
-  try {
-    const r = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${input.apiKey}`,
-      },
-      body: JSON.stringify({
-        from: input.from,
-        to: [input.to],
-        subject: `Priority Alert · ${input.signal.title.slice(0, 90)}`,
-        html,
-      }),
-    });
-    if (!r.ok) return { ok: false, error: await r.text() };
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: (err as Error).message };
-  }
-}
-
-function escapeHtml(s: string) {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
 }
 
 async function countSentAlertsToday(sb: ReturnType<typeof supabase>, userId: string) {

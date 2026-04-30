@@ -8,7 +8,7 @@ export const metadata = {
 const processors = [
   ['Supabase', 'Authentication, Postgres storage, row-level security'],
   ['Cloudflare / hosting CDN', 'Site delivery, TLS, and basic edge protections'],
-  ['Resend (optional)', 'Transactional briefing delivery when email briefings are enabled'],
+  ['In-app notifications', 'Delivery of daily briefings and priority alerts inside your account'],
   ['Gemini / Groq (optional)', 'LLM summarization and analyst responses when AI features are used'],
   ['Firecrawl / Brave / Reddit / Bluesky (optional)', 'Live corroboration lookups for verify and develop flows'],
 ] as const;
@@ -34,7 +34,7 @@ export default function PrivacyPage() {
       <section>
         <h2>What we collect</h2>
         <ul>
-          <li>Your email address for account authentication and optional briefing delivery.</li>
+          <li>Your email address for account authentication.</li>
           <li>Your account profile, preferences, saved views, and feedback.</li>
           <li>Your AI chats, verification submissions, and product events tied to your account.</li>
           <li>Operational request metadata needed for rate limiting and access-request review.</li>
@@ -54,7 +54,7 @@ export default function PrivacyPage() {
       <section>
         <h2>How we use data</h2>
         <ul>
-          <li>Your email authenticates your account and can send briefings if you opt in.</li>
+          <li>Your email authenticates your account.</li>
           <li>Your preferences personalize your feed, briefings, and alerts.</li>
           <li>Your feedback and product events help us improve ranking quality and reduce alert noise.</li>
           <li>Your verification and AI activity is stored so you can revisit prior work.</li>
@@ -99,7 +99,7 @@ export default function PrivacyPage() {
         <ul>
           <li>Export your account data as JSON from Settings using “Export my data.”</li>
           <li>Delete your account from Settings, which removes your auth row and linked user-owned data.</li>
-          <li>Manage feed, alert, and email preferences directly inside Settings.</li>
+          <li>Manage feed, alert, and notification preferences directly inside Settings.</li>
         </ul>
       </section>
 

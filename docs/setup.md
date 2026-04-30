@@ -11,7 +11,7 @@ step is free-tier compatible.
 - A GitHub repository (public or private)
 - At least one LLM API key — Gemini (AI Studio) or Groq (both free tiers)
 
-Optional: Resend for email briefings, Telegram bot for operator alerts.
+Optional: Telegram bot for operator alerts.
 
 ## 1. Clone and install
 

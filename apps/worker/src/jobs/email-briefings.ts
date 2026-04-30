@@ -1,26 +1,17 @@
 import { statusLabel } from '@osint/core';
 import type { VerificationStatus } from '@osint/core/types';
 import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
-import { env } from '../lib/env';
 import { consumeUserDailyLimit } from '../lib/daily-limits';
+import { createUserNotification } from '../lib/user-notifications';
 
 /**
- * Sends user-specific daily briefing emails.
- * - Uses preferences.email_briefings + user topics.
+ * Creates user-specific daily briefing notifications.
+ * - Uses preferences.notifications_enabled + user topics.
  * - Guarantees per-user isolation by generating each payload independently.
  */
-export async function runEmailBriefings(): Promise<{ sent: number; failed: number }> {
+export async function runUserNotifications(): Promise<{ sent: number; failed: number }> {
   const runId = await startEngineRun('brief');
   const sb = supabase();
-  const e = env();
-
-  if (!e.RESEND_API_KEY || !e.BRIEFING_FROM_EMAIL) {
-    await finishEngineRun(runId, {
-      status: 'partial',
-      errors: ['RESEND_API_KEY or BRIEFING_FROM_EMAIL missing'],
-    });
-    return { sent: 0, failed: 0 };
-  }
 
   const { data: latest, error: latestErr } = await sb
     .from('briefings')
@@ -35,20 +26,12 @@ export async function runEmailBriefings(): Promise<{ sent: number; failed: numbe
     return { sent: 0, failed: 0 };
   }
 
-  const [{ data: prefsRows }, usersRes] = await Promise.all([
-    sb
-      .from('preferences')
-      .select(
-        'user_id, topics, email_briefings, weather_lat, weather_lon, weather_label, briefing_frequency_preference',
-      )
-      .eq('email_briefings', true),
-    sb.auth.admin.listUsers({ page: 1, perPage: 1000 }),
-  ]);
-
-  const usersById = new Map<string, string>();
-  for (const u of usersRes.data?.users ?? []) {
-    if (u.email) usersById.set(u.id, u.email);
-  }
+  const { data: prefsRows } = await sb
+    .from('preferences')
+    .select(
+      'user_id, topics, notifications_enabled, weather_lat, weather_lon, weather_label, briefing_frequency_preference',
+    )
+    .eq('notifications_enabled', true);
 
   let sent = 0;
   let failed = 0;
@@ -57,8 +40,6 @@ export async function runEmailBriefings(): Promise<{ sent: number; failed: numbe
   for (const pref of prefsRows ?? []) {
     const freq = String(pref.briefing_frequency_preference ?? 'daily');
     if (!(freq === 'daily' || freq === 'both')) continue;
-    const email = usersById.get(pref.user_id);
-    if (!email) continue;
 
     const { data: existing } = await sb
       .from('briefing_deliveries')
@@ -73,7 +54,7 @@ export async function runEmailBriefings(): Promise<{ sent: number; failed: numbe
       await sb.from('briefing_deliveries').insert({
         briefing_id: latest.id,
         user_id: pref.user_id,
-        email,
+        email: null,
         status: 'skipped',
         error: `daily briefing cap reached (${dailyCap.limit})`,
       });
@@ -92,7 +73,7 @@ export async function runEmailBriefings(): Promise<{ sent: number; failed: numbe
 
     const weather = await fetchUserWeather(pref.weather_lat, pref.weather_lon, pref.weather_label);
 
-    const html = buildUserBriefingHtml({
+    const notificationBody = buildUserBriefingBody({
       headline: latest.headline,
       body: latest.body_markdown,
       focusTopics: pref.topics ?? [],
@@ -100,28 +81,33 @@ export async function runEmailBriefings(): Promise<{ sent: number; failed: numbe
       weather,
     });
 
-    const r = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${e.RESEND_API_KEY}`,
+    const topSignals = (signals ?? []).slice(0, 3);
+    const notification = await createUserNotification(sb, {
+      userId: pref.user_id,
+      type: 'daily_briefing',
+      title: `Daily briefing · ${latest.headline.slice(0, 140)}`,
+      summary:
+        topSignals.length > 0
+          ? topSignals.map((s) => `[${String(s.topic ?? 'other')}] ${s.title}`).join(' · ').slice(0, 560)
+          : 'No high-priority signals matched your current topics today.',
+      body: notificationBody,
+      briefingId: latest.id,
+      data: {
+        briefing_id: latest.id,
+        kind: 'daily',
+        period_start: latest.period_start,
+        signal_count: (signals ?? []).length,
       },
-      body: JSON.stringify({
-        from: e.BRIEFING_FROM_EMAIL,
-        to: [email],
-        subject: `Crosscheck Daily · ${latest.headline}`,
-        html,
-      }),
     });
 
-    if (!r.ok) {
-      const msg = `email ${email}: ${await r.text()}`;
+    if (!notification.ok) {
+      const msg = `notification failed: ${notification.error ?? 'unknown error'}`;
       failed++;
       errors.push(msg.slice(0, 400));
       await sb.from('briefing_deliveries').insert({
         briefing_id: latest.id,
         user_id: pref.user_id,
-        email,
+        email: null,
         status: 'failed',
         error: msg.slice(0, 500),
       });
@@ -132,7 +118,7 @@ export async function runEmailBriefings(): Promise<{ sent: number; failed: numbe
     await sb.from('briefing_deliveries').insert({
       briefing_id: latest.id,
       user_id: pref.user_id,
-      email,
+      email: null,
       status: 'sent',
     });
   }
@@ -148,7 +134,7 @@ export async function runEmailBriefings(): Promise<{ sent: number; failed: numbe
   return { sent, failed };
 }
 
-function buildUserBriefingHtml(input: {
+function buildUserBriefingBody(input: {
   headline: string;
   body: string;
   focusTopics: string[];
@@ -174,38 +160,38 @@ function buildUserBriefingHtml(input: {
       const sourcesLine = total > 0
         ? `${total} source${total === 1 ? '' : 's'}` +
           (credible > 0 ? ` (${credible} rated outlet${credible === 1 ? '' : 's'})` : '') +
-          (domains ? ` — ${escapeHtml(domains)}` : '')
+          (domains ? ` — ${domains}` : '')
         : '';
       const fresh = s.last_enriched_at
-        ? `<div style="color:#b45309;font-size:12px;margin-top:2px">Freshly corroborated — new sources surfaced in our latest live-search pass.</div>`
+        ? '\n  Freshly corroborated — new sources surfaced in our latest live-search pass.'
         : '';
-      return (
-        `<li style="margin-bottom:10px">` +
-        `<strong>[${escapeHtml(String(s.topic ?? 'other'))}]</strong> ${escapeHtml(s.title)} ` +
-        `<span style="color:#555">(sev ${s.severity}, ${escapeHtml(statusLabel(s.verification_status as VerificationStatus))})</span>` +
-        (s.url ? ` — <a href="${escapeHtml(String(s.url))}">open</a>` : '') +
-        (sourcesLine ? `<div style="color:#555;font-size:12px;margin-top:2px">${sourcesLine}</div>` : '') +
-        fresh +
-        `</li>`
-      );
+      return [
+        `- [${String(s.topic ?? 'other')}] ${s.title} (sev ${s.severity}, ${statusLabel(
+          s.verification_status as VerificationStatus,
+        )})`,
+        s.url ? `  Source: ${String(s.url)}` : null,
+        sourcesLine ? `  ${sourcesLine}` : null,
+        fresh ? `  ${fresh.trim()}` : null,
+      ]
+        .filter(Boolean)
+        .join('\n');
     })
-    .join('');
+    .join('\n');
 
-  return `
-    <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.5;color:#111">
-      <h2>${escapeHtml(input.headline)}</h2>
-      <p><strong>Your focus topics:</strong> ${escapeHtml(focus)}</p>
-      ${input.weather ? `<p><strong>Local weather signal:</strong> ${escapeHtml(input.weather)}</p>` : ''}
-      <p>${escapeHtml(input.body).slice(0, 2200).replace(/\n/g, '<br/>')}</p>
-      <h3>Top signals for your profile</h3>
-      <ul style="padding-left:18px">${cards || '<li>No high-priority signals matched your current topics today.</li>'}</ul>
-      <p style="color:#666;font-size:12px">
-        Labels describe how many independent sources are reporting each signal and how many match our
-        rated-outlet set. They are not claims of factual truth. This briefing is generated per
-        account; your preferences and AI state are isolated.
-      </p>
-    </div>
-  `;
+  return [
+    input.headline,
+    `Your focus topics: ${focus}`,
+    input.weather ? `Local weather signal: ${input.weather}` : null,
+    '',
+    input.body.slice(0, 2200),
+    '',
+    'Top signals for your profile',
+    cards || '- No high-priority signals matched your current topics today.',
+    '',
+    'Labels describe how many independent sources are reporting each signal and how many match our rated-outlet set. They are not claims of factual truth.',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 async function fetchUserWeather(
@@ -228,13 +214,4 @@ async function fetchUserWeather(
   } catch {
     return null;
   }
-}
-
-function escapeHtml(s: string) {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
 }

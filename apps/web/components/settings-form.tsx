@@ -13,7 +13,7 @@ export interface PrefsInitial {
   muted_sources?: string[];
   muted_topics?: Topic[];
   countries_of_focus?: string[];
-  email_briefings?: boolean;
+  notifications_enabled?: boolean;
   alerts_enabled?: boolean;
   min_alert_severity?: number;
   weather_lat?: number | null;
@@ -88,7 +88,9 @@ export function SettingsForm({
   const [mutedSources, setMutedSources] = useState<string[]>(initial?.muted_sources ?? []);
   const [mutedTopics, setMutedTopics] = useState<Topic[]>(initial?.muted_topics ?? []);
   const [countries, setCountries] = useState<string>((initial?.countries_of_focus ?? []).join(', '));
-  const [email, setEmail] = useState<boolean>(initial?.email_briefings ?? true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(
+    initial?.notifications_enabled ?? true,
+  );
   const [alerts, setAlerts] = useState<boolean>(initial?.alerts_enabled ?? true);
   const [minSev, setMinSev] = useState<number>(initial?.min_alert_severity ?? 70);
   const [weatherLabel, setWeatherLabel] = useState<string>(initial?.weather_label ?? '');
@@ -151,7 +153,7 @@ export function SettingsForm({
         .split(',')
         .map((s) => s.trim().toUpperCase())
         .filter((s) => s.length === 2),
-      email_briefings: email,
+      notifications_enabled: notificationsEnabled,
       alerts_enabled: alerts,
       min_alert_severity: minSev,
       feed_mode_preference: feedMode,
@@ -382,12 +384,16 @@ export function SettingsForm({
 
           <div className="flex flex-wrap items-center gap-6">
             <label className="flex items-center gap-2 text-sm text-ink-700">
-              <input type="checkbox" checked={email} onChange={(e) => setEmail(e.target.checked)} />
-              Daily email briefing
+              <input
+                type="checkbox"
+                checked={notificationsEnabled}
+                onChange={(e) => setNotificationsEnabled(e.target.checked)}
+              />
+              In-app notifications
             </label>
             <label className="flex items-center gap-2 text-sm text-ink-700">
               <input type="checkbox" checked={alerts} onChange={(e) => setAlerts(e.target.checked)} />
-              Priority alerts
+              Priority alerts in app
             </label>
           </div>
 
@@ -414,7 +420,7 @@ export function SettingsForm({
             />
           </Field>
 
-          <Field label={`Max alert emails per day (${maxAlertsPerDay})`} hint="Platform cap is 5/day.">
+          <Field label={`Max alert notifications per day (${maxAlertsPerDay})`} hint="Platform cap is 5/day.">
             <input
               type="range"
               min={1}

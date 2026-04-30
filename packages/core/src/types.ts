@@ -131,6 +131,7 @@ export interface Preferences {
   muted_sources: string[];
   muted_topics: Topic[];
   countries_of_focus: string[];
+  notifications_enabled: boolean;
   email_briefings: boolean;
   alerts_enabled: boolean;
   min_alert_severity: number;

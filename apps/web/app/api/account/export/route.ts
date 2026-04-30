@@ -22,6 +22,7 @@ export async function GET(req: Request) {
     { data: profile },
     { data: preferences },
     { data: feedback },
+    { data: notifications },
     { data: savedViews },
     { data: aiProfile },
     { data: aiSessions },
@@ -32,6 +33,11 @@ export async function GET(req: Request) {
     sb.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
     sb.from('preferences').select('*').eq('user_id', userId).maybeSingle(),
     sb.from('feedback').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+    sb
+      .from('user_notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
     sb.from('user_saved_views').select('*').eq('user_id', userId).order('updated_at', { ascending: false }),
     sb.from('ai_profiles').select('*').eq('user_id', userId).maybeSingle(),
     sb.from('ai_sessions').select('*').eq('user_id', userId).order('updated_at', { ascending: false }),
@@ -53,6 +59,7 @@ export async function GET(req: Request) {
     profile,
     preferences,
     feedback: feedback ?? [],
+    notifications: notifications ?? [],
     saved_views: savedViews ?? [],
     ai_profile: aiProfile,
     ai_sessions: aiSessions ?? [],

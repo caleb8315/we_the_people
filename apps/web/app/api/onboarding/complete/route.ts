@@ -56,7 +56,7 @@ export async function POST(req: Request) {
         topics,
         feed_mode_preference: feed_mode_preference ?? 'personalized',
         briefing_frequency_preference: briefing_frequency_preference ?? 'daily',
-        email_briefings: (briefing_frequency_preference ?? 'daily') !== 'off',
+        notifications_enabled: true,
         alert_intensity_preference: alert_intensity_preference ?? 'critical_only',
         max_alerts_per_day_preference: max_alerts_per_day_preference ?? 3,
         min_alert_severity: 85,

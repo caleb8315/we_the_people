@@ -99,7 +99,7 @@ Use this runbook after shipping personalization defaults.
 ### Baseline defaults
 
 - Feed default: `personalized` with one-tap global toggle.
-- Briefing default: `daily` (email enabled unless user sets `off`).
+- Briefing default: `daily` (in-app notifications enabled unless user turns notifications off).
 - Alerts default: `critical_only`, `max_alerts_per_day_preference = 3`, hard cap `5`.
 - AI chat beta limit: `10/day`.
 
