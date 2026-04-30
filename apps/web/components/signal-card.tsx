@@ -182,43 +182,50 @@ export function SignalCard({ s }: { s: SignalRow }) {
             </div>
           )}
 
-          {!isComplexSignal && inline.length > 0 && (
-            <div className="mt-3 rounded-xl border border-danger-200 bg-danger-50 px-3 py-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-danger-700">
-                Key differences detected
-              </p>
-              <ul className="mt-1.5 space-y-0.5 text-[13px] text-ink-700">
-                {inline.map((c, i) => (
-                  <li key={i} className="clamp-1">
-                    <span aria-hidden="true" className="text-danger-500">
-                      •
-                    </span>{' '}
-                    {formatContradictionInline(c)}
-                  </li>
-                ))}
-              </ul>
-              {(s.contradictions_count ?? 0) > inline.length && (
-                <p className="mt-1 text-[11px] text-danger-600">
-                  +{(s.contradictions_count ?? 0) - inline.length} more on the signal page
-                </p>
-              )}
-            </div>
-          )}
+          {/* Key differences — prefer the upgraded analyzed_conflicts
+              (broader taxonomy, numeric severity) when the decorate
+              path attached them. Falls back to the legacy contradiction
+              inline block for old rows or when only insufficient_evidence
+              fired (which we don't surface as a "difference"). */}
+          {!isComplexSignal && (s.analyzed_conflicts && s.analyzed_conflicts.length > 0
+            ? renderAnalyzedDifferences(s.analyzed_conflicts)
+            : inline.length > 0 && (
+                <div className="mt-3 rounded-xl border border-danger-200 bg-danger-50 px-3 py-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-danger-700">
+                    Key differences detected
+                  </p>
+                  <ul className="mt-1.5 space-y-0.5 text-[13px] text-ink-700">
+                    {inline.map((c, i) => (
+                      <li key={i} className="clamp-1">
+                        <span aria-hidden="true" className="text-danger-500">
+                          •
+                        </span>{' '}
+                        {formatContradictionInline(c)}
+                      </li>
+                    ))}
+                  </ul>
+                  {(s.contradictions_count ?? 0) > inline.length && (
+                    <p className="mt-1 text-[11px] text-danger-600">
+                      +{(s.contradictions_count ?? 0) - inline.length} more on the signal page
+                    </p>
+                  )}
+                </div>
+              ))}
 
           {showEvidenceBlock && s.physical_evidence && (
             <PhysicalEvidenceBlock pe={s.physical_evidence} />
           )}
 
-          {/* April 2026 evidence-comparison strip — at-a-glance source
-              mix, top conflict severity, and a bias signal chip. The
-              chip is colour-tinted but explicitly labelled "signal" so
-              it never reads as a verdict. Hidden when the row is from
-              an old un-decorated path (no analyzed_conflicts) so we
-              never render an empty strip. */}
+          {/* April 2026 comparison strip — source mix and bias signal.
+              Conflict info lives in the differences block above (which
+              prefers analyzed_conflicts when populated), so this strip
+              focuses on what the differences block can't show: the
+              ranked source mix and the corpus-level bias signal. The
+              bias chip is always tagged "signal" so it never reads as
+              a verdict. */}
           {(s.ranked_sources && s.ranked_sources.length > 0) && (
             <ComparisonStrip
               ranked={s.ranked_sources}
-              conflicts={s.analyzed_conflicts ?? []}
               bias={s.bias_report ?? null}
               breakdown={s.confidence_breakdown ?? null}
             />
@@ -349,27 +356,62 @@ function PhysicalEvidenceBlock({ pe }: { pe: PhysicalEvidence }) {
 }
 
 /**
- * At-a-glance comparison strip for the feed card. Three chips:
+ * Render the upgraded "Key differences detected" block using the
+ * analyzed_conflicts taxonomy. This replaces the legacy 3-type inline
+ * list when the decorate path has attached the broader analysis.
+ */
+function renderAnalyzedDifferences(conflicts: AnalyzedConflict[]) {
+  const visible = conflicts
+    .filter((c) => c.type !== 'insufficient_evidence')
+    .sort((a, b) => b.severity_score - a.severity_score)
+    .slice(0, 3);
+  if (visible.length === 0) return null;
+  const remaining = conflicts.length - visible.length;
+  return (
+    <div className="mt-3 rounded-xl border border-danger-200 bg-danger-50 px-3 py-2">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-danger-700">
+        Key differences detected
+      </p>
+      <ul className="mt-1.5 space-y-0.5 text-[13px] text-ink-700">
+        {visible.map((c, i) => (
+          <li key={i} className="clamp-1">
+            <span aria-hidden="true" className="text-danger-500">
+              •
+            </span>{' '}
+            <span className="font-semibold text-ink-800">
+              {conflictLabel(c)} {c.severity_score}/100:
+            </span>{' '}
+            {c.summary}
+          </li>
+        ))}
+      </ul>
+      {remaining > 0 && (
+        <p className="mt-1 text-[11px] text-danger-600">
+          +{remaining} more on the signal page
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * At-a-glance comparison strip for the feed card. Two chips:
  *   1. Source mix (primaries / officials / rated outlets)
- *   2. Worst conflict (when any) with numeric severity
- *   3. Bias signal (always with the "signal" qualifier)
- * Plus an optional confidence-breakdown sparkline on the right edge.
+ *   2. Bias signal (always with the "signal" qualifier)
+ * Plus a confidence-breakdown number on the right edge. Conflict info
+ * is rendered separately in the differences block above so we don't
+ * stack the same data twice.
  */
 function ComparisonStrip({
   ranked,
-  conflicts,
   bias,
   breakdown,
 }: {
   ranked: RankedSource[];
-  conflicts: AnalyzedConflict[];
   bias: CorpusBiasReport | null;
   breakdown: ConfidenceBreakdown | null;
 }) {
   const mix = computeMixSummary(ranked);
-  const worstConflict = conflicts
-    .filter((c) => c.type !== 'insufficient_evidence')
-    .sort((a, b) => b.severity_score - a.severity_score)[0] ?? null;
   const showBias = bias && bias.has_signal;
   return (
     <div className="mt-3 flex flex-wrap items-center gap-1.5 rounded-xl border border-ink-100 bg-canvas-50 px-2.5 py-2 text-[11px]">
@@ -378,17 +420,6 @@ function ComparisonStrip({
       </span>
       <span aria-hidden="true" className="text-ink-300">·</span>
       <span className="text-ink-600">{mix}</span>
-      {worstConflict && (
-        <>
-          <span aria-hidden="true" className="text-ink-300">·</span>
-          <span
-            className={`rounded-full px-2 py-0.5 font-medium ${conflictChipClass(worstConflict.severity_band)}`}
-            title={worstConflict.summary}
-          >
-            {conflictLabel(worstConflict)} {worstConflict.severity_score}/100
-          </span>
-        </>
-      )}
       {showBias && bias && (
         <>
           <span aria-hidden="true" className="text-ink-300">·</span>
@@ -436,17 +467,6 @@ function conflictLabel(c: AnalyzedConflict): string {
       return 'Missing context';
     case 'insufficient_evidence':
       return 'Thin';
-  }
-}
-
-function conflictChipClass(band: 'low' | 'medium' | 'high'): string {
-  switch (band) {
-    case 'high':
-      return 'bg-danger-100 text-danger-700';
-    case 'medium':
-      return 'bg-amber-100 text-amber-800';
-    case 'low':
-      return 'bg-ink-100 text-ink-600';
   }
 }
 
