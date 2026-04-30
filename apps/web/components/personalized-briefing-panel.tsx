@@ -6,6 +6,7 @@ export function PersonalizedBriefingPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [briefing, setBriefing] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
   const [signalsUsed, setSignalsUsed] = useState<number | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
 
@@ -23,11 +24,36 @@ export function PersonalizedBriefingPanel() {
       return;
     }
     setBriefing(body.briefing ?? null);
+    setExpanded(false);
     setSignalsUsed(typeof body.signals_used === 'number' ? body.signals_used : null);
     setRemaining(typeof body.remaining_estimate === 'number' ? body.remaining_estimate : null);
   }
 
   const sections = useMemo(() => parseBriefingSections(briefing ?? ''), [briefing]);
+  const collapsedSections = useMemo(() => {
+    if (expanded) return sections;
+    return sections
+      .slice(0, 2)
+      .map((section) => ({
+        ...section,
+        body: truncateForPreview(section.body, 340),
+      }));
+  }, [expanded, sections]);
+  const hasExpandableSections = useMemo(
+    () =>
+      sections.length > 2 ||
+      sections.some((section) => section.body.trim().length > 340),
+    [sections],
+  );
+  const fallbackPreview = useMemo(() => {
+    const raw = (briefing ?? '').trim();
+    if (expanded) return raw;
+    return truncateForPreview(raw, 720);
+  }, [briefing, expanded]);
+  const hasExpandableFallback = useMemo(
+    () => ((briefing ?? '').trim().length > 720),
+    [briefing],
+  );
 
   return (
     <section className="rounded-card border border-brand-200 bg-brand-50 p-5">
@@ -59,7 +85,7 @@ export function PersonalizedBriefingPanel() {
 
       {briefing && sections.length > 0 && (
         <div className="mt-3 space-y-2.5">
-          {sections.map((section, i) => (
+          {collapsedSections.map((section, i) => (
             <div key={i} className={`rounded-md border px-3 py-2.5 ${sectionToneClass(section.kind)}`}>
               {section.heading && (
                 <p className={`text-[10.5px] font-semibold uppercase tracking-[0.18em] ${sectionLabelTone(section.kind)}`}>
@@ -71,13 +97,33 @@ export function PersonalizedBriefingPanel() {
               </pre>
             </div>
           ))}
+          {hasExpandableSections && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="rounded-full border border-ink-200 bg-paper px-3 py-1.5 text-xs font-semibold text-ink-600 transition hover:border-ink-300 hover:text-ink"
+            >
+              {expanded ? 'Show less' : 'Expand briefing'}
+            </button>
+          )}
         </div>
       )}
 
       {briefing && sections.length === 0 && (
-        <pre className="mt-3 whitespace-pre-wrap rounded-md border border-ink-100 bg-paper p-3 text-sm leading-relaxed text-ink-700">
-          {briefing}
-        </pre>
+        <div className="mt-3 space-y-2.5">
+          <pre className="whitespace-pre-wrap rounded-md border border-ink-100 bg-paper p-3 text-sm leading-relaxed text-ink-700">
+            {fallbackPreview}
+          </pre>
+          {hasExpandableFallback && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="rounded-full border border-ink-200 bg-paper px-3 py-1.5 text-xs font-semibold text-ink-600 transition hover:border-ink-300 hover:text-ink"
+            >
+              {expanded ? 'Show less' : 'Expand briefing'}
+            </button>
+          )}
+        </div>
       )}
     </section>
   );
@@ -162,4 +208,10 @@ function sectionLabelTone(kind: SectionKind): string {
     default:
       return 'text-ink-500';
   }
+}
+
+function truncateForPreview(text: string, maxChars: number): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= maxChars) return trimmed;
+  return `${trimmed.slice(0, maxChars).trimEnd()}…`;
 }
