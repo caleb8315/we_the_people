@@ -520,63 +520,70 @@ function VerifyResult({ data }: { data: VerifyResponse }) {
         </div>
       )}
 
-      {/* 3. Supporting detail — always open, because this IS the content. */}
-      {(reader.what_we_found.length > 0 || reader.what_is_unclear.length > 0) && (
-        <div className="space-y-4">
-          {reader.what_we_found.length > 0 && (
-            <ReaderBlock title="What the evidence says" bullets={reader.what_we_found} />
-          )}
-          {reader.what_is_unclear.length > 0 && (
-            <ReaderBlock title="Limitations to keep in mind" bullets={reader.what_is_unclear} />
-          )}
-        </div>
-      )}
+      {/* April 2026 evidence-comparison panel — ranked sources,
+          extended conflict taxonomy, bias signal (kept separate from
+          confidence), evidence cards with stance, and the four result
+          explanation sections.
 
-      {/* 3b. April 2026 evidence-comparison panel — ranked sources,
-            extended conflict taxonomy, bias signal (kept separate from
-            confidence), evidence cards with stance, and the four result
-            explanation sections. The legacy reader-report blocks above
-            stay so existing language regression tests keep passing. */}
-      {analysis && <VerifyAnalysis data={analysis} />}
-
-      {/* 4. Sources — show who reported what, not just system names. */}
-      {reader.source_trace_friendly.length > 0 && (
-        <details open className="group">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl border border-ink-100 bg-canvas-50 px-4 py-2.5 text-[12px] font-semibold uppercase tracking-[0.16em] text-ink-500 hover:bg-canvas-100">
-            <span>Sources behind this assessment</span>
-            <span className="text-ink-400 transition-transform group-open:rotate-180" aria-hidden="true">&#8964;</span>
-          </summary>
-          <div className="mt-3 rounded-xl border border-ink-100 bg-canvas-50 p-4">
-            <ul className="space-y-2.5">
-              {reader.source_trace_friendly.map((t, i) => (
-                <li key={i} className="flex items-start gap-2.5 text-sm">
-                  <span
-                    className={`mt-0.5 inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[10px] font-semibold uppercase tracking-wider ${roleChipClass(t.role_label)}`}
-                  >
-                    {t.role_label}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <a
-                      href={t.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-medium text-ink-700 hover:text-amber-600"
-                    >
-                      {t.outlet_label}
-                    </a>
-                    {t.title && (
-                      <p className="mt-0.5 truncate text-xs text-ink-500">{t.title}</p>
-                    )}
-                    <p className="text-xs text-ink-400">
-                      {t.domain}
-                      {t.is_credible && <span className="ml-1.5 text-emerald-600">&#10003; Rated source</span>}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </details>
+          When the upgraded analysis is available, it covers everything
+          the legacy reader-report bullets and source-trace fallback
+          rendered, with sharper data (numeric severity, per-source
+          rationale, stance per card). We only fall back to the legacy
+          reader_report blocks when analysis is absent — this keeps
+          the page from showing two copies of the same information. */}
+      {analysis ? (
+        <VerifyAnalysis data={analysis} />
+      ) : (
+        <>
+          {(reader.what_we_found.length > 0 || reader.what_is_unclear.length > 0) && (
+            <div className="space-y-4">
+              {reader.what_we_found.length > 0 && (
+                <ReaderBlock title="What the evidence says" bullets={reader.what_we_found} />
+              )}
+              {reader.what_is_unclear.length > 0 && (
+                <ReaderBlock title="Limitations to keep in mind" bullets={reader.what_is_unclear} />
+              )}
+            </div>
+          )}
+          {reader.source_trace_friendly.length > 0 && (
+            <details open className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl border border-ink-100 bg-canvas-50 px-4 py-2.5 text-[12px] font-semibold uppercase tracking-[0.16em] text-ink-500 hover:bg-canvas-100">
+                <span>Sources behind this assessment</span>
+                <span className="text-ink-400 transition-transform group-open:rotate-180" aria-hidden="true">&#8964;</span>
+              </summary>
+              <div className="mt-3 rounded-xl border border-ink-100 bg-canvas-50 p-4">
+                <ul className="space-y-2.5">
+                  {reader.source_trace_friendly.map((t, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-sm">
+                      <span
+                        className={`mt-0.5 inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[10px] font-semibold uppercase tracking-wider ${roleChipClass(t.role_label)}`}
+                      >
+                        {t.role_label}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <a
+                          href={t.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium text-ink-700 hover:text-amber-600"
+                        >
+                          {t.outlet_label}
+                        </a>
+                        {t.title && (
+                          <p className="mt-0.5 truncate text-xs text-ink-500">{t.title}</p>
+                        )}
+                        <p className="text-xs text-ink-400">
+                          {t.domain}
+                          {t.is_credible && <span className="ml-1.5 text-emerald-600">&#10003; Rated source</span>}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </details>
+          )}
+        </>
       )}
 
       {/* 5. Transparency: which systems we searched — collapsed, for the curious. */}
