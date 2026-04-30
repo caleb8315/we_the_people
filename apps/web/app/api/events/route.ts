@@ -27,6 +27,7 @@ const EventBody = z.object({
     'verify_result_viewed',
     'verify_shared',
     'signal_feedback_sent',
+    'signal_developed',
   ]),
   event_props: z.record(z.unknown()).optional(),
 });

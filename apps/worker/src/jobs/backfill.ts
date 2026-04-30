@@ -11,6 +11,7 @@ import {
 import type { EvidenceItem } from '@osint/core/types';
 
 import { upsertContradictions } from '../lib/contradictions';
+import { buildMapLocationsFromSignalRaw } from '../lib/map-locations';
 import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
 
 /**
@@ -167,9 +168,15 @@ export async function runBackfill(opts: BackfillOptions = {}): Promise<BackfillR
         signal.raw_data && typeof signal.raw_data === 'object'
           ? (signal.raw_data as Record<string, unknown>)
           : {};
+      const mapLocations = buildMapLocationsFromSignalRaw(
+        existingRaw,
+        null,
+        (signal.country_code as string | null) ?? null,
+      );
       const raw_data = {
         ...existingRaw,
         reliability: reliability.details,
+        map_locations: mapLocations,
         physical_evidence: physicalEvidence,
         contradiction_detection: {
           skipped: detection.skipped,

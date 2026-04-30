@@ -26,6 +26,7 @@ import type { EvidenceItem, Topic, VerificationStatus } from '@osint/core/types'
 import { loadAdapters } from '../adapters/index';
 import type { RawItem } from '../adapters/base';
 import { upsertContradictions } from '../lib/contradictions';
+import { buildSignalMapLocations } from '../lib/map-locations';
 import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
 
 /**
@@ -258,6 +259,11 @@ export async function runIngest(): Promise<{
         title: primary.title,
         summary: primary.summary,
       });
+      const mapLocations = buildSignalMapLocations({
+        rawGroup,
+        topic,
+        countryCode: primary.country_code ?? null,
+      });
 
       // Compose signal tags. Each tag is a compact, machine-readable flag
       // that the UI and ops tooling can filter on. `complex_signal` is the
@@ -298,6 +304,7 @@ export async function runIngest(): Promise<{
           group_size: rawGroup.length,
           reliability: reliability.details,
           physical_evidence: physicalEvidence,
+          map_locations: mapLocations,
           contradiction_detection: {
             skipped: detection.skipped,
             reason: detection.reason,

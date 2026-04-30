@@ -9,11 +9,17 @@ export interface SignalGeoPoint {
   lat: number;
   lon: number;
   isApproximate: boolean;
+  precision: 'exact' | 'approximate';
+  source_class: 'sensor' | 'news' | 'social' | 'markets' | 'official' | 'other';
+  source_id: string | null;
+  location_label: string | null;
   country_code: string | null;
   occurred_at: string | null;
   source_count: number;
   credible_source_count: number;
 }
+
+export type MapSourceClass = SignalGeoPoint['source_class'];
 
 const COUNTRY_CENTROIDS: Record<string, { lat: number; lon: number }> = {
   AF: { lat: 33.94, lon: 67.71 },
@@ -129,6 +135,96 @@ function normalizeLng(value: number): number {
   return value;
 }
 
+function sourceClassFromSourceId(sourceId: string | null | undefined): SignalGeoPoint['source_class'] {
+  const id = String(sourceId ?? '').toLowerCase();
+  if (!id) return 'other';
+  if (
+    id.includes('usgs') ||
+    id.includes('noaa') ||
+    id.includes('nasa') ||
+    id.includes('open-meteo') ||
+    id.includes('swpc')
+  ) {
+    return 'sensor';
+  }
+  if (id.includes('reddit') || id.includes('bluesky') || id.includes('mastodon')) return 'social';
+  if (
+    id.includes('coingecko') ||
+    id.includes('yahoo-finance') ||
+    id.includes('polymarket')
+  ) {
+    return 'markets';
+  }
+  if (id.includes('cisa')) return 'official';
+  if (id.includes('gdelt') || id.includes('rss') || id.includes('gnews') || id.includes('bbc') || id.includes('reuters')) {
+    return 'news';
+  }
+  return 'other';
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function toMaybeString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function toPrecision(value: unknown): 'exact' | 'approximate' {
+  return value === 'approximate' ? 'approximate' : 'exact';
+}
+
+function readRawMapLocations(raw: unknown): Array<{
+  lat: number;
+  lon: number;
+  precision: 'exact' | 'approximate';
+  source_id: string | null;
+  source_class: SignalGeoPoint['source_class'];
+  label: string | null;
+}> {
+  if (!raw || typeof raw !== 'object') return [];
+  const mapLocations = (raw as Record<string, unknown>).map_locations;
+  if (!Array.isArray(mapLocations)) return [];
+  const out: Array<{
+    lat: number;
+    lon: number;
+    precision: 'exact' | 'approximate';
+    source_id: string | null;
+    source_class: SignalGeoPoint['source_class'];
+    label: string | null;
+  }> = [];
+  for (const row of mapLocations) {
+    if (!row || typeof row !== 'object') continue;
+    const rec = row as Record<string, unknown>;
+    const lat = toFiniteNumber(rec.lat);
+    const lonRaw = toFiniteNumber(rec.lon);
+    if (lat == null || lonRaw == null) continue;
+    if (lat < -90 || lat > 90) continue;
+    const lon = normalizeLng(lonRaw);
+    out.push({
+      lat,
+      lon,
+      precision: toPrecision(rec.precision),
+      source_id: toMaybeString(rec.source_id),
+      source_class:
+        rec.source_class === 'sensor' ||
+        rec.source_class === 'news' ||
+        rec.source_class === 'social' ||
+        rec.source_class === 'markets' ||
+        rec.source_class === 'official'
+          ? rec.source_class
+          : sourceClassFromSourceId(toMaybeString(rec.source_id)),
+      label: toMaybeString(rec.label),
+    });
+  }
+  return out;
+}
+
 function parseLatLonFromRaw(raw: unknown): { lat: number; lon: number } | null {
   if (!raw || typeof raw !== 'object') return null;
   const obj = raw as Record<string, unknown>;
@@ -150,43 +246,89 @@ function parseLatLonFromRaw(raw: unknown): { lat: number; lon: number } | null {
   return null;
 }
 
-export function signalGeoPoint(
+export function signalGeoPoints(
   signal: SignalRowRaw & { raw_data?: Record<string, unknown> | null },
-): SignalGeoPoint | null {
-  const direct = parseLatLonFromRaw(signal.raw_data ?? null);
-  if (direct) {
-    return {
+): SignalGeoPoint[] {
+  const out: SignalGeoPoint[] = [];
+  const seen = new Set<string>();
+  const addPoint = (
+    lat: number,
+    lon: number,
+    precision: 'exact' | 'approximate',
+    sourceId: string | null,
+    sourceClass: SignalGeoPoint['source_class'],
+    label: string | null,
+  ) => {
+    const key = `${lat.toFixed(4)}:${lon.toFixed(4)}:${precision}:${sourceClass}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({
       id: signal.id,
       title: signal.title,
       topic: signal.topic,
       severity: signal.severity,
       verification_status: signal.verification_status,
-      lat: direct.lat,
-      lon: direct.lon,
-      isApproximate: false,
+      lat,
+      lon,
+      isApproximate: precision === 'approximate',
+      precision,
+      source_class: sourceClass,
+      source_id: sourceId,
+      location_label: label,
       country_code: signal.country_code ?? null,
       occurred_at: signal.occurred_at ?? null,
       source_count: signal.source_count ?? 0,
       credible_source_count: signal.credible_source_count ?? 0,
-    };
+    });
+  };
+
+  const rawMulti = readRawMapLocations(signal.raw_data ?? null);
+  for (const loc of rawMulti) {
+    addPoint(
+      loc.lat,
+      loc.lon,
+      loc.precision,
+      loc.source_id,
+      loc.source_class,
+      loc.label,
+    );
+  }
+
+  if (out.length > 0) {
+    // Avoid rendering excessive points for a single signal.
+    return out.slice(0, 6);
+  }
+
+  const direct = parseLatLonFromRaw(signal.raw_data ?? null);
+  if (direct) {
+    addPoint(
+      direct.lat,
+      direct.lon,
+      'exact',
+      (signal.raw_data?.source_id as string | null | undefined) ?? signal.source_id ?? null,
+      sourceClassFromSourceId(signal.source_id ?? null),
+      null,
+    );
+    return out;
   }
 
   const cc = String(signal.country_code ?? '').toUpperCase();
   const centroid = COUNTRY_CENTROIDS[cc];
-  if (!centroid) return null;
+  if (!centroid) return [];
+  addPoint(
+    centroid.lat,
+    centroid.lon,
+    'approximate',
+    signal.source_id ?? null,
+    sourceClassFromSourceId(signal.source_id ?? null),
+    cc ? `${cc} centroid` : null,
+  );
+  return out;
+}
 
-  return {
-    id: signal.id,
-    title: signal.title,
-    topic: signal.topic,
-    severity: signal.severity,
-    verification_status: signal.verification_status,
-    lat: centroid.lat,
-    lon: centroid.lon,
-    isApproximate: true,
-    country_code: cc || null,
-    occurred_at: signal.occurred_at ?? null,
-    source_count: signal.source_count ?? 0,
-    credible_source_count: signal.credible_source_count ?? 0,
-  };
+// Backwards compatibility for existing callers during rollout.
+export function signalGeoPoint(
+  signal: SignalRowRaw & { raw_data?: Record<string, unknown> | null },
+): SignalGeoPoint | null {
+  return signalGeoPoints(signal)[0] ?? null;
 }

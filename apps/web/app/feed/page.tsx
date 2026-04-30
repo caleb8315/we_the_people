@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { SignalsMap } from '@/components/signals-map';
 import { logProductEvent } from '@/lib/product-events';
 import { applyMutes, decorateSignals, personalizeSignals, type SignalRowRaw } from '@/lib/signals';
-import { signalGeoPoint, type SignalGeoPoint } from '@/lib/signal-geo';
+import { signalGeoPoints, type SignalGeoPoint } from '@/lib/signal-geo';
 
 export const metadata = { title: 'Feed · Crosscheck' };
 export const dynamic = 'force-dynamic';
@@ -116,9 +116,7 @@ export default async function FeedPage({
     ? applyMutes(allSignals, prefs)
     : allSignals;
   const signals = await decorateSignals(sb, filtered);
-  const geoPoints: SignalGeoPoint[] = signals
-    .map((s) => signalGeoPoint(s))
-    .filter((x): x is SignalGeoPoint => Boolean(x));
+  const geoPoints: SignalGeoPoint[] = signals.flatMap((s) => signalGeoPoints(s));
 
   if (userId) {
     void logProductEvent(sb, {
