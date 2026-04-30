@@ -50,7 +50,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en">
       <body className="min-h-screen bg-canvas text-ink antialiased">
         <NavBar />
-        <main className="mx-auto max-w-6xl px-4 pb-28 pt-4 sm:px-6 sm:pb-16 sm:pt-8">
+        <main className="mx-auto max-w-6xl px-4 pb-28 pt-3 sm:px-6 sm:pb-16 sm:pt-6">
           {children}
         </main>
         <MobileBottomNav signedIn={signedIn} />

@@ -187,7 +187,7 @@ export function VerifyClient() {
   }
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-5 sm:space-y-6">
       <div className="rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
         <div className="flex flex-wrap items-center gap-2">
           <Segmented
@@ -202,13 +202,13 @@ export function VerifyClient() {
           />
         </div>
 
-        <div className="mt-5 space-y-4">
+        <div className="mt-4 space-y-4">
           {kind === 'url' && (
             <label className="block">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">
                 Article, social post, or image URL
               </span>
-              <div className="mt-1.5 flex items-center gap-3">
+              <div className="mt-1.5 flex flex-col items-stretch gap-2.5 sm:flex-row sm:items-center sm:gap-3">
                 <input
                   type="url"
                   value={url}
@@ -283,7 +283,7 @@ export function VerifyClient() {
                     <div className="h-px flex-1 bg-ink-100" />
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-stretch gap-2.5 sm:flex-row sm:items-center sm:gap-3">
                     <input
                       type="url"
                       value={imageUrl}

@@ -4,7 +4,7 @@ export const metadata = { title: 'Verify · Crosscheck' };
 
 export default function VerifyPage() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-7">
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">
           Verification

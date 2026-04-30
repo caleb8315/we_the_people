@@ -175,7 +175,7 @@ export default async function FeedPage({
   const severityStops = [0, 60, 75, 85] as const;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-7">
       {/* Greeting hero — mirrors the reference "let's go trip to africa" header. */}
       <section>
         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">
@@ -189,7 +189,7 @@ export default async function FeedPage({
 
         {/* Search + filter button. The amber square on the right matches the
             reference's filter affordance. */}
-        <form action="/feed" className="mt-6 flex max-w-xl items-center gap-3">
+        <form action="/feed" className="mt-5 flex max-w-xl items-center gap-3">
           <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-ink-100 bg-paper px-4 py-3 shadow-card">
             <svg
               aria-hidden="true"
@@ -267,7 +267,7 @@ export default async function FeedPage({
 
       {/* Results header — mode / view / severity + count summary. */}
       <section>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold tracking-tight text-ink sm:text-xl">
               {mode === 'personalized' ? 'Your feed' : 'Global feed'}
@@ -279,10 +279,11 @@ export default async function FeedPage({
               {minSeverity > 0 && <> · severity {minSeverity}+</>}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
             {userId && (
               <Segmented
                 ariaLabel="Feed mode"
+                className="w-full sm:w-auto"
                 active={mode}
                 options={[
                   { label: 'My feed', value: 'personalized', href: qp('personalized', topic) },
@@ -292,6 +293,7 @@ export default async function FeedPage({
             )}
             <Segmented
               ariaLabel="Feed view"
+              className="w-full sm:w-auto"
               active={view}
               options={[
                 { label: 'List', value: 'list', href: qp(mode, topic, 'list') },
@@ -300,27 +302,29 @@ export default async function FeedPage({
             />
             <Link
               href="/briefings"
-              className="rounded-full border border-ink-100 bg-paper px-3.5 py-1.5 text-sm text-ink-600 hover:border-ink-200 hover:text-ink"
+              className="inline-flex min-h-[36px] items-center justify-center rounded-full border border-ink-100 bg-paper px-3.5 py-1.5 text-sm text-ink-600 hover:border-ink-200 hover:text-ink sm:min-h-0"
             >
               Briefings
             </Link>
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          {severityStops.map((sev) => (
-            <a
-              key={sev}
-              href={qp(mode, topic, view, sev)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                sev === minSeverity
-                  ? 'border-ink-900 bg-ink-900 text-white'
-                  : 'border-ink-100 bg-paper text-ink-500 hover:border-ink-200 hover:text-ink'
-              }`}
-            >
-              {sev === 0 ? 'All severities' : `Severity ${sev}+`}
-            </a>
-          ))}
+        <div className="mt-3 -mx-1 overflow-x-auto pb-1">
+          <div className="flex w-max gap-2 px-1">
+            {severityStops.map((sev) => (
+              <a
+                key={sev}
+                href={qp(mode, topic, view, sev)}
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                  sev === minSeverity
+                    ? 'border-ink-900 bg-ink-900 text-white'
+                    : 'border-ink-100 bg-paper text-ink-500 hover:border-ink-200 hover:text-ink'
+                }`}
+              >
+                {sev === 0 ? 'All severities' : `Severity ${sev}+`}
+              </a>
+            ))}
+          </div>
         </div>
 
         {userId && (savedViews ?? []).length > 0 && (

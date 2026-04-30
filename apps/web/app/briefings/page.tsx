@@ -57,8 +57,8 @@ export default async function BriefingsPage({ searchParams }: { searchParams: { 
   }
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-3">
+    <div className="space-y-5 sm:space-y-6">
+      <header className="flex flex-col gap-2.5 sm:gap-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Briefings</h1>
@@ -86,7 +86,7 @@ export default async function BriefingsPage({ searchParams }: { searchParams: { 
       </header>
 
       {mode === 'my' && userId && (
-        <div className="space-y-4">
+        <div className="space-y-3.5 sm:space-y-4">
           <PersonalizedBriefingPanel />
 
           <Card

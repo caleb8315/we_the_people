@@ -33,8 +33,8 @@ export function NavBarClient({
   const greeting = displayName ? `Hello, ${displayName}` : 'Hello there';
 
   return (
-    <header className="sticky top-0 z-40 border-b border-ink-100 bg-canvas">
-      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:gap-6 sm:px-6 sm:py-4">
+    <header className="sticky top-0 z-40 border-b border-ink-100 bg-canvas/95 backdrop-blur">
+      <div className="mx-auto flex max-w-6xl items-center gap-2.5 px-4 py-2.5 sm:gap-6 sm:px-6 sm:py-4">
         {/* Amber logo tile — mirrors the reference's square app icon. */}
         <Link href="/" className="group flex items-center gap-3">
           <span
@@ -56,7 +56,7 @@ export function NavBarClient({
           <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-ink-400">
             {greeting}
           </span>
-          <span className="truncate text-[13px] font-semibold text-ink">Live coverage feed</span>
+          <span className="truncate text-[12px] font-semibold text-ink">Live coverage feed</span>
         </div>
 
         {/* Desktop pill nav */}
@@ -80,7 +80,7 @@ export function NavBarClient({
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2 md:ml-0">
+        <div className="ml-auto flex items-center gap-1.5 md:ml-0 md:gap-2">
           {signedIn ? (
             <>
               <Link

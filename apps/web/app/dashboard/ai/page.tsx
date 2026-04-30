@@ -34,7 +34,7 @@ export default async function AiPage() {
   const remaining = Math.max(0, chatCap - chatsToday);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">AI workspace</h1>
         <p className="mt-1 text-sm text-ink-500">

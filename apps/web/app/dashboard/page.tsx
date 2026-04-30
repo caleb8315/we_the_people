@@ -82,7 +82,7 @@ export default async function DashboardPage() {
   const alertCap = Number(prefs?.max_alerts_per_day_preference ?? 3);
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="space-y-5 sm:space-y-7">
       {/* Hero — warm cream panel with an inline "today" strip on the right. */}
       <header className="relative overflow-hidden rounded-card border border-ink-100 bg-gradient-to-br from-brand-50/60 via-paper to-paper p-5 sm:p-7">
         <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-brand-200/40 blur-3xl" aria-hidden />
@@ -115,7 +115,7 @@ export default async function DashboardPage() {
       </header>
 
       {/* Priority workspace + top signal — side by side on desktop */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
         <Link
           href="/dashboard/intel"
           className="group flex items-start gap-4 rounded-card border border-amber-200 bg-gradient-to-br from-amber-50/80 via-paper to-paper p-5 shadow-card transition hover:shadow-card-hover"
@@ -153,7 +153,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Two-column body: signals on the left, sidebar rail on the right. */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-5 lg:grid-cols-3">
         <section className="lg:col-span-2">
           <header className="mb-3 flex items-center justify-between">
             <div>

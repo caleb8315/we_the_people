@@ -23,7 +23,7 @@ export default async function BriefingPage({ params }: { params: { id: string } 
   const sections = parseBriefingSections(String(data.body_markdown ?? ''));
 
   return (
-    <article className="prose-osint space-y-6">
+    <article className="prose-osint space-y-5 sm:space-y-6">
       <header className="space-y-3">
         <div className="flex items-center gap-2">
           <Badge variant="neutral" withIcon={false}>
@@ -47,7 +47,7 @@ export default async function BriefingPage({ params }: { params: { id: string } 
       </header>
 
       {sections.length > 0 ? (
-        <div className="space-y-4">
+        <div className="space-y-3.5 sm:space-y-4">
           {sections.map((section, i) => (
             <section
               key={i}

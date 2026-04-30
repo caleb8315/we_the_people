@@ -129,18 +129,8 @@ export default async function SignalPage({ params }: PageProps) {
     complex_signal: isComplexSignal,
     title: signal.title,
   });
-  const guidedFlowSteps: Array<{ href: string; label: string }> = [
-    { href: '#why-shown', label: 'Why this signal is shown' },
-    { href: '#sources', label: `Sources (${report.source_trace.length})` },
-    { href: '#source-disagreement', label: `Source disagreement (${contradictionsCount})` },
-    ...(physicalEvidence ? [{ href: '#physical-evidence', label: 'Physical evidence' }] : []),
-    ...(signal.reliability_score != null
-      ? [{ href: '#advanced-reliability', label: 'Advanced reliability' }]
-      : []),
-    { href: '#all-evidence', label: `All evidence (${evidenceCount})` },
-  ];
   return (
-    <article className="space-y-5 sm:space-y-6">
+    <article className="space-y-4 sm:space-y-5">
       {/* Reader-first header: what happened → what we think about it →
           the technical chrome. The event title is the hero because it's
           the thing you're here to read; the verdict sits right below it
@@ -161,7 +151,7 @@ export default async function SignalPage({ params }: PageProps) {
           )}
           <Badge
             variant={signal.verification_status}
-            title="Reliability label — how well this event is corroborated across independently-rated sources."
+            title="Reliability label — how well this event is corroborated across independent sources."
           >
             {statusLabel(signal.verification_status)}
           </Badge>
@@ -194,7 +184,6 @@ export default async function SignalPage({ params }: PageProps) {
           signalId={signal.id}
           band={report.band}
           bandTone={bandTone}
-          credibleSourceCount={signal.credible_source_count ?? 0}
           totalSourceCount={signal.source_count ?? 0}
           explanation={trustExplanation}
           bottomLine={bottomLine}
@@ -228,16 +217,6 @@ export default async function SignalPage({ params }: PageProps) {
 
 
 
-      {/* Develop-the-story — runs the same live corroboration fan-out
-          the /verify page uses against this signal, pulling in fresh
-          sources the ingest adapters haven't caught yet. */}
-      <DevelopStoryButton
-        signalId={signal.id}
-        lastEnrichedAt={lastEnrichedAt}
-        canForce={canForce}
-      />
-      <GuidedFlowNav steps={guidedFlowSteps} />
-
       <Disclosure id="why-shown" title="Why it’s shown" defaultOpen={true}>
         <ul className="space-y-2 text-sm text-ink-600">
           <li>
@@ -255,83 +234,10 @@ export default async function SignalPage({ params }: PageProps) {
         </ul>
       </Disclosure>
 
-      {/* Source trace — friendly role labels + pretty outlet names, no
-          jargon like `[primary]`. The full evidence list is further down. */}
-      <Disclosure id="sources" title={`Sources (${report.source_trace.length})`} defaultOpen={false}>
-        <p className="text-xs text-ink-500">
-          The sources that drove the verdict above, grouped by how they relate to the event.
-        </p>
-        <ul className="mt-3 space-y-2 text-sm">
-          {report.source_trace.map((t, i) => (
-            <li
-              key={`${t.url}-${i}`}
-              className="flex items-start gap-3 rounded-xl border border-ink-100 bg-canvas-50 p-3"
-            >
-              <span
-                className={`inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[10px] font-semibold uppercase tracking-wider ${roleChipClass(t.role)}`}
-              >
-                {friendlyRoleLabel(t.role)}
-              </span>
-              <div className="min-w-0 flex-1">
-                <a
-                  href={t.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-medium text-ink hover:text-amber-600 hover:underline"
-                >
-                  {t.title ?? prettyOutletName(t.domain)}
-                </a>
-                <div className="text-xs text-ink-400">
-                  {prettyOutletName(t.domain)} · {t.domain}
-                  {t.is_credible && <span className="ml-1.5 text-amber-600">· rated outlet</span>}
-                  {t.published_at ? ` · ${new Date(t.published_at).toLocaleString()}` : ''}
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </Disclosure>
-
-      {signal.reliability_score != null && (
-        <Disclosure
-          id="advanced-reliability"
-          title={`Advanced: reliability score (${signal.reliability_score}/100)`}
-          defaultOpen={false}
-        >
-          <p className="text-xs text-ink-500">
-            A composite of four signals about how this event is being reported. Pair it with the
-            confidence band above for context.
-          </p>
-          <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-            <ScoreRow
-              label="Agreement"
-              value={signal.agreement_score}
-              hint="Share of sources that describe the event the same way."
-            />
-            <ScoreRow
-              label="Source independence"
-              value={signal.source_independence_score}
-              hint="Distinct domains vs. total sources — penalises syndicated copies."
-            />
-            <ScoreRow
-              label="Evidence strength"
-              value={signal.evidence_strength_score}
-              hint="USGS / NASA-EONET sensor matches plus 4+ rated outlets."
-            />
-            <ScoreRow
-              label="Narrative divergence"
-              value={signal.narrative_divergence_score}
-              hint="Number of source disagreements × 25, capped at 100 (lower is better)."
-              danger
-            />
-          </dl>
-        </Disclosure>
-      )}
-
       <Disclosure
         id="source-disagreement"
         title={`Source disagreement (${contradictionsCount})`}
-        defaultOpen={contradictionsCount > 0 || isComplexSignal}
+        defaultOpen={false}
         tone={contradictionsCount > 0 ? 'danger' : isComplexSignal ? 'warn' : 'neutral'}
         badge={
           contradictionsCount > 0
@@ -411,6 +317,43 @@ export default async function SignalPage({ params }: PageProps) {
         )}
       </Disclosure>
 
+      {/* Source trace — friendly role labels + pretty outlet names, no
+          jargon like `[primary]`. The full evidence list is further down. */}
+      <Disclosure id="sources" title={`Sources (${report.source_trace.length})`} defaultOpen={false}>
+        <p className="text-xs text-ink-500">
+          The sources that drove the verdict above, grouped by how they relate to the event.
+        </p>
+        <ul className="mt-3 space-y-2 text-sm">
+          {report.source_trace.map((t, i) => (
+            <li
+              key={`${t.url}-${i}`}
+              className="flex items-start gap-3 rounded-xl border border-ink-100 bg-canvas-50 p-3"
+            >
+              <span
+                className={`inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[10px] font-semibold uppercase tracking-wider ${roleChipClass(t.role)}`}
+              >
+                {friendlyRoleLabel(t.role)}
+              </span>
+              <div className="min-w-0 flex-1">
+                <a
+                  href={t.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-ink hover:text-amber-600 hover:underline"
+                >
+                  {t.title ?? prettyOutletName(t.domain)}
+                </a>
+                <div className="text-xs text-ink-400">
+                  {prettyOutletName(t.domain)} · {t.domain}
+                  {t.is_credible && <span className="ml-1.5 text-amber-600">· rated outlet</span>}
+                  {t.published_at ? ` · ${new Date(t.published_at).toLocaleString()}` : ''}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Disclosure>
+
       {physicalEvidence && (
         <Disclosure
           id="physical-evidence"
@@ -462,6 +405,51 @@ export default async function SignalPage({ params }: PageProps) {
           </p>
         </Disclosure>
       )}
+
+      {signal.reliability_score != null && (
+        <Disclosure
+          id="advanced-reliability"
+          title={`Advanced: reliability score (${signal.reliability_score}/100)`}
+          defaultOpen={false}
+        >
+          <p className="text-xs text-ink-500">
+            A composite of four signals about how this event is being reported. Pair it with the
+            confidence band above for context.
+          </p>
+          <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+            <ScoreRow
+              label="Agreement"
+              value={signal.agreement_score}
+              hint="Share of sources that describe the event the same way."
+            />
+            <ScoreRow
+              label="Source independence"
+              value={signal.source_independence_score}
+              hint="Distinct domains vs. total sources — penalises syndicated copies."
+            />
+            <ScoreRow
+              label="Evidence strength"
+              value={signal.evidence_strength_score}
+              hint="USGS / NASA-EONET sensor matches plus 4+ rated outlets."
+            />
+            <ScoreRow
+              label="Narrative divergence"
+              value={signal.narrative_divergence_score}
+              hint="Number of source disagreements × 25, capped at 100 (lower is better)."
+              danger
+            />
+          </dl>
+        </Disclosure>
+      )}
+
+      {/* Develop-the-story — runs the same live corroboration fan-out
+          the /verify page uses against this signal, pulling in fresh
+          sources the ingest adapters haven't caught yet. */}
+      <DevelopStoryButton
+        signalId={signal.id}
+        lastEnrichedAt={lastEnrichedAt}
+        canForce={canForce}
+      />
 
       <Disclosure id="all-evidence" title={`All evidence (${evidenceCount})`} defaultOpen={false}>
         {evidenceCount === 0 ? (
@@ -522,41 +510,6 @@ function bandDotClass(band: ConfidenceBand): string {
     case 'low':
       return 'bg-ink-300';
   }
-}
-
-function GuidedFlowNav({
-  steps,
-}: {
-  steps: Array<{ href: string; label: string }>;
-}) {
-  return (
-    <nav
-      aria-label="Signal detail flow"
-      className="rounded-card border border-ink-100 bg-paper p-4 shadow-card sm:p-5"
-    >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-500">
-        Follow this flow
-      </p>
-      <ol className="mt-2 space-y-1.5">
-        {steps.map((step, index) => (
-          <li key={step.href}>
-            <a
-              href={step.href}
-              className="group flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-sm text-ink-600 transition hover:bg-canvas-50 hover:text-ink"
-            >
-              <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-ink-200 bg-canvas-50 text-[11px] font-semibold text-ink-500 group-hover:border-amber-200 group-hover:bg-amber-50 group-hover:text-amber-700">
-                {index + 1}
-              </span>
-              <span className="min-w-0 flex-1 truncate">{step.label}</span>
-              <span aria-hidden="true" className="text-ink-300 group-hover:text-amber-500">
-                →
-              </span>
-            </a>
-          </li>
-        ))}
-      </ol>
-    </nav>
-  );
 }
 
 /** Colours for the hero verdict callout — mirrors the same helper the

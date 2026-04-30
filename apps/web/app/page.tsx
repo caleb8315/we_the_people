@@ -31,7 +31,7 @@ export default async function LandingPage() {
   if (signedIn) redirect('/dashboard');
 
   return (
-    <div className="space-y-10 sm:space-y-14">
+    <div className="space-y-8 sm:space-y-12">
       <section>
         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">
           Source consistency
@@ -47,7 +47,7 @@ export default async function LandingPage() {
         </p>
 
         {/* Search-like CTA row matching the reference's rounded input + filter button. */}
-        <form action="/feed" className="mt-7 flex max-w-xl items-center gap-3">
+        <form action="/feed" className="mt-6 flex max-w-xl items-center gap-3">
           <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-ink-100 bg-paper px-4 py-3 shadow-card">
             <svg
               aria-hidden="true"
@@ -90,7 +90,7 @@ export default async function LandingPage() {
           </button>
         </form>
 
-        <div className="mt-6 flex flex-wrap gap-3">
+        <div className="mt-5 flex flex-wrap gap-3">
           <Link
             href={signedIn ? '/dashboard' : '/login'}
             className="rounded-full bg-ink-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-ink-700"

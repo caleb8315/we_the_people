@@ -86,9 +86,9 @@ export default async function IntelWorkspacePage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <header>
-        <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Priority workspace</h1>
             <p className="mt-1 text-sm text-ink-500">
@@ -98,6 +98,7 @@ export default async function IntelWorkspacePage({
           </div>
           <Segmented
             ariaLabel="Intel view mode"
+            className="w-full sm:w-auto"
             active={view}
             options={[
               { label: 'List', value: 'list', href: '/dashboard/intel?view=list' },

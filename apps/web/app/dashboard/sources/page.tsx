@@ -44,7 +44,7 @@ export default async function SourcesPage() {
   const mapReadyCount = rows.filter((s) => hasGeoCoverage(s)).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Source control</h1>
         <p className="mt-1 text-sm text-ink-500">
@@ -52,7 +52,7 @@ export default async function SourcesPage() {
         </p>
       </header>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-2.5 sm:gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="Sources active" value={activeCount} hint={`in your account (of ${rows.length})`} tone="accent" />
         <StatTile label="You have muted" value={mutedCount} tone={mutedCount > 0 ? 'warn' : 'neutral'} />
         <StatTile label="High credibility" value={highCredCount} hint="credibility 80+" />
