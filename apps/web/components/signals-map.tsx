@@ -1,5 +1,7 @@
 'use client';
 
+ 'use client';
+
 import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
 import type { MapSourceClass, SignalGeoPoint } from '@/lib/signal-geo';

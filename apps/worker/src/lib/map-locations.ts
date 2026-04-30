@@ -18,7 +18,6 @@ const MAX_LOCATIONS_PER_SIGNAL = 24;
 
 export function buildSignalMapLocations(input: {
   rawGroup: RawItem[];
-  topic: string;
   countryCode: string | null;
 }): MapLocationRecord[] {
   const out: MapLocationRecord[] = [];
