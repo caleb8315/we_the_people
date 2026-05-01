@@ -22,11 +22,21 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-sm text-ink-500">
-          Signed in as <span className="font-mono text-ink-600">{auth.user.email}</span>.
-        </p>
+      <header className="relative overflow-hidden rounded-card border border-ink-100 bg-gradient-to-br from-brand-50/40 via-paper to-paper p-5 sm:p-6">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-brand-200/30 blur-3xl" aria-hidden />
+        <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-ink-900 text-lg font-bold text-white shadow-sm">
+              {(profile?.display_name ?? auth.user.email ?? '?').slice(0, 1).toUpperCase()}
+            </span>
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Settings</h1>
+              <p className="text-sm text-ink-500">
+                <span className="font-mono text-ink-600">{auth.user.email}</span>
+              </p>
+            </div>
+          </div>
+        </div>
       </header>
       <SettingsForm
         initial={prefs ?? null}

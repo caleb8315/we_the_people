@@ -1,8 +1,6 @@
 import Link from 'next/link';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { PersonalizedBriefingPanel } from '@/components/personalized-briefing-panel';
-import { Segmented } from '@/components/ui/segmented';
-import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SignalCard } from '@/components/signal-card';
@@ -57,49 +55,86 @@ export default async function BriefingsPage({ searchParams }: { searchParams: { 
   }
 
   return (
-    <div className="space-y-5 sm:space-y-6">
-      <header className="flex flex-col gap-2.5 sm:gap-3">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Briefings</h1>
-            <p className="mt-1 text-sm text-ink-500">
-              Personal briefing is tuned to your settings. Global briefing shows platform-wide coverage.
-            </p>
-            {!userId && (
-              <p className="mt-1 text-xs text-ink-400">
-                Public view: these briefings are global and not connected to any user profile.
+    <div className="space-y-6 sm:space-y-8">
+      {/* Hero header with clear visual hierarchy */}
+      <header className="relative overflow-hidden rounded-card border border-amber-200/60 bg-gradient-to-br from-amber-50/80 via-paper to-paper p-5 sm:p-7">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-amber-200/30 blur-3xl" aria-hidden />
+        <div className="relative">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="max-w-xl">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-700">
+                Intelligence briefings
               </p>
+              <h1 className="mt-2 text-[26px] font-semibold leading-tight tracking-tight sm:text-[32px]">
+                {mode === 'my' ? 'Your personal briefing' : 'Global briefing stream'}
+              </h1>
+              <p className="mt-2 text-sm text-ink-500">
+                {mode === 'my'
+                  ? 'Tuned to your topics, countries, and source settings. AI-structured into supported, disputed, changed, and watch sections.'
+                  : 'Platform-wide coverage across all monitored sources and topics.'}
+              </p>
+            </div>
+
+            {userId && (
+              <nav className="flex shrink-0 gap-1 rounded-full border border-ink-100 bg-paper/80 p-1 shadow-sm backdrop-blur-sm">
+                <Link
+                  href="/briefings?mode=my"
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                    mode === 'my'
+                      ? 'bg-amber-500 text-white shadow-sm'
+                      : 'text-ink-500 hover:bg-ink-100 hover:text-ink'
+                  }`}
+                >
+                  My briefing
+                </Link>
+                <Link
+                  href="/briefings?mode=global"
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                    mode === 'global'
+                      ? 'bg-amber-500 text-white shadow-sm'
+                      : 'text-ink-500 hover:bg-ink-100 hover:text-ink'
+                  }`}
+                >
+                  Global
+                </Link>
+              </nav>
             )}
           </div>
 
-          {userId && (
-            <Segmented
-              ariaLabel="Briefing mode"
-              active={mode}
-              options={[
-                { label: 'My briefing', value: 'my', href: '/briefings?mode=my' },
-                { label: 'Global briefing', value: 'global', href: '/briefings?mode=global' },
-              ]}
-            />
+          {!userId && (
+            <div className="mt-4 flex items-center gap-3 rounded-lg border border-ink-100 bg-paper/60 px-4 py-3">
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-ink-400" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4" />
+                <path d="M12 8h.01" />
+              </svg>
+              <p className="text-sm text-ink-500">
+                <Link href="/login?next=/briefings" className="font-medium text-amber-700 hover:text-amber-800">Sign in</Link> for a personalized AI briefing tuned to your interests.
+              </p>
+            </div>
           )}
         </div>
       </header>
 
+      {/* Personal briefing panel — given breathing room */}
       {mode === 'my' && userId && (
-        <div className="space-y-3.5 sm:space-y-4">
+        <div className="space-y-6">
           <PersonalizedBriefingPanel />
 
-          <Card
-            title="Top signals in your current brief context"
-            action={
-              <Link href="/feed" className="text-xs text-brand-700 hover:underline">
-                Open my feed
+          <section>
+            <header className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-ink-600">
+                  Signals in your briefing context
+                </h2>
+                <p className="mt-0.5 text-xs text-ink-400">
+                  Reflects your topics and mute settings
+                </p>
+              </div>
+              <Link href="/feed" className="text-sm font-medium text-amber-700 hover:text-amber-800">
+                Open feed →
               </Link>
-            }
-          >
-            <p className="-mt-2 mb-3 text-xs text-ink-500">
-              Preview reflects your topics and mute settings so you can confirm personalization at a glance.
-            </p>
+            </header>
             {personalized.length === 0 ? (
               <EmptyState
                 title="No personalized signals right now."
@@ -107,15 +142,15 @@ export default async function BriefingsPage({ searchParams }: { searchParams: { 
                 action={{ label: 'See global briefing', href: '/briefings?mode=global' }}
               />
             ) : (
-              <ul className="space-y-3">
-                {personalized.slice(0, 5).map((s) => (
+              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {personalized.slice(0, 6).map((s) => (
                   <li key={s.id}>
                     <SignalCard s={s} />
                   </li>
                 ))}
               </ul>
             )}
-          </Card>
+          </section>
         </div>
       )}
 
@@ -129,8 +164,15 @@ export default async function BriefingsPage({ searchParams }: { searchParams: { 
 
       {(mode === 'global' || !userId) && (
         <section>
-          <header className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-600">Global briefings</h2>
+          <header className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-ink-600">
+              Global briefings
+            </h2>
+            {globalBriefings && globalBriefings.length > 0 && (
+              <span className="rounded-full border border-ink-100 bg-paper px-2.5 py-0.5 text-[11px] font-medium text-ink-500">
+                {globalBriefings.length} briefing{globalBriefings.length === 1 ? '' : 's'}
+              </span>
+            )}
           </header>
           {globalBriefings == null || globalBriefings.length === 0 ? (
             <EmptyState
@@ -138,12 +180,12 @@ export default async function BriefingsPage({ searchParams }: { searchParams: { 
               body="The first daily briefing runs after the first ingest cycle completes."
             />
           ) : (
-            <ul className="space-y-3">
+            <ul className="grid gap-3 sm:grid-cols-2">
               {globalBriefings.map((b: any) => (
                 <li key={b.id}>
                   <Link
                     href={`/briefings/${b.id}`}
-                    className="block rounded-card border border-ink-100 bg-paper p-4 transition hover:border-ink-200 hover:bg-canvas-50"
+                    className="group block rounded-card border border-ink-100 bg-paper p-5 shadow-card transition hover:border-ink-200 hover:shadow-card-hover"
                   >
                     <div className="flex items-center gap-2 text-xs text-ink-500">
                       <Badge variant="neutral" withIcon={false}>
@@ -151,8 +193,21 @@ export default async function BriefingsPage({ searchParams }: { searchParams: { 
                       </Badge>
                       <span>{new Date(b.period_start).toLocaleString()}</span>
                     </div>
-                    <h3 className="mt-2 text-base font-semibold clamp-2">{b.headline}</h3>
-                    <p className="mt-1 text-xs text-ink-400">{(b.topics ?? []).join(' · ')}</p>
+                    <h3 className="mt-2.5 text-base font-semibold text-ink group-hover:text-amber-700 clamp-2">
+                      {b.headline}
+                    </h3>
+                    {(b.topics ?? []).length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {(b.topics as string[]).slice(0, 4).map((t: string) => (
+                          <span
+                            key={t}
+                            className="rounded-full border border-ink-100 bg-canvas-50 px-2 py-0.5 text-[10px] font-medium capitalize text-ink-500"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </Link>
                 </li>
               ))}
