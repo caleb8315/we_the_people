@@ -56,72 +56,116 @@ export function PersonalizedBriefingPanel() {
   );
 
   return (
-    <section className="rounded-card border border-brand-200 bg-brand-50 p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-700">
-            AI briefing · structured into supported / disputed / changed / watch
-          </p>
-          <h2 className="mt-1 text-base font-semibold">My AI briefing</h2>
-          <p className="mt-1 text-xs text-ink-500">
-            Personalized to your topic, country, and source settings. Beta limit: 2 AI briefing calls/day.
-          </p>
+    <section className="rounded-card border border-amber-200/70 bg-gradient-to-br from-amber-50/80 via-paper to-paper shadow-card">
+      <div className="p-5 sm:p-6">
+        <div className="flex items-start gap-4">
+          <span className="mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-sm">
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 4h16v16H4z" />
+              <path d="M4 10h16" />
+              <path d="M10 4v16" />
+            </svg>
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-700">
+              AI briefing
+            </p>
+            <h2 className="mt-1 text-lg font-semibold text-ink">My personalized briefing</h2>
+            <p className="mt-1 text-sm text-ink-500">
+              Structured into supported, disputed, changed, and watch sections based on your settings.
+            </p>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={generate}
-          disabled={loading}
-          className="rounded-full bg-amber-500 px-4 py-1.5 text-sm font-semibold text-white shadow-[0_6px_16px_-4px_rgba(245,158,11,0.55)] hover:bg-amber-600 disabled:opacity-60"
-        >
-          {loading ? 'Generating…' : 'Generate my briefing'}
-        </button>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={generate}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_6px_16px_-4px_rgba(245,158,11,0.55)] transition hover:bg-amber-600 disabled:opacity-60"
+          >
+            {loading ? (
+              <>
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+                Generating…
+              </>
+            ) : (
+              'Generate my briefing'
+            )}
+          </button>
+          <div className="flex items-center gap-3 text-xs text-ink-400">
+            {signalsUsed != null && (
+              <span className="flex items-center gap-1">
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3 4 6v6c0 4.5 3.3 8.3 8 9 4.7-.7 8-4.5 8-9V6l-8-3z" /></svg>
+                {signalsUsed} signals
+              </span>
+            )}
+            {remaining != null && (
+              <span className="flex items-center gap-1">
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+                {remaining} left today
+              </span>
+            )}
+            {remaining == null && signalsUsed == null && (
+              <span>Beta limit: 2 calls/day</span>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="mt-2 text-xs text-ink-500">
-        {signalsUsed != null && <span>Using {signalsUsed} personalized signals. </span>}
-        {remaining != null && <span>Remaining today: {remaining}.</span>}
-      </div>
-      {error && <p className="mt-3 text-sm text-danger-600">{error}</p>}
+      {error && <p className="border-t border-amber-200/50 px-5 py-3 text-sm text-danger-600 sm:px-6">{error}</p>}
 
       {briefing && sections.length > 0 && (
-        <div className="mt-3 space-y-2.5">
-          {collapsedSections.map((section, i) => (
-            <div key={i} className={`rounded-md border px-3 py-2.5 ${sectionToneClass(section.kind)}`}>
-              {section.heading && (
-                <p className={`text-[10.5px] font-semibold uppercase tracking-[0.18em] ${sectionLabelTone(section.kind)}`}>
-                  {section.heading}
-                </p>
-              )}
-              <pre className="mt-1 whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-ink-700">
-                {section.body}
-              </pre>
-            </div>
-          ))}
+        <div className="border-t border-amber-200/50 p-5 sm:p-6">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {collapsedSections.map((section, i) => (
+              <div key={i} className={`rounded-lg border p-4 ${sectionToneClass(section.kind)}`}>
+                {section.heading && (
+                  <p className={`text-[10.5px] font-semibold uppercase tracking-[0.18em] ${sectionLabelTone(section.kind)}`}>
+                    {section.heading}
+                  </p>
+                )}
+                <pre className="mt-1.5 whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-ink-700">
+                  {section.body}
+                </pre>
+              </div>
+            ))}
+          </div>
           {hasExpandableSections && (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="rounded-full border border-ink-200 bg-paper px-3 py-1.5 text-xs font-semibold text-ink-600 transition hover:border-ink-300 hover:text-ink"
-            >
-              {expanded ? 'Show less' : 'Expand briefing'}
-            </button>
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-paper px-4 py-2 text-xs font-semibold text-ink-600 transition hover:border-ink-300 hover:text-ink"
+              >
+                {expanded ? 'Show less' : 'Expand full briefing'}
+                <svg aria-hidden="true" viewBox="0 0 24 24" className={`h-3.5 w-3.5 transition ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+            </div>
           )}
         </div>
       )}
 
       {briefing && sections.length === 0 && (
-        <div className="mt-3 space-y-2.5">
-          <pre className="whitespace-pre-wrap rounded-md border border-ink-100 bg-paper p-3 text-sm leading-relaxed text-ink-700">
+        <div className="border-t border-amber-200/50 p-5 sm:p-6">
+          <pre className="whitespace-pre-wrap rounded-lg border border-ink-100 bg-paper p-4 text-sm leading-relaxed text-ink-700">
             {fallbackPreview}
           </pre>
           {hasExpandableFallback && (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="rounded-full border border-ink-200 bg-paper px-3 py-1.5 text-xs font-semibold text-ink-600 transition hover:border-ink-300 hover:text-ink"
-            >
-              {expanded ? 'Show less' : 'Expand briefing'}
-            </button>
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-paper px-4 py-2 text-xs font-semibold text-ink-600 transition hover:border-ink-300 hover:text-ink"
+              >
+                {expanded ? 'Show less' : 'Expand full briefing'}
+                <svg aria-hidden="true" viewBox="0 0 24 24" className={`h-3.5 w-3.5 transition ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+            </div>
           )}
         </div>
       )}
