@@ -4,11 +4,15 @@ import { useState } from 'react';
 import type {
   AnalyzedConflict,
   AnalyzedConflictType,
+  ClaimCaseFile,
+  ClaimEvidenceStance,
   ConfidenceBreakdown,
   CorpusBiasReport,
   EvidenceCard,
+  EvidenceCaseFile,
   EvidenceCardSummary,
   EvidenceStance,
+  ClaimVerdict,
   RankedSource,
   RankedSourceSummary,
   ResultExplanation,
@@ -48,11 +52,24 @@ export interface VerifyAnalysisData {
   cards_summary: EvidenceCardSummary;
   confidence_breakdown: ConfidenceBreakdown;
   explanation: ResultExplanation;
+  case_file?: EvidenceCaseFile;
+  specialized_sources?: Array<{
+    id: string;
+    name: string;
+    status: 'hit' | 'miss' | 'skipped' | 'unavailable' | 'error';
+    hits: number;
+    note: string;
+    evidence_count: number;
+  }>;
 }
 
 export function VerifyAnalysis({ data }: { data: VerifyAnalysisData }) {
   return (
     <section className="space-y-5">
+      {data.case_file && <CaseFileCard caseFile={data.case_file} />}
+      {data.specialized_sources && data.specialized_sources.length > 0 && (
+        <SpecializedSourcesCard systems={data.specialized_sources} />
+      )}
       <ConfidenceBreakdownCard breakdown={data.confidence_breakdown} />
       <ResultExplanationCard explanation={data.explanation} />
       <ConflictsCard conflicts={data.conflicts} summary={data.conflict_summary} />
@@ -60,6 +77,233 @@ export function VerifyAnalysis({ data }: { data: VerifyAnalysisData }) {
       <RankedSourcesCard sources={data.ranked_sources} />
       <EvidenceCardsList cards={data.evidence_cards} summary={data.cards_summary} />
     </section>
+  );
+}
+
+/* ─── Case file: claim-level evidence OS ───────────────────────────────── */
+
+function CaseFileCard({ caseFile }: { caseFile: EvidenceCaseFile }) {
+  return (
+    <article className="rounded-card border border-brand-200 bg-brand-500/[0.06] p-5 shadow-card sm:p-6">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-700">
+            Crosscheck case file
+          </p>
+          <h3 className="mt-1 max-w-3xl text-lg font-semibold text-ink sm:text-xl">
+            {caseFile.overall_summary}
+          </h3>
+          <p className="mt-2 max-w-prose text-[13.5px] leading-relaxed text-ink-600">
+            We split the submission into checkable claims, then mapped source evidence to each claim.
+            This is evidence-bound analysis, not an AI truth verdict.
+          </p>
+        </div>
+        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${verdictClass(caseFile.overall_verdict)}`}>
+          {verdictDisplay(caseFile.overall_verdict)}
+        </span>
+      </header>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <CaseFileMiniBlock title="What we can say" tone="good" items={caseFile.what_we_can_say} />
+        <CaseFileMiniBlock title="Still uncertain" tone="warn" items={caseFile.what_remains_uncertain} />
+        <CaseFileMiniBlock title="Would strengthen this" tone="info" items={caseFile.what_would_make_this_stronger} />
+      </div>
+
+      <div className="mt-5 space-y-3">
+        {caseFile.claims.map((claim, idx) => (
+          <ClaimCaseCard key={claim.claim.id} claim={claim} index={idx} />
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function CaseFileMiniBlock({
+  title,
+  items,
+  tone,
+}: {
+  title: string;
+  items: string[];
+  tone: 'good' | 'warn' | 'info';
+}) {
+  const dot = tone === 'good' ? 'bg-emerald-500' : tone === 'warn' ? 'bg-amber-500' : 'bg-brand-500';
+  return (
+    <div className="rounded-xl border border-ink-100 bg-paper/80 px-3 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">{title}</p>
+      <ul className="mt-2 space-y-1.5 text-[12.5px] leading-relaxed text-ink-700">
+        {(items.length > 0 ? items : ['No strong signal in this section yet.']).slice(0, 4).map((item, i) => (
+          <li key={i} className="flex gap-2">
+            <span aria-hidden="true" className={`mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ClaimCaseCard({ claim, index }: { claim: ClaimCaseFile; index: number }) {
+  const topEvidence = claim.evidence.slice(0, 4);
+  return (
+    <section className="rounded-2xl border border-ink-100 bg-paper p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-400">
+            Claim {index + 1} · {claim.claim.kind} · {claim.claim.checkability.replace('_', ' ')}
+          </p>
+          <h4 className="mt-1 text-sm font-semibold leading-relaxed text-ink-800">
+            {claim.claim.text}
+          </h4>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-ink-600">{claim.summary}</p>
+        </div>
+        <div className="flex flex-col items-end gap-1.5">
+          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${verdictClass(claim.verdict)}`}>
+            {verdictDisplay(claim.verdict)}
+          </span>
+          <span className="text-[11px] text-ink-500">
+            {claim.confidence_score}/100 · {claim.confidence_band}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
+        <MetricPill label="Supports" value={claim.support_count} tone="good" />
+        <MetricPill label="Contradicts" value={claim.contradiction_count} tone="warn" />
+        <MetricPill label="Context" value={claim.context_count} tone="info" />
+      </div>
+
+      {topEvidence.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">
+            Strongest mapped evidence
+          </p>
+          <ul className="mt-2 space-y-2">
+            {topEvidence.map((e) => (
+              <li key={`${claim.claim.id}-${e.url}`} className="rounded-xl border border-ink-100 bg-canvas-50 px-3 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <a
+                    href={e.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink-700 underline-offset-2 hover:underline"
+                  >
+                    {e.title || prettyOutletName(e.domain)}
+                  </a>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${stanceClass(e.stance)}`}>
+                    {stanceDisplay(e.stance)}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-ink-500">
+                  {prettyOutletName(e.domain)}{e.source_role ? ` · ${e.source_role}` : ''}{typeof e.source_score === 'number' ? ` · source ${e.source_score}/100` : ''}
+                </p>
+                <p className="mt-1 text-[12.5px] leading-relaxed text-ink-600">{e.explanation}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <ClaimUncertainty claim={claim} />
+    </section>
+  );
+}
+
+function MetricPill({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: 'good' | 'warn' | 'info';
+}) {
+  const color = tone === 'good' ? 'text-emerald-700' : tone === 'warn' ? 'text-amber-700' : 'text-brand-700';
+  return (
+    <div className="rounded-xl border border-ink-100 bg-canvas-50 px-3 py-2">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-400">{label}</p>
+      <p className={`mt-0.5 text-lg font-semibold tabular-nums ${color}`}>{value}</p>
+    </div>
+  );
+}
+
+function ClaimUncertainty({ claim }: { claim: ClaimCaseFile }) {
+  const items = [
+    ...claim.uncertainty.missing_evidence,
+    ...claim.uncertainty.conflicting_evidence,
+    ...claim.uncertainty.weak_points,
+    ...claim.uncertainty.not_fact_checkable_reasons,
+  ].slice(0, 4);
+  if (items.length === 0 && claim.uncertainty.what_would_resolve.length === 0) return null;
+  return (
+    <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+      {items.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/50 px-3 py-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Uncertainty</p>
+          <ul className="mt-1.5 space-y-1 text-[12.5px] leading-relaxed text-ink-700">
+            {items.map((item, i) => <li key={i}>• {item}</li>)}
+          </ul>
+        </div>
+      )}
+      {claim.uncertainty.what_would_resolve.length > 0 && (
+        <div className="rounded-xl border border-brand-200 bg-brand-500/[0.06] px-3 py-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-brand-700">What would resolve this</p>
+          <ul className="mt-1.5 space-y-1 text-[12.5px] leading-relaxed text-ink-700">
+            {claim.uncertainty.what_would_resolve.slice(0, 3).map((item, i) => <li key={i}>• {item}</li>)}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Specialized source coverage ──────────────────────────────────────── */
+
+function SpecializedSourcesCard({
+  systems,
+}: {
+  systems: NonNullable<VerifyAnalysisData['specialized_sources']>;
+}) {
+  const hits = systems.filter((s) => s.status === 'hit').length;
+  const unavailable = systems.filter((s) => s.status === 'unavailable').length;
+  return (
+    <article className="rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
+      <header className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-400">
+            Deep source coverage
+          </p>
+          <h3 className="mt-1 text-lg font-semibold text-ink sm:text-xl">
+            {hits} specialized source{hits === 1 ? '' : 's'} found matching records
+          </h3>
+        </div>
+        {unavailable > 0 && (
+          <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800">
+            {unavailable} need free API setup
+          </span>
+        )}
+      </header>
+      <p className="mt-2 max-w-prose text-[13.5px] leading-relaxed text-ink-600">
+        These are claim-specific searches across fact-check, scholarly, legal, finance, and cyber databases.
+        They add evidence only; the case-file engine still decides how each source maps to each claim.
+      </p>
+      <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {systems.map((s) => (
+          <li key={s.id} className="rounded-xl border border-ink-100 bg-canvas-50 px-3 py-2.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-sm font-semibold text-ink-700">{s.name}</p>
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${systemStatusClass(s.status)}`}>
+                {s.status}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] text-ink-500">
+              {s.evidence_count} evidence item{s.evidence_count === 1 ? '' : 's'}
+            </p>
+            <p className="mt-1 text-[12px] leading-relaxed text-ink-600">{s.note}</p>
+          </li>
+        ))}
+      </ul>
+    </article>
   );
 }
 
@@ -527,7 +771,7 @@ function EvidenceCardRow({ card }: { card: EvidenceCard }) {
     <li className="rounded-xl border border-ink-100 bg-canvas-50 p-3">
       <div className="flex items-baseline justify-between gap-2">
         <p className="text-[12px] font-semibold text-ink-700">{card.publisher}</p>
-        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${stanceClass(card.stance)}`}>
+        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${evidenceCardStanceClass(card.stance)}`}>
           {capitalize(card.stance)}
         </span>
       </div>
@@ -607,6 +851,21 @@ function reasonDot(effect: 'positive' | 'negative' | 'neutral'): string {
   }
 }
 
+function systemStatusClass(status: 'hit' | 'miss' | 'skipped' | 'unavailable' | 'error'): string {
+  switch (status) {
+    case 'hit':
+      return 'bg-emerald-100 text-emerald-800';
+    case 'miss':
+      return 'bg-ink-100 text-ink-600';
+    case 'skipped':
+      return 'bg-sky-100 text-sky-800';
+    case 'unavailable':
+      return 'bg-amber-100 text-amber-800';
+    case 'error':
+      return 'bg-danger-100 text-danger-700';
+  }
+}
+
 function roleChip(role: RankedSource['role']): string {
   switch (role) {
     case 'primary':
@@ -626,7 +885,7 @@ function roleChip(role: RankedSource['role']): string {
   }
 }
 
-function stanceClass(s: EvidenceStance): string {
+function evidenceCardStanceClass(s: EvidenceStance): string {
   switch (s) {
     case 'supports':
       return 'bg-emerald-100 text-emerald-800';
@@ -636,6 +895,72 @@ function stanceClass(s: EvidenceStance): string {
       return 'bg-sky-100 text-sky-800';
     case 'neutral':
       return 'bg-ink-100 text-ink-600';
+  }
+}
+
+function stanceClass(s: ClaimEvidenceStance): string {
+  switch (s) {
+    case 'directly_supports':
+    case 'partially_supports':
+      return 'bg-emerald-100 text-emerald-800';
+    case 'contradicts':
+    case 'weakens':
+      return 'bg-danger-100 text-danger-700';
+    case 'context_only':
+      return 'bg-sky-100 text-sky-800';
+    case 'mentions_without_evidence':
+      return 'bg-amber-100 text-amber-800';
+    case 'cannot_determine':
+    case 'unrelated':
+      return 'bg-ink-100 text-ink-600';
+  }
+}
+
+function stanceDisplay(s: ClaimEvidenceStance): string {
+  switch (s) {
+    case 'directly_supports':
+      return 'Direct support';
+    case 'partially_supports':
+      return 'Partial support';
+    case 'contradicts':
+      return 'Contradicts';
+    case 'weakens':
+      return 'Weakens';
+    case 'context_only':
+      return 'Context';
+    case 'mentions_without_evidence':
+      return 'Mention only';
+    case 'cannot_determine':
+      return 'Unclear';
+    case 'unrelated':
+      return 'Unrelated';
+  }
+}
+
+function verdictDisplay(v: ClaimVerdict): string {
+  return v
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function verdictClass(v: ClaimVerdict): string {
+  switch (v) {
+    case 'supported':
+      return 'border-emerald-200 bg-emerald-100 text-emerald-800';
+    case 'partly_supported':
+      return 'border-sky-200 bg-sky-100 text-sky-800';
+    case 'contradicted':
+    case 'unsupported':
+      return 'border-danger-200 bg-danger-100 text-danger-700';
+    case 'unresolved':
+    case 'misleading_framing':
+      return 'border-amber-200 bg-amber-100 text-amber-800';
+    case 'context_only':
+      return 'border-brand-200 bg-brand-500/[0.12] text-brand-800';
+    case 'not_enough_evidence':
+    case 'not_fact_checkable':
+      return 'border-ink-200 bg-ink-100 text-ink-700';
   }
 }
 

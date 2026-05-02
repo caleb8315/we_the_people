@@ -23,6 +23,8 @@ import {
   summarizeEvidenceCards,
   buildConfidenceBreakdown,
   buildResultExplanation,
+  buildEvidenceCaseFile,
+  decomposeClaims,
 } from '@osint/core';
 import type {
   ConfidenceReport,
@@ -40,6 +42,7 @@ import type {
   EvidenceCardSummary,
   ConfidenceBreakdown,
   ResultExplanation,
+  EvidenceCaseFile,
 } from '@osint/core';
 import { getAdminSupabase, getServerSupabase } from '@/lib/supabase-server';
 import { getClientKey, limit } from '@/lib/rate-limit';
@@ -51,6 +54,10 @@ import {
   type MatchedSignal,
 } from '@/lib/verify-corroboration';
 import { buildReaderReport, type ReaderReport } from '@/lib/reader-report';
+import {
+  runSpecializedCaseSearch,
+  type SpecializedCaseSearchResult,
+} from '@/lib/specialized-sources';
 
 /** Cap on how many hosts we remember per image hash. Keeps rows small. */
 const MAX_SEEN_HOSTS = 10;
@@ -118,6 +125,8 @@ type VerifyResponse = {
     cards_summary: EvidenceCardSummary;
     confidence_breakdown: ConfidenceBreakdown;
     explanation: ResultExplanation;
+    case_file: EvidenceCaseFile;
+    specialized_sources: SpecializedCaseSearchResult['systems'];
   };
   input: {
     kind: 'url' | 'text' | 'image';
@@ -132,6 +141,7 @@ type VerifyResponse = {
   link: LinkProvenance | null;
   image: ImageProvenance | null;
   verification_id: string | null;
+  case_id: string | null;
   /**
    * Phase 7 — live multi-system corroboration. Every submission fans out
    * in parallel to web search, Reddit, Bluesky, Wikipedia, GDELT, open
@@ -305,10 +315,22 @@ export async function POST(req: Request) {
     text: body.text ?? null,
     keywords,
   });
+  const specializedClaims = decomposeClaims({
+    title: searchedTitle ?? title,
+    text: body.kind === 'text' ? body.text ?? null : pageDescription,
+    url: canonical_url ?? body.url ?? null,
+    kind: body.kind,
+    max_claims: 5,
+  });
+  const specialized = await runSpecializedCaseSearch(specializedClaims);
 
   // Merge the user's own submission at slot 0 so it stays the "primary"
-  // source trace entry, then the deduped live corpus behind it.
-  const mergedEvidence = dedupeByUrl([...evidence, ...corroboration.merged_evidence]);
+  // source trace entry, then the deduped live + specialized corpus behind it.
+  const mergedEvidence = dedupeByUrl([
+    ...evidence,
+    ...corroboration.merged_evidence,
+    ...specialized.evidence,
+  ]);
 
   // Run the same engine the feed uses. With corroboration folded in, this
   // now sees every outlet, social post, reference anchor, and sensor hit
@@ -394,10 +416,21 @@ export async function POST(req: Request) {
     is_text_only: body.kind === 'text',
     is_social: Boolean(social),
   });
+  const caseFile = buildEvidenceCaseFile({
+    title: searchedTitle ?? title,
+    text: body.kind === 'text' ? body.text ?? null : pageDescription,
+    url: canonical_url ?? body.url ?? null,
+    evidence: mergedEvidence,
+    ranked_sources: ranked,
+    evidence_cards: evidenceCards,
+    contradictions: corroboration.contradictions,
+    overall_band: report.band,
+  });
 
   // Persist when the user is authenticated. Anonymous readers still get a
   // full confidence report back — we just don't retain a history row.
   let verification_id: string | null = null;
+  let case_id: string | null = null;
   if (userId) {
     const { data, error } = await sb
       .from('verifications')
@@ -414,11 +447,22 @@ export async function POST(req: Request) {
         provenance_tags: provenanceWarnings.slice(0, 10),
         confidence_band: report.band,
         confidence_report: report,
+        case_file: caseFile,
         status: 'ready',
       })
       .select('id')
       .single();
     if (!error && data) verification_id = (data as { id: string }).id;
+    if (verification_id) {
+      case_id = await persistCaseFile(sb, {
+        userId,
+        verificationId: verification_id,
+        caseFile,
+        inputKind: body.kind,
+        inputUrl: body.kind === 'url' ? body.url ?? null : body.kind === 'image' ? body.image_url ?? null : null,
+        inputText: body.kind === 'text' ? body.text ?? null : null,
+      });
+    }
   }
 
   // Phase 5 — KPI instrumentation. Deliberately fire-and-forget so an
@@ -490,6 +534,8 @@ export async function POST(req: Request) {
       cards_summary: cardsSummary,
       confidence_breakdown: breakdown,
       explanation: resultExplanation,
+      case_file: caseFile,
+      specialized_sources: specialized.systems,
     },
     input: {
       kind: body.kind,
@@ -504,6 +550,7 @@ export async function POST(req: Request) {
     link,
     image,
     verification_id,
+    case_id,
     corroboration: {
       matched_signal: matchedSignal,
       matched_by: corroboration.matched_by,
@@ -531,6 +578,95 @@ function dedupeByUrl(items: EvidenceItem[]): EvidenceItem[] {
     out.push(e);
   }
   return out;
+}
+
+async function persistCaseFile(
+  sb: Awaited<ReturnType<typeof getServerSupabase>>,
+  input: {
+    userId: string;
+    verificationId: string;
+    caseFile: EvidenceCaseFile;
+    inputKind: 'url' | 'text' | 'image';
+    inputUrl: string | null;
+    inputText: string | null;
+  },
+): Promise<string | null> {
+  const { data: caseRow, error: caseErr } = await sb
+    .from('verification_cases')
+    .insert({
+      user_id: input.userId,
+      verification_id: input.verificationId,
+      input_kind: input.inputKind,
+      input_url: input.inputUrl,
+      input_text: input.inputText,
+      title: input.caseFile.title,
+      overall_verdict: input.caseFile.overall_verdict,
+      overall_band: input.caseFile.overall_band,
+      overall_summary: input.caseFile.overall_summary,
+      what_we_can_say: input.caseFile.what_we_can_say,
+      what_remains_uncertain: input.caseFile.what_remains_uncertain,
+      what_would_strengthen: input.caseFile.what_would_make_this_stronger,
+      case_file: input.caseFile,
+      status: 'ready',
+    })
+    .select('id')
+    .single();
+
+  if (caseErr || !caseRow) return null;
+  const caseId = (caseRow as { id: string }).id;
+
+  for (let i = 0; i < input.caseFile.claims.length; i += 1) {
+    const claim = input.caseFile.claims[i]!;
+    const { data: claimRow, error: claimErr } = await sb
+      .from('verification_claims')
+      .insert({
+        case_id: caseId,
+        claim_key: claim.claim.id,
+        claim_text: claim.claim.text,
+        normalized_text: claim.claim.normalized_text,
+        claim_kind: claim.claim.kind,
+        checkability: claim.claim.checkability,
+        risk_level: claim.claim.risk_level,
+        entities: claim.claim.entities,
+        dates: claim.claim.dates,
+        locations: claim.claim.locations,
+        verdict_label: claim.verdict,
+        confidence_band: claim.confidence_band,
+        confidence_score: claim.confidence_score,
+        support_count: claim.support_count,
+        contradiction_count: claim.contradiction_count,
+        context_count: claim.context_count,
+        summary: claim.summary,
+        uncertainty: claim.uncertainty,
+        sort_order: i,
+      })
+      .select('id')
+      .single();
+    if (claimErr || !claimRow) continue;
+    const claimId = (claimRow as { id: string }).id;
+    const rows = claim.evidence.slice(0, 20).map((e) => ({
+      claim_id: claimId,
+      url: e.url,
+      domain: e.domain,
+      title: e.title,
+      excerpt: e.excerpt,
+      published_at: e.published_at,
+      source_role: e.source_role,
+      source_rank: e.source_rank,
+      source_score: e.source_score,
+      source_components: e.source_components,
+      is_credible: e.is_credible,
+      stance: e.stance,
+      stance_confidence: e.stance_confidence,
+      explanation: e.explanation,
+      retrieved_via: e.retrieved_via,
+    }));
+    if (rows.length > 0) {
+      await sb.from('claim_evidence').insert(rows);
+    }
+  }
+
+  return caseId;
 }
 
 /**

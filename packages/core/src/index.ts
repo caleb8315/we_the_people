@@ -29,3 +29,5 @@ export * from './bias';
 export * from './evidence-cards';
 export * from './confidence-breakdown';
 export * from './result-explanation';
+export * from './claim-decomposition';
+export * from './case-file';
