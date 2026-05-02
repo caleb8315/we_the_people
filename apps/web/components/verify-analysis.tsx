@@ -53,12 +53,23 @@ export interface VerifyAnalysisData {
   confidence_breakdown: ConfidenceBreakdown;
   explanation: ResultExplanation;
   case_file?: EvidenceCaseFile;
+  specialized_sources?: Array<{
+    id: string;
+    name: string;
+    status: 'hit' | 'miss' | 'skipped' | 'unavailable' | 'error';
+    hits: number;
+    note: string;
+    evidence_count: number;
+  }>;
 }
 
 export function VerifyAnalysis({ data }: { data: VerifyAnalysisData }) {
   return (
     <section className="space-y-5">
       {data.case_file && <CaseFileCard caseFile={data.case_file} />}
+      {data.specialized_sources && data.specialized_sources.length > 0 && (
+        <SpecializedSourcesCard systems={data.specialized_sources} />
+      )}
       <ConfidenceBreakdownCard breakdown={data.confidence_breakdown} />
       <ResultExplanationCard explanation={data.explanation} />
       <ConflictsCard conflicts={data.conflicts} summary={data.conflict_summary} />
@@ -243,6 +254,56 @@ function ClaimUncertainty({ claim }: { claim: ClaimCaseFile }) {
         </div>
       )}
     </div>
+  );
+}
+
+/* ─── Specialized source coverage ──────────────────────────────────────── */
+
+function SpecializedSourcesCard({
+  systems,
+}: {
+  systems: NonNullable<VerifyAnalysisData['specialized_sources']>;
+}) {
+  const hits = systems.filter((s) => s.status === 'hit').length;
+  const unavailable = systems.filter((s) => s.status === 'unavailable').length;
+  return (
+    <article className="rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
+      <header className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-400">
+            Deep source coverage
+          </p>
+          <h3 className="mt-1 text-lg font-semibold text-ink sm:text-xl">
+            {hits} specialized source{hits === 1 ? '' : 's'} found matching records
+          </h3>
+        </div>
+        {unavailable > 0 && (
+          <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800">
+            {unavailable} need free API setup
+          </span>
+        )}
+      </header>
+      <p className="mt-2 max-w-prose text-[13.5px] leading-relaxed text-ink-600">
+        These are claim-specific searches across fact-check, scholarly, legal, finance, and cyber databases.
+        They add evidence only; the case-file engine still decides how each source maps to each claim.
+      </p>
+      <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {systems.map((s) => (
+          <li key={s.id} className="rounded-xl border border-ink-100 bg-canvas-50 px-3 py-2.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-sm font-semibold text-ink-700">{s.name}</p>
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${systemStatusClass(s.status)}`}>
+                {s.status}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] text-ink-500">
+              {s.evidence_count} evidence item{s.evidence_count === 1 ? '' : 's'}
+            </p>
+            <p className="mt-1 text-[12px] leading-relaxed text-ink-600">{s.note}</p>
+          </li>
+        ))}
+      </ul>
+    </article>
   );
 }
 
@@ -787,6 +848,21 @@ function reasonDot(effect: 'positive' | 'negative' | 'neutral'): string {
       return 'bg-amber-500';
     case 'neutral':
       return 'bg-ink-300';
+  }
+}
+
+function systemStatusClass(status: 'hit' | 'miss' | 'skipped' | 'unavailable' | 'error'): string {
+  switch (status) {
+    case 'hit':
+      return 'bg-emerald-100 text-emerald-800';
+    case 'miss':
+      return 'bg-ink-100 text-ink-600';
+    case 'skipped':
+      return 'bg-sky-100 text-sky-800';
+    case 'unavailable':
+      return 'bg-amber-100 text-amber-800';
+    case 'error':
+      return 'bg-danger-100 text-danger-700';
   }
 }
 

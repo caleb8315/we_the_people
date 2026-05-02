@@ -24,6 +24,7 @@ import {
   buildConfidenceBreakdown,
   buildResultExplanation,
   buildEvidenceCaseFile,
+  decomposeClaims,
 } from '@osint/core';
 import type {
   ConfidenceReport,
@@ -53,6 +54,10 @@ import {
   type MatchedSignal,
 } from '@/lib/verify-corroboration';
 import { buildReaderReport, type ReaderReport } from '@/lib/reader-report';
+import {
+  runSpecializedCaseSearch,
+  type SpecializedCaseSearchResult,
+} from '@/lib/specialized-sources';
 
 /** Cap on how many hosts we remember per image hash. Keeps rows small. */
 const MAX_SEEN_HOSTS = 10;
@@ -121,6 +126,7 @@ type VerifyResponse = {
     confidence_breakdown: ConfidenceBreakdown;
     explanation: ResultExplanation;
     case_file: EvidenceCaseFile;
+    specialized_sources: SpecializedCaseSearchResult['systems'];
   };
   input: {
     kind: 'url' | 'text' | 'image';
@@ -309,10 +315,22 @@ export async function POST(req: Request) {
     text: body.text ?? null,
     keywords,
   });
+  const specializedClaims = decomposeClaims({
+    title: searchedTitle ?? title,
+    text: body.kind === 'text' ? body.text ?? null : pageDescription,
+    url: canonical_url ?? body.url ?? null,
+    kind: body.kind,
+    max_claims: 5,
+  });
+  const specialized = await runSpecializedCaseSearch(specializedClaims);
 
   // Merge the user's own submission at slot 0 so it stays the "primary"
-  // source trace entry, then the deduped live corpus behind it.
-  const mergedEvidence = dedupeByUrl([...evidence, ...corroboration.merged_evidence]);
+  // source trace entry, then the deduped live + specialized corpus behind it.
+  const mergedEvidence = dedupeByUrl([
+    ...evidence,
+    ...corroboration.merged_evidence,
+    ...specialized.evidence,
+  ]);
 
   // Run the same engine the feed uses. With corroboration folded in, this
   // now sees every outlet, social post, reference anchor, and sensor hit
@@ -517,6 +535,7 @@ export async function POST(req: Request) {
       confidence_breakdown: breakdown,
       explanation: resultExplanation,
       case_file: caseFile,
+      specialized_sources: specialized.systems,
     },
     input: {
       kind: body.kind,
