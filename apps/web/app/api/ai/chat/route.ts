@@ -15,6 +15,8 @@ export const runtime = 'nodejs';
 const Body = z.object({
   session_id: z.string().uuid().optional(),
   message: z.string().min(1).max(3000),
+  case_id: z.string().uuid().optional(),
+  claim_id: z.string().uuid().optional(),
 });
 
 /**
@@ -168,6 +170,12 @@ export async function POST(req: Request) {
     briefings: (recentBriefings ?? []) as Array<any>,
   });
 
+  const caseGrounding = await buildCaseGroundingContext(sb, {
+    userId: auth.user.id,
+    caseId: parsed.data.case_id ?? null,
+    claimId: parsed.data.claim_id ?? null,
+  });
+
   const { data: contextRows } = await sb
     .from('ai_messages')
     .select('role, content')
@@ -186,7 +194,7 @@ export async function POST(req: Request) {
       ...context,
       {
         role: 'system',
-        content: grounding,
+        content: caseGrounding ? `${grounding}\n\n${caseGrounding}` : grounding,
       },
     ],
   });
@@ -206,6 +214,107 @@ export async function POST(req: Request) {
     session_id: sessionId,
     reply: assistantReply,
   });
+}
+
+async function buildCaseGroundingContext(
+  sb: ReturnType<typeof getServerSupabase>,
+  input: {
+    userId: string;
+    caseId: string | null;
+    claimId: string | null;
+  },
+): Promise<string | null> {
+  if (!input.caseId && !input.claimId) return null;
+
+  let caseId = input.caseId;
+  if (!caseId && input.claimId) {
+    const { data: claimRow } = await sb
+      .from('verification_claims')
+      .select('case_id')
+      .eq('id', input.claimId)
+      .maybeSingle();
+    caseId = (claimRow as { case_id?: string } | null)?.case_id ?? null;
+  }
+  if (!caseId) return null;
+
+  const { data: caseRow } = await sb
+    .from('verification_cases')
+    .select('id,title,overall_verdict,overall_band,overall_summary,what_we_can_say,what_remains_uncertain,what_would_strengthen')
+    .eq('id', caseId)
+    .eq('user_id', input.userId)
+    .maybeSingle();
+  if (!caseRow) return null;
+
+  let claimsQuery = sb
+    .from('verification_claims')
+    .select('id,claim_text,claim_kind,checkability,verdict_label,confidence_band,confidence_score,summary,uncertainty,sort_order')
+    .eq('case_id', caseId)
+    .order('sort_order', { ascending: true })
+    .limit(8);
+  if (input.claimId) claimsQuery = claimsQuery.eq('id', input.claimId);
+  const { data: claims } = await claimsQuery;
+
+  const claimIds = (claims ?? []).map((c: any) => String(c.id));
+  const { data: evidenceRows } = claimIds.length > 0
+    ? await sb
+        .from('claim_evidence')
+        .select('claim_id,domain,title,url,source_role,source_score,stance,stance_confidence,explanation')
+        .in('claim_id', claimIds)
+        .order('source_rank', { ascending: true, nullsFirst: false })
+        .limit(30)
+    : { data: [] as any[] };
+
+  const evidenceByClaim = new Map<string, any[]>();
+  for (const e of evidenceRows ?? []) {
+    const key = String(e.claim_id);
+    const list = evidenceByClaim.get(key) ?? [];
+    if (list.length < 4) list.push(e);
+    evidenceByClaim.set(key, list);
+  }
+
+  const c = caseRow as any;
+  const lines: string[] = [
+    'ACTIVE CASE FILE CONTEXT (PRIVATE TO CURRENT USER)',
+    `Case: ${c.title}`,
+    `Overall: ${c.overall_verdict} / ${c.overall_band} — ${c.overall_summary}`,
+    `What we can say: ${(c.what_we_can_say ?? []).join(' | ') || 'n/a'}`,
+    `Uncertain: ${(c.what_remains_uncertain ?? []).join(' | ') || 'n/a'}`,
+    `Would strengthen: ${(c.what_would_strengthen ?? []).join(' | ') || 'n/a'}`,
+    '',
+    'Claims and mapped evidence:',
+  ];
+
+  for (const claim of claims ?? []) {
+    const row = claim as any;
+    lines.push(
+      `- Claim ${row.sort_order + 1}: ${row.claim_text} | kind=${row.claim_kind} checkability=${row.checkability} verdict=${row.verdict_label} confidence=${row.confidence_score}/100 ${row.confidence_band}`,
+      `  Summary: ${row.summary}`,
+    );
+    const uncertainty = row.uncertainty ?? {};
+    const unresolved = [
+      ...(uncertainty.missing_evidence ?? []),
+      ...(uncertainty.conflicting_evidence ?? []),
+      ...(uncertainty.weak_points ?? []),
+    ].slice(0, 3);
+    if (unresolved.length > 0) lines.push(`  Uncertainty: ${unresolved.join(' | ')}`);
+    const evs = evidenceByClaim.get(String(row.id)) ?? [];
+    for (const ev of evs) {
+      lines.push(
+        `  Evidence: ${ev.domain} stance=${ev.stance} source_score=${ev.source_score ?? '-'} role=${ev.source_role ?? '-'} :: ${ev.title ?? ev.url} :: ${ev.explanation}`,
+      );
+    }
+  }
+
+  lines.push(
+    '',
+    'CASE FILE INSTRUCTIONS:',
+    '- Answer from the active case file first.',
+    '- Do not add facts that are not in the mapped evidence.',
+    '- If the case file is missing evidence, say what is missing and what source type would help.',
+    '- Use supported / partly supported / unsupported / unresolved wording, not absolute true/false.',
+  );
+
+  return lines.join('\n');
 }
 
 async function generateAssistantReply(input: {
@@ -293,6 +402,59 @@ function buildGroundingContext(input: {
     '- If context is stale or missing, say so clearly and propose next checks.',
     '- Cite concrete signal/source lines in your response when possible.',
   ].join('\n');
+}
+
+function safeJson(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function buildCaseGrounding(input: {
+  caseRow: any | null;
+  claimRows: any[];
+  evidenceRows: any[];
+}): string | null {
+  if (!input.caseRow) return null;
+  const caseFile = safeJson(input.caseRow.case_file);
+  const claimLines = input.claimRows.slice(0, 8).map((claim, idx) => {
+    const claimEvidence = input.evidenceRows
+      .filter((e) => e.claim_id === claim.id)
+      .slice(0, 4)
+      .map((e) => {
+        const title = e.title ?? e.domain ?? e.url;
+        return `    - ${e.stance} (${e.domain}, score=${e.source_score ?? '-'}) ${title} :: ${e.explanation ?? ''} ${e.url ?? ''}`;
+      });
+    const uncertainty = safeJson(claim.uncertainty);
+    const missing = Array.isArray(uncertainty?.missing_evidence)
+      ? uncertainty.missing_evidence.slice(0, 2).join('; ')
+      : '';
+    return [
+      `${idx + 1}. ${claim.claim_text}`,
+      `   verdict=${claim.verdict_label} band=${claim.confidence_band} score=${claim.confidence_score}/100 kind=${claim.claim_kind} checkability=${claim.checkability}`,
+      claim.summary ? `   summary=${claim.summary}` : '',
+      missing ? `   missing=${missing}` : '',
+      claimEvidence.join('\n'),
+    ].filter(Boolean).join('\n');
+  });
+
+  return [
+    'ATTACHED CASE FILE CONTEXT (PRIVATE TO CURRENT USER)',
+    `Case: ${input.caseRow.title}`,
+    `Overall: ${input.caseRow.overall_verdict} / ${input.caseRow.overall_band}`,
+    `Summary: ${input.caseRow.overall_summary}`,
+    Array.isArray(caseFile?.what_remains_uncertain)
+      ? `Uncertainty: ${caseFile.what_remains_uncertain.slice(0, 5).join(' | ')}`
+      : '',
+    '',
+    'Atomic claims and mapped evidence:',
+    claimLines.join('\n\n') || 'No claim rows available.',
+    '',
+    'CASE FILE INSTRUCTIONS:',
+    '- Treat the case file as the source of truth for this answer.',
+    '- Do not introduce new factual claims not present in the case evidence.',
+    '- If evidence is missing, say exactly what is missing and what source type would resolve it.',
+  ].filter(Boolean).join('\n');
 }
 
 function compactForModel<T extends { role: string; content: string }>(

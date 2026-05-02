@@ -31,7 +31,9 @@
     "./bias": "./src/bias.ts",
     "./evidence-cards": "./src/evidence-cards.ts",
     "./confidence-breakdown": "./src/confidence-breakdown.ts",
-    "./result-explanation": "./src/result-explanation.ts"
+    "./result-explanation": "./src/result-explanation.ts",
+    "./claim-decomposition": "./src/claim-decomposition.ts",
+    "./case-file": "./src/case-file.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
