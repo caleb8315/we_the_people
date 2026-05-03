@@ -9,11 +9,14 @@ import { SignalsMap } from '@/components/signals-map';
 import { decorateSignals, type SignalRowRaw } from '@/lib/signals';
 import { signalGeoPoints, type SignalGeoPoint } from '@/lib/signal-geo';
 import { logProductEvent } from '@/lib/product-events';
+import { recencyScore } from '@/lib/signal-feed';
 
 export const metadata = { title: 'Priority Workspace · Crosscheck' };
 export const dynamic = 'force-dynamic';
 const VIEWS = ['list', 'map'] as const;
 type IntelView = (typeof VIEWS)[number];
+const FRESH_WINDOW_HOURS = 36;
+const FALLBACK_WINDOW_HOURS = 96;
 
 export default async function IntelWorkspacePage({
   searchParams,
@@ -32,7 +35,11 @@ export default async function IntelWorkspacePage({
   if (!profile?.onboarded_at) redirect('/onboarding');
 
   const requestedView = parseView(searchParams.view);
-  const [{ data: prefs }, { data: rawSignals }, { data: savedViews }] = await Promise.all([
+  const nowIso = new Date().toISOString();
+  const freshSinceIso = new Date(Date.now() - FRESH_WINDOW_HOURS * 3600 * 1000).toISOString();
+  const fallbackSinceIso = new Date(Date.now() - FALLBACK_WINDOW_HOURS * 3600 * 1000).toISOString();
+
+  const [{ data: prefs }, { data: rawFreshSignals }, { data: rawFallbackSignals }, { data: savedViews }] = await Promise.all([
     sb
       .from('preferences')
       .select('topics, min_alert_severity, alert_intensity_preference, feed_view_preference')
@@ -43,8 +50,17 @@ export default async function IntelWorkspacePage({
       .select('*')
       .in('verification_status', ['verified', 'developing'])
       .gte('severity', 60)
+      .gte('first_seen_at', freshSinceIso)
       .order('severity', { ascending: false })
       .limit(80),
+    sb
+      .from('signals_public')
+      .select('*')
+      .in('verification_status', ['verified', 'developing'])
+      .gte('severity', 60)
+      .gte('first_seen_at', fallbackSinceIso)
+      .order('severity', { ascending: false })
+      .limit(120),
     sb
       .from('user_saved_views')
       .select('id, name, context, view_mode, filters, updated_at')
@@ -55,9 +71,18 @@ export default async function IntelWorkspacePage({
   ]);
 
   const focusTopics = new Set((prefs?.topics ?? ['war', 'economy', 'climate']) as string[]);
-  const rows = (rawSignals ?? []) as SignalRowRaw[];
-  const prioritizedRaw = rows.filter((s) => focusTopics.has(s.topic ?? 'other'));
-  const overflowRaw = rows.filter((s) => !focusTopics.has(s.topic ?? 'other'));
+  const freshRows = ((rawFreshSignals ?? []) as SignalRowRaw[]).filter((s: any) => !s.expires_at || s.expires_at > nowIso);
+  const fallbackRows = ((rawFallbackSignals ?? []) as SignalRowRaw[]).filter(
+    (s: any) => !s.expires_at || s.expires_at > nowIso,
+  );
+  const rows = freshRows.length >= 8 ? freshRows : fallbackRows;
+
+  const prioritizedRaw = rows
+    .filter((s) => focusTopics.has(s.topic ?? 'other'))
+    .sort((a, b) => rankForIntel(b) - rankForIntel(a));
+  const overflowRaw = rows
+    .filter((s) => !focusTopics.has(s.topic ?? 'other'))
+    .sort((a, b) => rankForIntel(b) - rankForIntel(a));
 
   const [prioritized, overflow] = await Promise.all([
     decorateSignals(sb, prioritizedRaw, { newSince: profile.last_dashboard_visit_at ?? null }),
@@ -94,6 +119,9 @@ export default async function IntelWorkspacePage({
             <p className="mt-1 text-sm text-ink-500">
               Prioritized by your focus topics and how well each signal is corroborated. Alert intensity:{' '}
               {prefs?.alert_intensity_preference ?? 'critical_only'}. Threshold: {prefs?.min_alert_severity ?? 70}.
+            </p>
+            <p className="mt-1 text-xs text-ink-400">
+              Showing {freshRows.length >= 8 ? `fresh window (${FRESH_WINDOW_HOURS}h)` : `fallback window (${FALLBACK_WINDOW_HOURS}h)`}.
             </p>
           </div>
           <Segmented
@@ -183,6 +211,19 @@ export default async function IntelWorkspacePage({
       </section>
     </div>
   );
+}
+
+function rankForIntel(s: SignalRowRaw): number {
+  const freshnessHours = ageHours(s);
+  const freshnessBonus = freshnessHours <= 24 ? 18 : freshnessHours <= 48 ? 10 : freshnessHours <= 72 ? 4 : 0;
+  const credibilityBonus = Math.min(14, Math.max(0, Number(s.credible_source_count ?? 0)) * 2);
+  return Number(s.severity ?? 0) + freshnessBonus + credibilityBonus + recencyScore(s) / 1_000_000_000_000;
+}
+
+function ageHours(s: Pick<SignalRowRaw, 'occurred_at' | 'first_seen_at'>): number {
+  const ts = Date.parse(s.occurred_at ?? s.first_seen_at);
+  if (!Number.isFinite(ts)) return 9999;
+  return Math.max(0, (Date.now() - ts) / 3600_000);
 }
 
 function parseView(view: string | undefined): IntelView | null {

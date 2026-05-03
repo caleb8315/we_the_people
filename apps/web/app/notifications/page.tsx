@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ExpandableText } from '@/components/expandable-text';
 
 export const metadata = { title: 'Notifications · Crosscheck' };
 export const dynamic = 'force-dynamic';
@@ -84,7 +85,7 @@ export default async function NotificationsPage({
       ) : (
         <ul className="space-y-3">
           {notifications.map((n) => (
-            <li key={n.id} className="rounded-card border border-ink-100 bg-paper p-4">
+            <li key={n.id} className="rounded-card border border-ink-100 bg-paper p-3 sm:p-3.5">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={badgeVariantForType(n.type)} withIcon={false}>
                   {labelForType(n.type)}
@@ -99,13 +100,15 @@ export default async function NotificationsPage({
                 </span>
               </div>
 
-              <h2 className="mt-2 text-base font-semibold text-ink">{n.title}</h2>
-              <p className="mt-1 text-sm text-ink-600">{n.summary}</p>
-              <pre className="mt-3 whitespace-pre-wrap rounded-xl border border-ink-100 bg-canvas-50 p-3 text-sm text-ink-700">
-                {n.body}
-              </pre>
+              <h2 className="mt-2 text-sm font-semibold text-ink sm:text-[15px]">{n.title}</h2>
+              <p className="mt-1 text-[13px] leading-relaxed text-ink-600">{n.summary}</p>
+              {n.body && (
+                <div className="mt-2.5 rounded-xl border border-ink-100 bg-canvas-50 p-2.5 sm:p-3">
+                  <ExpandableText text={n.body} previewLines={4} minCharsToCollapse={280} />
+                </div>
+              )}
 
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
                 {n.signal_id && (
                   <Link
                     href={`/signal/${n.signal_id}`}

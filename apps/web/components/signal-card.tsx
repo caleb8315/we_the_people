@@ -51,6 +51,7 @@ export interface SignalRow {
   trust_explanation?: TrustExplanation;
   physical_evidence?: PhysicalEvidence | null;
   contradictions_inline?: ContradictionInline[];
+  related_updates_count?: number;
 }
 
 const PHYSICAL_EVIDENCE_TOPICS = new Set(['war', 'disaster', 'climate']);
@@ -217,6 +218,15 @@ export function SignalCard({ s }: { s: SignalRow }) {
               {s.is_new_since && (
                 <Badge variant="new" title="New since your last visit">
                   New
+                </Badge>
+              )}
+              {(s.related_updates_count ?? 0) > 0 && (
+                <Badge
+                  variant="neutral"
+                  title="Overlapping updates merged into this primary card to reduce feed noise"
+                >
+                  +{s.related_updates_count} related update
+                  {s.related_updates_count === 1 ? '' : 's'}
                 </Badge>
               )}
               <span>
