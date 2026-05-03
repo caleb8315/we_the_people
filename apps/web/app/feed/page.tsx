@@ -8,8 +8,9 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { SignalsMap } from '@/components/signals-map';
 import { FeedFreshness } from '@/components/feed-freshness';
 import { logProductEvent } from '@/lib/product-events';
-import { applyMutes, decorateSignals, personalizeSignals, type SignalRowRaw } from '@/lib/signals';
+import { applyMutes, decorateSignals, type SignalRowRaw } from '@/lib/signals';
 import { signalGeoPoints, type SignalGeoPoint } from '@/lib/signal-geo';
+import { groupSignalsForFeed } from '@/lib/signal-feed';
 
 export const metadata = { title: 'Feed · Crosscheck' };
 export const dynamic = 'force-dynamic';
@@ -125,7 +126,16 @@ export default async function FeedPage({
   const filtered = userId
     ? applyMutes(allSignals, prefs)
     : allSignals;
-  const signals = await decorateSignals(sb, filtered);
+  const grouped = groupSignalsForFeed(filtered);
+  const groupedCountById = new Map(grouped.map((g) => [g.primary.id, g.groupedCount]));
+  const signals = (await decorateSignals(
+    sb,
+    grouped.map((g) => g.primary),
+  )).map((s) => ({
+    ...s,
+    related_updates_count: Math.max(0, (groupedCountById.get(s.id) ?? 1) - 1),
+  }));
+  const mergedAwayCount = Math.max(0, filtered.length - signals.length);
   const geoPoints: SignalGeoPoint[] = signals.flatMap((s) => signalGeoPoints(s));
 
   if (userId) {
@@ -281,8 +291,9 @@ export default async function FeedPage({
               {mode === 'personalized' ? 'Your feed' : 'Global feed'}
             </h2>
             <p className="mt-0.5 text-sm text-ink-500">
-              <strong className="text-ink-700">{signals.length}</strong> signal
-              {signals.length === 1 ? '' : 's'} · past {hours}h
+              <strong className="text-ink-700">{signals.length}</strong> signal cluster
+              {signals.length === 1 ? '' : 's'} · {filtered.length} total update
+              {filtered.length === 1 ? '' : 's'} · past {hours}h
               {topic !== 'all' && <> · topic: {topic}</>}
               {minSeverity > 0 && <> · severity {minSeverity}+</>}
             </p>
@@ -366,6 +377,12 @@ export default async function FeedPage({
               }}
             />
           </div>
+        )}
+        {mergedAwayCount > 0 && (
+          <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Compacted repetitive coverage: merged {mergedAwayCount} overlapping update
+            {mergedAwayCount === 1 ? '' : 's'} into primary story cards.
+          </p>
         )}
       </section>
 
