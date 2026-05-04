@@ -447,13 +447,14 @@ export default async function FeedPage({
         {singleSourceCount > 0 && corroboration === 'all' && (
           <p className="mt-2 rounded-xl border border-ink-100 bg-canvas-50 px-3 py-2 text-xs text-ink-600">
             {singleSourceCount} card{singleSourceCount === 1 ? '' : 's'} still single-source in this window.
-            Auto-enrichment runs continuously to grow corroboration; use "Multi-source first (2+)" to hide them.
+            Auto-enrichment runs continuously to grow corroboration; use &quot;Multi-source first
+            (2+)&quot; to hide them.
           </p>
         )}
         {hiddenSingleSourceCount > 0 && corroboration === 'multi_plus' && (
           <p className="mt-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-xs text-brand-700">
             Single-source stories are hidden by default here so feed top stays corroboration-first.
-            Switch to "All coverage" to include them.
+            Switch to &quot;All coverage&quot; to include them.
           </p>
         )}
         {isGlobalFeed && corroboration === 'multi_plus' && (
