@@ -17,9 +17,15 @@ export interface SignalGeoPoint {
   occurred_at: string | null;
   source_count: number;
   credible_source_count: number;
+  map_layer?: 'primary' | 'pressure';
 }
 
 export type MapSourceClass = SignalGeoPoint['source_class'];
+export type SignalGeoPressurePoint = SignalGeoPoint & {
+  map_layer: 'pressure';
+  isPressurePoint: true;
+  pressure_reason: 'hidden_single_source';
+};
 
 const COUNTRY_CENTROIDS: Record<string, { lat: number; lon: number }> = {
   AF: { lat: 33.94, lon: 67.71 },

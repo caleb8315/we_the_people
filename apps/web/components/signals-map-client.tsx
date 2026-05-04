@@ -35,6 +35,12 @@ function pinColor(severity: number): string {
   return '#10b981';
 }
 
+function pressureColor(priority: number): string {
+  if (priority >= 85) return '#dc2626';
+  if (priority >= 70) return '#f97316';
+  return '#eab308';
+}
+
 function badgeTone(status: SignalGeoPoint['verification_status']) {
   if (status === 'verified') return 'border-brand-200 text-brand-700';
   if (status === 'developing') return 'border-amber-200 text-amber-700';
@@ -45,6 +51,17 @@ function markerIcon(L: typeof Leaflet, color: string) {
   return L.divIcon({
     className: 'osint-map-pin',
     html: `<span style="display:inline-block;width:14px;height:14px;border-radius:999px;background:${color};border:2px solid #0b0d12;box-shadow:0 0 0 1px rgba(255,255,255,.25)"></span>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+    popupAnchor: [0, -8],
+  });
+}
+
+function pressureMarkerIcon(L: typeof Leaflet, color: string, isApproximate: boolean) {
+  const borderStyle = isApproximate ? '2px dashed #111827' : '2px solid #111827';
+  return L.divIcon({
+    className: 'osint-map-pressure-pin',
+    html: `<span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:${color};border:${borderStyle};box-shadow:0 0 0 1px rgba(255,255,255,.25)"></span>`,
     iconSize: [14, 14],
     iconAnchor: [7, 7],
     popupAnchor: [0, -8],
@@ -167,10 +184,12 @@ function buildClusters(points: SignalGeoPoint[]): ClusterBucket[] {
 
 export function SignalsMapClient({
   points,
+  pressurePoints = [],
   allPointsCount,
   context,
 }: {
   points: SignalGeoPoint[];
+  pressurePoints?: SignalGeoPoint[];
   allPointsCount: number;
   context: 'feed' | 'intel';
 }) {
@@ -184,14 +203,16 @@ export function SignalsMapClient({
   const [leafletReady, setLeafletReady] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const exactCount = useMemo(() => points.filter((p) => !p.isApproximate).length, [points]);
-  const approxCount = points.length - exactCount;
+  const combinedPoints = useMemo(() => [...points, ...pressurePoints], [points, pressurePoints]);
+  const exactCount = useMemo(() => combinedPoints.filter((p) => !p.isApproximate).length, [combinedPoints]);
+  const approxCount = combinedPoints.length - exactCount;
   const corroboratedCount = useMemo(
     () => points.filter((p) => p.verification_status === 'verified').length,
     [points],
   );
   const clusters = useMemo(() => buildClusters(points), [points]);
   const stackedClusters = useMemo(() => clusters.filter((c) => c.points.length > 1).length, [clusters]);
+  const pressureClusters = useMemo(() => buildClusters(pressurePoints), [pressurePoints]);
 
   // Step 1 — initialize the Leaflet map once the dynamic import resolves.
   // Cleanup disposes the map so route-changes and Hot Reload don't leak
@@ -257,7 +278,7 @@ export function SignalsMapClient({
       if (!map || !layer) return;
 
       layer.clearLayers();
-      if (points.length === 0) return;
+      if (points.length === 0 && pressurePoints.length === 0) return;
 
       const bounds = Lmod.latLngBounds([]);
       for (const cluster of clusters) {
@@ -339,17 +360,76 @@ export function SignalsMapClient({
         marker.addTo(layer);
         bounds.extend([cluster.lat, cluster.lon]);
       }
+      for (const cluster of pressureClusters) {
+        const sorted = [...cluster.points].sort((a, b) => {
+          if (b.severity !== a.severity) return b.severity - a.severity;
+          return Date.parse(b.first_seen_at ?? '') - Date.parse(a.first_seen_at ?? '');
+        });
+        const primary = sorted[0]!;
+        const icon =
+          cluster.points.length > 1
+            ? clusterIcon(
+                Lmod,
+                cluster.points.length,
+                sorted.reduce((m, p) => (p.severity > m ? p.severity : m), primary.severity),
+              )
+            : pressureMarkerIcon(Lmod, pressureColor(primary.severity), primary.isApproximate);
+        const marker = Lmod.marker([cluster.lat, cluster.lon], { icon });
+        const popupRoot = document.createElement('div');
+        popupRoot.className = 'min-w-[240px] max-w-[300px] space-y-2 text-sm';
+        if (cluster.points.length > 1) {
+          const listRows = sorted
+            .slice(0, 5)
+            .map(
+              (p) => `<li style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+                <a href="/signal/${encodeURIComponent(p.id)}?from=map&context=${context}" style="font-weight:500;color:#111827;text-decoration:none;display:block;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.title)}</a>
+                <span style="font-size:11px;color:#6b7280;white-space:nowrap">${p.severity}/100</span>
+              </li>`,
+            )
+            .join('');
+          popupRoot.innerHTML = `
+          <div class="flex flex-wrap items-center gap-1">
+            <span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">Corroboration pressure</span>
+            <span class="rounded-full border border-ink-200 px-2 py-0.5 text-[11px] font-medium text-ink-700">${cluster.points.length} hidden single-source</span>
+          </div>
+          <p class="font-semibold leading-snug text-ink-900" style="line-height:1.35">Coverage is thin here</p>
+          <ul style="margin:0;padding-left:0;list-style:none;display:grid;gap:6px">${listRows}</ul>
+          ${cluster.points.length > 5 ? `<p class="text-xs text-ink-500">+${cluster.points.length - 5} more in this hotspot</p>` : ''}
+          <p class="text-xs text-ink-600">These are queued for automatic multi-source enrichment.</p>
+          `;
+        } else {
+          popupRoot.innerHTML = `
+          <div class="flex flex-wrap items-center gap-1">
+            <span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">Corroboration pressure</span>
+            <span class="rounded-full border border-ink-200 px-2 py-0.5 text-[11px] text-ink-600">${primary.severity}/100</span>
+            ${primary.isApproximate ? '<span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700">approx location</span>' : ''}
+          </div>
+          <p class="font-semibold leading-snug text-ink-900" style="line-height:1.35">${escapeHtml(primary.title)}</p>
+          <p class="text-xs text-ink-600">Single-source story hidden from corroborated map view and queued for automatic source expansion.</p>
+          `;
+        }
+        const link = document.createElement('a');
+        link.href = `/signal/${primary.id}?from=map&context=${context}`;
+        link.className =
+          'inline-flex items-center gap-1 rounded-full bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 transition';
+        link.textContent = 'Review signal →';
+        popupRoot.appendChild(link);
+        marker.bindPopup(popupRoot, { maxWidth: 320 });
+        marker.addTo(layer);
+        bounds.extend([cluster.lat, cluster.lon]);
+      }
       if (bounds.isValid()) {
         map.fitBounds(bounds.pad(0.2), { animate: false, maxZoom: 8 });
       }
       void fireEvent('map_filter_changed', {
         context,
-        points: points.length,
+        points: combinedPoints.length,
         total_points: allPointsCount,
         exact_points: exactCount,
         approximate_points: approxCount,
         corroborated_points: corroboratedCount,
         stacked_clusters: stackedClusters,
+        pressure_points: pressurePoints.length,
       });
     });
   }, [
@@ -360,7 +440,10 @@ export function SignalsMapClient({
     corroboratedCount,
     exactCount,
     leafletReady,
+    combinedPoints,
     points,
+    pressurePoints,
+    pressureClusters,
     stackedClusters,
   ]);
 
@@ -372,11 +455,16 @@ export function SignalsMapClient({
     <div className="relative h-full w-full">
       <div className="absolute left-2 right-2 top-2 z-[500] flex flex-wrap items-center gap-1.5 rounded-xl border border-ink-100/80 bg-paper/95 p-2 text-[11px] shadow-sm backdrop-blur">
         <span className="rounded-full border border-ink-100 px-2 py-1 text-[10px] text-ink-500">
-          {points.length} shown · {allPointsCount} total
+          {combinedPoints.length} shown · {allPointsCount} total
         </span>
         <span className="rounded-full border border-ink-100 px-2 py-1 text-[10px] text-ink-500">
           {stackedClusters} stacked
         </span>
+        {pressurePoints.length > 0 && (
+          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] text-amber-700">
+            {pressurePoints.length} pressure
+          </span>
+        )}
       </div>
       <div ref={mapElementRef} className="h-full w-full pt-12" aria-busy={!leafletReady} />
       {!leafletReady && !loadError && (
