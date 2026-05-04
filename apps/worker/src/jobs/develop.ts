@@ -50,6 +50,11 @@ export interface DevelopOptions {
   max?: number;
   cooldownMinutes?: number;
   windowHours?: number;
+  /**
+   * Signals at or below this source count are considered under-corroborated
+   * and get first priority in the auto-enrichment queue.
+   */
+  thinSourceThreshold?: number;
   dryRun?: boolean;
 }
 
@@ -64,6 +69,7 @@ export async function runDevelop(opts: DevelopOptions = {}): Promise<{
   const max = opts.max ?? DEFAULT_MAX_SIGNALS;
   const cooldownMinutes = opts.cooldownMinutes ?? DEFAULT_COOLDOWN_MINUTES;
   const windowHours = opts.windowHours ?? DEFAULT_WINDOW_HOURS;
+  const thinSourceThreshold = Math.max(1, opts.thinSourceThreshold ?? 2);
   const dryRun = Boolean(opts.dryRun);
 
   const runId = await startEngineRun('develop');
@@ -134,9 +140,18 @@ export async function runDevelop(opts: DevelopOptions = {}): Promise<{
     return { candidates: 0, attempted: 0, enriched: 0, cooldown: 0, errors: 1 };
   }
 
-  const rows = (candidates ?? []).slice(0, max);
+  const sorted = (candidates ?? []).sort((a, b) => {
+    const aThin = Number(a.source_count ?? 0) <= thinSourceThreshold ? 1 : 0;
+    const bThin = Number(b.source_count ?? 0) <= thinSourceThreshold ? 1 : 0;
+    if (aThin !== bThin) return bThin - aThin;
+    const aSev = Number(a.severity ?? 0);
+    const bSev = Number(b.severity ?? 0);
+    if (aSev !== bSev) return bSev - aSev;
+    return Number(a.source_count ?? 0) - Number(b.source_count ?? 0);
+  });
+  const rows = sorted.slice(0, max);
   console.log(
-    `[develop] starting — ${rows.length} candidates (window=${windowHours}h, cooldown=${cooldownMinutes}m, dryRun=${dryRun})`,
+    `[develop] starting — ${rows.length} candidates (window=${windowHours}h, cooldown=${cooldownMinutes}m, thin<=${thinSourceThreshold}, dryRun=${dryRun})`,
   );
 
   if (rows.length === 0) {
@@ -161,7 +176,7 @@ export async function runDevelop(opts: DevelopOptions = {}): Promise<{
       records_in: rows.length,
       records_out: 0,
       errors: [],
-      meta: { dry_run: true, candidates: rows.length },
+      meta: { dry_run: true, candidates: rows.length, thin_source_threshold: thinSourceThreshold },
     });
     return { candidates: rows.length, attempted: 0, enriched: 0, cooldown: 0, errors: 0 };
   }
@@ -204,6 +219,7 @@ export async function runDevelop(opts: DevelopOptions = {}): Promise<{
       attempted,
       enriched,
       cooldown,
+      thin_source_threshold: thinSourceThreshold,
     },
   });
 

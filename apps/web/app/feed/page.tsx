@@ -18,8 +18,10 @@ export const dynamic = 'force-dynamic';
 const TOPICS = ['all', 'war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'tech', 'finance'] as const;
 const MODES = ['personalized', 'global'] as const;
 const VIEWS = ['list', 'map'] as const;
+const CORROBORATION_FILTERS = ['all', 'multi_plus'] as const;
 type FeedMode = (typeof MODES)[number];
 type FeedView = (typeof VIEWS)[number];
+type CorroborationFilter = (typeof CORROBORATION_FILTERS)[number];
 
 interface SavedViewRow {
   id: string;
@@ -33,13 +35,21 @@ interface SavedViewRow {
 export default async function FeedPage({
   searchParams,
 }: {
-  searchParams: { topic?: string; hours?: string; mode?: string; view?: string; min_severity?: string };
+  searchParams: {
+    topic?: string;
+    hours?: string;
+    mode?: string;
+    view?: string;
+    min_severity?: string;
+    corroboration?: string;
+  };
 }) {
   const topic = (searchParams.topic ?? 'all').toLowerCase();
   const hours = clamp(Number(searchParams.hours ?? '48'), 1, 24 * 14);
   const requestedMode = parseMode(searchParams.mode);
   const requestedView = parseView(searchParams.view);
   const minSeverity = clamp(Number(searchParams.min_severity ?? '0'), 0, 100);
+  const corroboration = parseCorroboration(searchParams.corroboration);
 
   const sb = getServerSupabase();
   const hdrs = headers();
@@ -123,9 +133,13 @@ export default async function FeedPage({
     .sort()
     .pop() ?? null;
   // Apply remaining filters (muted sources, countries) in JS
-  const filtered = userId
+  const mutedApplied = userId
     ? applyMutes(allSignals, prefs)
     : allSignals;
+  const filtered =
+    corroboration === 'multi_plus'
+      ? mutedApplied.filter((s) => Number(s.source_count ?? 0) >= 2)
+      : mutedApplied;
   const grouped = groupSignalsForFeed(filtered);
   const groupedCountById = new Map(grouped.map((g) => [g.primary.id, g.groupedCount]));
   const signals = (await decorateSignals(
@@ -136,7 +150,15 @@ export default async function FeedPage({
     related_updates_count: Math.max(0, (groupedCountById.get(s.id) ?? 1) - 1),
   }));
   const mergedAwayCount = Math.max(0, filtered.length - signals.length);
+  const hiddenSingleSourceCount =
+    corroboration === 'multi_plus'
+      ? mutedApplied.filter((s) => Number(s.source_count ?? 0) <= 1).length
+      : 0;
   const geoPoints: SignalGeoPoint[] = signals.flatMap((s) => signalGeoPoints(s));
+  const singleSourceCount =
+    corroboration === 'all'
+      ? signals.filter((s) => Number(s.source_count ?? 0) <= 1).length
+      : 0;
 
   if (userId) {
     void logProductEvent(sb, {
@@ -189,7 +211,9 @@ export default async function FeedPage({
   }
 
   const qp = (m: string, t: string, v: FeedView = view, sev: number = minSeverity) =>
-    `/feed?mode=${m}&topic=${t}&hours=${hours}&view=${v}&min_severity=${sev}`;
+    `/feed?mode=${m}&topic=${t}&hours=${hours}&view=${v}&min_severity=${sev}&corroboration=${corroboration}`;
+  const qpWithCorroboration = (corr: CorroborationFilter) =>
+    `/feed?mode=${mode}&topic=${topic}&hours=${hours}&view=${view}&min_severity=${minSeverity}&corroboration=${corr}`;
   const severityStops = [0, 60, 75, 85] as const;
 
   return (
@@ -232,6 +256,7 @@ export default async function FeedPage({
             <input type="hidden" name="hours" value={String(hours)} />
             <input type="hidden" name="view" value={view} />
             <input type="hidden" name="mode" value={mode} />
+            <input type="hidden" name="corroboration" value={corroboration} />
           </label>
           <button
             type="submit"
@@ -294,6 +319,7 @@ export default async function FeedPage({
               <strong className="text-ink-700">{signals.length}</strong> signal cluster
               {signals.length === 1 ? '' : 's'} · {filtered.length} total update
               {filtered.length === 1 ? '' : 's'} · past {hours}h
+              {hiddenSingleSourceCount > 0 && <> · {hiddenSingleSourceCount} single-source hidden</>}
               {topic !== 'all' && <> · topic: {topic}</>}
               {minSeverity > 0 && <> · severity {minSeverity}+</>}
             </p>
@@ -346,6 +372,23 @@ export default async function FeedPage({
             ))}
           </div>
         </div>
+        <div className="mt-2 -mx-1 overflow-x-auto pb-1">
+          <div className="flex w-max gap-2 px-1">
+            {CORROBORATION_FILTERS.map((corr) => (
+              <a
+                key={corr}
+                href={qpWithCorroboration(corr)}
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                  corr === corroboration
+                    ? 'border-ink-900 bg-ink-900 text-white'
+                    : 'border-ink-100 bg-paper text-ink-500 hover:border-ink-200 hover:text-ink'
+                }`}
+              >
+                {corr === 'multi_plus' ? 'Multi-source first (2+)' : 'All coverage'}
+              </a>
+            ))}
+          </div>
+        </div>
 
         {userId && (savedViews ?? []).length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-500">
@@ -356,7 +399,8 @@ export default async function FeedPage({
               const savedMode = typeof f.mode === 'string' ? f.mode : mode;
               const savedHours = Number(f.hours ?? hours);
               const savedMinSev = Number(f.min_severity ?? 0);
-              const href = `/feed?mode=${savedMode}&topic=${savedTopic}&hours=${savedHours}&view=${sv.view_mode}&min_severity=${savedMinSev}`;
+              const savedCorroboration = typeof f.corroboration === 'string' ? f.corroboration : corroboration;
+              const href = `/feed?mode=${savedMode}&topic=${savedTopic}&hours=${savedHours}&view=${sv.view_mode}&min_severity=${savedMinSev}&corroboration=${savedCorroboration}`;
               return (
                 <Link
                   key={sv.id}
@@ -374,6 +418,7 @@ export default async function FeedPage({
                 mode,
                 hours,
                 min_severity: minSeverity,
+                corroboration,
               }}
             />
           </div>
@@ -382,6 +427,18 @@ export default async function FeedPage({
           <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             Compacted repetitive coverage: merged {mergedAwayCount} overlapping update
             {mergedAwayCount === 1 ? '' : 's'} into primary story cards.
+          </p>
+        )}
+        {singleSourceCount > 0 && corroboration === 'all' && (
+          <p className="mt-2 rounded-xl border border-ink-100 bg-canvas-50 px-3 py-2 text-xs text-ink-600">
+            {singleSourceCount} card{singleSourceCount === 1 ? '' : 's'} still single-source in this window.
+            Auto-enrichment runs continuously to grow corroboration; use "Multi-source first (2+)" to hide them.
+          </p>
+        )}
+        {hiddenSingleSourceCount > 0 && corroboration === 'multi_plus' && (
+          <p className="mt-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-xs text-brand-700">
+            Single-source stories are hidden by default here so feed top stays corroboration-first.
+            Switch to "All coverage" to include them.
           </p>
         )}
       </section>
@@ -442,6 +499,13 @@ function parseMode(mode: string | undefined): FeedMode | null {
 function parseView(view: string | undefined): FeedView | null {
   if (!view) return null;
   return VIEWS.includes(view as FeedView) ? (view as FeedView) : null;
+}
+
+function parseCorroboration(value: string | undefined): CorroborationFilter {
+  if (!value) return 'multi_plus';
+  return CORROBORATION_FILTERS.includes(value as CorroborationFilter)
+    ? (value as CorroborationFilter)
+    : 'multi_plus';
 }
 
 function SaveViewButton({
