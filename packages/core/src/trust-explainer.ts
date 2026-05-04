@@ -59,6 +59,18 @@ export interface TrustHeadlineChip {
   hint?: string;
 }
 
+export type TrustEvidenceState =
+  | 'confirmed'
+  | 'multi_source'
+  | 'single_source'
+  | 'disputed'
+  | 'missing_evidence';
+
+export interface TrustBriefPoint {
+  text: string;
+  state: TrustEvidenceState;
+}
+
 export interface TrustExplanation {
   /** One sentence the reader sees first. Always plain English. */
   summary: string;
@@ -78,6 +90,18 @@ export interface TrustExplanation {
   whats_unclear: string[];
   /** A short suggested chat-prompt the reader can ask the AI analyst. */
   suggested_prompt: string;
+  /** Reader-first brief fields used by story and briefing surfaces. */
+  reader_summary: string;
+  why_it_matters: string[];
+  confirmed_points: TrustBriefPoint[];
+  disputed_or_uncertain_points: TrustBriefPoint[];
+  watch_next_points: TrustBriefPoint[];
+  source_note: string;
+  source_confidence: {
+    label: string;
+    detail: string;
+    level: 'high' | 'medium' | 'low' | 'contested';
+  };
 }
 
 /** Phrases that absolutely must not appear in user-facing trust copy. */
@@ -121,6 +145,7 @@ export function buildTrustExplanation(
   // through this surface — better to drop a bullet than mislead readers.
   const safeSummary = stripIfForbidden(summary) ?? FALLBACK_SUMMARY;
   const safeWhy = why.map(stripIfForbidden).filter(isString);
+  const readerBrief = buildReaderBrief(input, safeSummary, contraTypes);
 
   return {
     summary: safeSummary,
@@ -132,6 +157,13 @@ export function buildTrustExplanation(
     whats_disputed: disputed.slice(0, 3),
     whats_unclear: unclear.slice(0, 3),
     suggested_prompt: prompt,
+    reader_summary: readerBrief.summary,
+    why_it_matters: readerBrief.whyItMatters.slice(0, 3),
+    confirmed_points: readerBrief.confirmed.slice(0, 4),
+    disputed_or_uncertain_points: readerBrief.disputedOrUncertain.slice(0, 4),
+    watch_next_points: readerBrief.watchNext.slice(0, 4),
+    source_note: readerBrief.sourceNote,
+    source_confidence: readerBrief.sourceConfidence,
   };
 }
 
@@ -508,4 +540,217 @@ function buildSuggestedPrompt(
  */
 export function isPlainTrustSafe(s: string): boolean {
   return !FORBIDDEN_TRUST_PHRASES.some((rx) => rx.test(s));
+}
+
+function buildReaderBrief(
+  input: TrustExplanationInput,
+  safeSummary: string,
+  contraTypes: string[],
+): {
+  summary: string;
+  whyItMatters: string[];
+  confirmed: TrustBriefPoint[];
+  disputedOrUncertain: TrustBriefPoint[];
+  watchNext: TrustBriefPoint[];
+  sourceNote: string;
+  sourceConfidence: {
+    label: string;
+    detail: string;
+    level: 'high' | 'medium' | 'low' | 'contested';
+  };
+} {
+  const whyItMatters = buildWhyItMatters(input);
+  const confirmed = buildConfirmedPoints(input);
+  const disputedOrUncertain = buildDisputedOrUncertainPoints(input, contraTypes);
+  const watchNext = buildWatchNextPoints(input, contraTypes);
+  const sourceNote = buildSourceNote(input);
+
+  const sourceConfidence =
+    input.report.band === 'high'
+      ? {
+          label: 'High source consistency',
+          detail: 'Multiple independent reports align on the core event.',
+          level: 'high' as const,
+        }
+      : input.report.band === 'medium'
+        ? {
+            label: 'Developing source consistency',
+            detail: 'Some corroboration exists, but key details can still move.',
+            level: 'medium' as const,
+          }
+        : input.report.band === 'contested'
+          ? {
+              label: 'Disputed reporting',
+              detail: 'Sources disagree on important details. Check both sides below.',
+              level: 'contested' as const,
+            }
+          : {
+              label: 'Limited source consistency',
+              detail: 'Coverage is thin or mostly single-source right now.',
+              level: 'low' as const,
+            };
+
+  return {
+    summary: safeSummary,
+    whyItMatters,
+    confirmed,
+    disputedOrUncertain,
+    watchNext,
+    sourceNote,
+    sourceConfidence,
+  };
+}
+
+function buildWhyItMatters(input: TrustExplanationInput): string[] {
+  const out: string[] = [];
+  if (input.contradictions_count > 0) {
+    out.push(
+      'Important decisions can change when key details are disputed across sources.',
+    );
+  } else if (input.report.band === 'high') {
+    out.push('Independent coverage is aligned, so this story is less likely to swing suddenly.');
+  } else {
+    out.push('Coverage is still developing, so confidence can change quickly as new evidence arrives.');
+  }
+
+  if (input.syndicated) {
+    out.push('A high outlet count can be misleading when many sites republish one original article.');
+  }
+
+  if (input.physical_evidence?.status === 'none_detected') {
+    out.push('No matching sensor record has been found yet, which leaves an evidence gap.');
+  } else if (input.physical_evidence?.status === 'partial') {
+    out.push('Sensor data supports part of the story, but not the full picture yet.');
+  }
+
+  if (out.length === 0) {
+    out.push('This story is tracked because its reporting consistency and evidence depth are changing.');
+  }
+  return out.map((line) => safeOrNull(line)).filter(isString);
+}
+
+function buildConfirmedPoints(input: TrustExplanationInput): TrustBriefPoint[] {
+  const out: TrustBriefPoint[] = [];
+  if (input.source_count >= 2 && !input.syndicated && input.contradictions_count === 0) {
+    out.push({
+      text: `${input.source_count} sources report the same core event description.`,
+      state: 'multi_source',
+    });
+  }
+  if (input.physical_evidence?.status === 'confirmed') {
+    out.push({
+      text: 'Public sensor networks recorded a matching event.',
+      state: 'confirmed',
+    });
+  } else if (input.physical_evidence?.status === 'partial') {
+    out.push({
+      text: 'Sensor data partially matches the reporting.',
+      state: 'confirmed',
+    });
+  }
+  if (out.length === 0 && input.source_count === 1 && input.contradictions_count === 0) {
+    out.push({
+      text: 'At least one source is currently reporting this event.',
+      state: 'single_source',
+    });
+  }
+  return out.map((row) => ({ ...row, text: safeOrNull(row.text) ?? row.text }));
+}
+
+function buildDisputedOrUncertainPoints(
+  input: TrustExplanationInput,
+  contraTypes: string[],
+): TrustBriefPoint[] {
+  const out: TrustBriefPoint[] = [];
+  if (input.contradictions_count > 0) {
+    const kinds = [...new Set(contraTypes.map(shortConflictKind))].filter(Boolean);
+    out.push({
+      text:
+        kinds.length > 0
+          ? `Sources disagree on ${kinds.join(', ')}.`
+          : 'Sources disagree on a material detail.',
+      state: 'disputed',
+    });
+  }
+  if (input.source_count <= 1) {
+    out.push({
+      text: 'The story is still single-source, so specifics may change.',
+      state: 'single_source',
+    });
+  }
+  if (input.syndicated) {
+    out.push({
+      text: 'Many outlets appear to carry the same original article, so independent confirmation is limited.',
+      state: 'missing_evidence',
+    });
+  }
+  if (input.physical_evidence?.status === 'none_detected') {
+    out.push({
+      text: 'No matching public sensor signal has been detected in this window.',
+      state: 'missing_evidence',
+    });
+  }
+  if (out.length === 0) {
+    out.push({
+      text: 'Some details remain uncertain while corroboration is still developing.',
+      state: 'missing_evidence',
+    });
+  }
+  return out.map((row) => ({ ...row, text: safeOrNull(row.text) ?? row.text }));
+}
+
+function buildWatchNextPoints(
+  input: TrustExplanationInput,
+  contraTypes: string[],
+): TrustBriefPoint[] {
+  const out: TrustBriefPoint[] = [];
+  if (contraTypes.includes('numeric_conflict')) {
+    out.push({
+      text: 'Watch for updated numbers from independent outlets and official updates.',
+      state: 'disputed',
+    });
+  }
+  if (contraTypes.includes('cause_conflict')) {
+    out.push({
+      text: 'Watch for direct evidence that clarifies cause or attribution.',
+      state: 'disputed',
+    });
+  }
+  if (input.syndicated) {
+    out.push({
+      text: 'Watch for original reporting from additional newsrooms beyond republished copies.',
+      state: 'missing_evidence',
+    });
+  } else if (input.source_count <= 2) {
+    out.push({
+      text: 'Watch for additional independent sources confirming the same details.',
+      state: input.source_count <= 1 ? 'single_source' : 'multi_source',
+    });
+  }
+  if (input.physical_evidence?.status !== 'confirmed') {
+    out.push({
+      text: 'Watch for new sensor or official evidence that narrows current gaps.',
+      state: 'missing_evidence',
+    });
+  }
+  if (out.length === 0) {
+    out.push({
+      text: 'Watch for any shift in source agreement as new reporting arrives.',
+      state: 'confirmed',
+    });
+  }
+  return out.map((row) => ({ ...row, text: safeOrNull(row.text) ?? row.text }));
+}
+
+function buildSourceNote(input: TrustExplanationInput): string {
+  const sourceShape = input.syndicated
+    ? `${input.source_count} sites are carrying this story, but many appear to republish the same original article.`
+    : `${input.source_count} sources are in this cluster, including ${input.credible_source_count} rated outlets.`;
+  const evidenceChecked =
+    input.physical_evidence?.status === 'confirmed'
+      ? 'Checked: outlet agreement, contradiction scan, and matching sensor evidence.'
+      : input.physical_evidence?.status === 'partial'
+        ? 'Checked: outlet agreement, contradiction scan, and partial sensor evidence.'
+        : 'Checked: outlet agreement, contradiction scan, and available sensor coverage.';
+  return `${sourceShape} ${evidenceChecked}`;
 }

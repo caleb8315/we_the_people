@@ -173,7 +173,18 @@ export function PersonalizedBriefingPanel() {
   );
 }
 
-type SectionKind = 'happened' | 'supported' | 'disputed' | 'changed' | 'watch' | 'evidence' | 'other';
+type SectionKind =
+  | 'summary'
+  | 'matters'
+  | 'confirmed'
+  | 'disputed'
+  | 'watch'
+  | 'source_note'
+  | 'changed'
+  | 'happened'
+  | 'supported'
+  | 'evidence'
+  | 'other';
 
 interface BriefingSection {
   heading: string | null;
@@ -209,6 +220,11 @@ function parseBriefingSections(text: string): BriefingSection[] {
 
 function classifyHeading(heading: string): SectionKind {
   const h = heading.toLowerCase();
+  if (/^summary$/.test(h)) return 'summary';
+  if (/why it matters/.test(h)) return 'matters';
+  if (/^confirmed$/.test(h)) return 'confirmed';
+  if (/disputed \/ uncertain|disputed\/uncertain|disputed or uncertain/.test(h)) return 'disputed';
+  if (/^source note$/.test(h)) return 'source_note';
   if (/widely supported|what is supported|what is widely/.test(h)) return 'supported';
   if (/disputed|unclear|conflict|disagree/.test(h)) return 'disputed';
   if (/what changed|changed in the last/.test(h)) return 'changed';
@@ -220,12 +236,20 @@ function classifyHeading(heading: string): SectionKind {
 
 function sectionToneClass(kind: SectionKind): string {
   switch (kind) {
+    case 'summary':
+      return 'border-ink-100 bg-paper';
+    case 'matters':
+      return 'border-amber-200 bg-amber-50/70';
+    case 'confirmed':
+      return 'border-emerald-200 bg-emerald-50/70';
     case 'supported':
       return 'border-emerald-200 bg-emerald-50/70';
     case 'disputed':
       return 'border-danger-200 bg-danger-50/70';
     case 'watch':
       return 'border-amber-200 bg-amber-50/70';
+    case 'source_note':
+      return 'border-ink-100 bg-canvas-50';
     case 'changed':
       return 'border-sky-200 bg-sky-50/70';
     case 'evidence':
@@ -239,12 +263,20 @@ function sectionToneClass(kind: SectionKind): string {
 
 function sectionLabelTone(kind: SectionKind): string {
   switch (kind) {
+    case 'summary':
+      return 'text-ink-600';
+    case 'matters':
+      return 'text-amber-700';
+    case 'confirmed':
+      return 'text-emerald-700';
     case 'supported':
       return 'text-emerald-700';
     case 'disputed':
       return 'text-danger-700';
     case 'watch':
       return 'text-amber-700';
+    case 'source_note':
+      return 'text-ink-500';
     case 'changed':
       return 'text-sky-700';
     case 'evidence':

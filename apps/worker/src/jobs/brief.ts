@@ -296,11 +296,21 @@ Hard rules:
   sources after the initial ingest — treat that as legitimate growth of coverage, not as a new event.
 
 Required structure (use these exact section headings, in order):
-1. **What happened** — neutral one-line description of each top development with the source count (3–5 items).
-2. **What is widely supported** — points where credible outlets agree.
-3. **What is disputed or unclear** — source disagreements, with both sides cited; never pick one.
-4. **What changed in the last ${kind === 'weekly' ? 'week' : '24 hours'}** — agreement shifts, new corroboration, new sensor data.
-5. **What to watch next** — concrete, neutral things a reader can check; no predictions, no calls to action.
+1. **Summary** — 3–4 bullets, each starting with the event in plain language.
+2. **Why it matters** — short bullets that explain impact/risk without hype.
+3. **Confirmed** — bullets for what is clearly supported right now.
+4. **Disputed / uncertain** — bullets for active disagreements or evidence gaps.
+5. **Watch next** — neutral, concrete checks for the next update window.
+6. **Source note** — one short paragraph explaining source independence and any republishing caveat.
+
+Evidence-state labels:
+- Prefix EACH bullet in Confirmed / Disputed / Watch next with one of:
+  - Confirmed
+  - Reported by multiple independent sources
+  - Reported by one source
+  - Disputed
+  - Missing evidence
+- If many outlets are republishing the same original article, say so explicitly in Source note.
 
 Hard length cap: 350 words total. Group by topic where it makes sense.
 
@@ -319,27 +329,71 @@ ${contradictionsBlock}
  * so users get real corroboration context even on LLM-skipped runs.
  */
 function renderDeterministic(kind: 'daily' | 'weekly', items: EnrichedSignal[]): string {
-  const lines = items.slice(0, 12).map((s) => {
-    const url = s.url ? ` — ${s.url}` : '';
-    const label = statusLabel(s.verification_status as VerificationStatus);
-    const sources = `${s.credible_source_count}/${s.source_count} credible sources`;
-    const domainsList = (s.distinct_domains ?? []).slice(0, 3);
-    const moreDomains = (s.distinct_domains ?? []).length > domainsList.length
-      ? `, +${(s.distinct_domains ?? []).length - domainsList.length} more`
-      : '';
-    const domains = domainsList.length > 0
-      ? `domains: ${domainsList.join(', ')}${moreDomains}`
-      : 'no domains';
-    const contraBadge =
-      s.contradictions.length > 0
-        ? ` ⚠ ${s.contradictions.length} source disagreement${s.contradictions.length === 1 ? '' : 's'}`
-        : '';
-    const freshBadge = s.last_enriched_at ? ' · freshly corroborated' : '';
-    return (
-      `- **[${s.topic}]** ${s.title} _(severity ${s.severity}, reliability: ${label}, ${sources}, ${domains}${contraBadge}${freshBadge})_${url}`
-    );
+  const _kind = kind;
+  const top = items.slice(0, 10);
+  const summaryLines = top.slice(0, 4).map((s) => {
+    const sourceWord = s.source_count === 1 ? 'source' : 'sources';
+    return `- [${String(s.topic ?? 'other')}] ${s.title} (${s.source_count} ${sourceWord})`;
   });
-  return `### ${kind === 'weekly' ? 'Weekly' : 'Daily'} — key signals\n\n${lines.join('\n')}`;
+  const whyLines = top.slice(0, 3).map((s) => {
+    const note =
+      s.severity >= 85
+        ? 'high-severity signal'
+        : s.contradictions.length > 0
+          ? 'source disagreement can change interpretation'
+          : 'developing corroboration may shift confidence';
+    return `- ${s.title.slice(0, 80)} — ${note}`;
+  });
+  const confirmedLines = top.slice(0, 4).map((s) => {
+    const state =
+      s.contradictions.length > 0
+        ? 'Disputed'
+        : s.source_count <= 1
+          ? 'Reported by one source'
+          : s.credible_source_count >= 2
+            ? 'Confirmed'
+            : 'Reported by multiple independent sources';
+    return `- ${state}: ${s.title.slice(0, 110)}`;
+  });
+  const disputedLines = top
+    .filter((s) => s.contradictions.length > 0 || s.source_count <= 1)
+    .slice(0, 4)
+    .map((s) => {
+      if (s.contradictions.length > 0) {
+        return `- Disputed: ${s.title.slice(0, 100)} (${s.contradictions.length} disagreement${s.contradictions.length === 1 ? '' : 's'})`;
+      }
+      return `- Missing evidence: ${s.title.slice(0, 100)} (single-source coverage)`;
+    });
+  const watchLines = top.slice(0, 4).map((s) => {
+    const prefix =
+      s.contradictions.length > 0
+        ? 'Disputed'
+        : s.source_count <= 1
+          ? 'Reported by one source'
+          : 'Reported by multiple independent sources';
+    return `- ${prefix}: monitor updates for ${s.title.slice(0, 80)}`;
+  });
+  const domains = [...new Set(top.flatMap((s) => (s.distinct_domains ?? []).slice(0, 2)))];
+  const sourceNote = `Cluster window includes ${top.length} top signals. Source counts reflect independent domains where possible; repeated republishing can inflate counts. Key domains: ${domains.slice(0, 8).join(', ') || 'none listed'}.`;
+  return [
+    `### Summary`,
+    summaryLines.join('\n') || '- No high-signal developments in this window.',
+    '',
+    `### Why it matters`,
+    whyLines.join('\n') || '- Corroboration and disagreement changes alter risk interpretation.',
+    '',
+    `### Confirmed`,
+    confirmedLines.join('\n') || '- Missing evidence: no confirmed points in this window.',
+    '',
+    `### Disputed / uncertain`,
+    disputedLines.join('\n') || '- Missing evidence: no major disputes flagged, but coverage is still evolving.',
+    '',
+    `### Watch next`,
+    watchLines.join('\n') || '- Reported by one source: watch for independent confirmation.',
+    '',
+    `### Source note`,
+    sourceNote,
+  ].join('\n');
 }
 
 function deriveHeadline(items: EnrichedSignal[]): string {

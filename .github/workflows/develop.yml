@@ -6,26 +6,32 @@ name: Develop signals
 # web app's /api/signal/:id/develop endpoint, so Firecrawl / Brave /
 # Bluesky creds stay on the web side only.
 #
-# Cadence: every 30 minutes at :07 / :37 (offset from ingest's */15).
-# Per run: up to 8 stale signals by default, spaced 6s apart.
+# Cadence: every 15 minutes at :11 / :26 / :41 / :56 (offset from ingest's
+# */15 cadence) so low-source signals get enriched quickly without waiting on
+# a manual "find more sources" click.
+# Per run: up to 12 stale signals by default, spaced 6s apart.
 # This is the "automatic enrichment" path — see the note in
 # apps/worker/src/jobs/develop.ts for why we don't enrich every signal
 # at ingest time.
 #
-# 30 minutes was chosen so that a developing single-source story has a
-# realistic shot at being corroborated within an hour of first
-# surfacing. The endpoint is rate-limited per-signal (cooldown) so
-# bumping the schedule does not cause repeat work for fresh enrichments.
+# 15-minute cadence is used so developing single-source stories are
+# re-checked quickly. The endpoint is still rate-limited per-signal
+# (cooldown), so this schedule does not repeatedly hit freshly-enriched
+# signals.
 
 on:
   schedule:
-    - cron: '7,37 * * * *'
+    - cron: '11,26,41,56 * * * *'
   workflow_dispatch:
     inputs:
       max:
         description: 'Max signals to enrich this run'
         required: false
-        default: '6'
+        default: '12'
+      thin:
+        description: 'Prioritize signals with source_count <= this value'
+        required: false
+        default: '2'
       dry_run:
         description: 'If "true", list candidates without calling the endpoint'
         required: false
@@ -58,8 +64,9 @@ jobs:
       - run: npm ci
       - name: Run develop
         run: |
-          max="${{ github.event.inputs.max || '8' }}"
+          max="${{ github.event.inputs.max || '12' }}"
+          thin="${{ github.event.inputs.thin || '2' }}"
           dry="${{ github.event.inputs.dry_run || 'false' }}"
-          args="--max=$max"
+          args="--max=$max --thin=$thin"
           if [ "$dry" = "true" ]; then args="$args --dry-run"; fi
           npm run develop -- $args

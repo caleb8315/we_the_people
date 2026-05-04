@@ -300,4 +300,38 @@ describe('buildTrustExplanation', () => {
     assert.match(exp.suggested_prompt, /Earthquake in coastal city/);
     assert.ok(isPlainTrustSafe(exp.suggested_prompt), 'suggested prompt must be safe');
   });
+
+  it('builds reader-first brief sections with explicit evidence states', () => {
+    const exp = buildTrustExplanation({
+      report: contestedReport(),
+      source_count: 3,
+      credible_source_count: 2,
+      contradictions_count: 1,
+      contradiction_types: ['cause_conflict'],
+      syndicated: true,
+      title: 'Port explosion investigation',
+    });
+    assert.ok(exp.reader_summary.length > 0, 'reader summary should be present');
+    assert.ok(exp.why_it_matters.length >= 1, 'why-it-matters should have at least one point');
+    assert.ok(exp.confirmed_points.length >= 1, 'confirmed points should have at least one point');
+    assert.ok(
+      exp.disputed_or_uncertain_points.some((p) => p.state === 'disputed'),
+      'disputed/uncertain points should include a disputed state when contradictions exist',
+    );
+    assert.ok(exp.watch_next_points.length >= 1, 'watch-next points should have at least one point');
+    assert.ok(exp.source_note.length > 0, 'source note should be present');
+    assert.ok(exp.source_confidence.label.length > 0, 'source confidence label should be present');
+    assert.equal(exp.source_confidence.level, 'contested');
+    const allLines = [
+      exp.reader_summary,
+      ...exp.why_it_matters,
+      ...exp.confirmed_points.map((p) => p.text),
+      ...exp.disputed_or_uncertain_points.map((p) => p.text),
+      ...exp.watch_next_points.map((p) => p.text),
+      exp.source_note,
+    ];
+    for (const line of allLines) {
+      assert.ok(isPlainTrustSafe(line), `reader brief line must be safe: ${line}`);
+    }
+  });
 });

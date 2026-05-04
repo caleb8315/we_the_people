@@ -22,6 +22,7 @@ import { runMaintenance } from './jobs/maintenance';
  *   tsx src/index.ts develop                  # enrich stale developing signals
  *   tsx src/index.ts develop --dry-run        # list candidates, no writes
  *   tsx src/index.ts develop --max=12         # override max signals per run
+ *   tsx src/index.ts develop --thin=2         # prioritise low-source signals first
  *   tsx src/index.ts maintenance              # prune retention-managed rows
  */
 const args = process.argv.slice(2);
@@ -61,12 +62,14 @@ async function main() {
       const maxArg = args.find((a) => a.startsWith('--max='));
       const cooldownArg = args.find((a) => a.startsWith('--cooldown='));
       const windowArg = args.find((a) => a.startsWith('--window='));
+      const thinArg = args.find((a) => a.startsWith('--thin='));
       await runDevelop({
         max: maxArg ? Number(maxArg.slice('--max='.length)) : undefined,
         cooldownMinutes: cooldownArg
           ? Number(cooldownArg.slice('--cooldown='.length))
           : undefined,
         windowHours: windowArg ? Number(windowArg.slice('--window='.length)) : undefined,
+        thinSourceThreshold: thinArg ? Number(thinArg.slice('--thin='.length)) : undefined,
         dryRun,
       });
       return;
@@ -84,7 +87,7 @@ async function main() {
     }
     default:
       console.error(
-        `unknown command: ${cmd}. use: ingest [--fast] | brief [weekly] | alert | notifications (or email alias) | backfill [hours] [--dry-run] [--limit=N] | develop [--dry-run] [--max=N] [--cooldown=MIN] [--window=HRS] | maintenance [--dry-run] [--usage-days=N] [--signal-hours=N]`,
+        `unknown command: ${cmd}. use: ingest [--fast] | brief [weekly] | alert | notifications (or email alias) | backfill [hours] [--dry-run] [--limit=N] | develop [--dry-run] [--max=N] [--cooldown=MIN] [--window=HRS] [--thin=N] | maintenance [--dry-run] [--usage-days=N] [--signal-hours=N]`,
       );
       process.exit(2);
   }
