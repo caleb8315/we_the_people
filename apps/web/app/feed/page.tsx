@@ -7,6 +7,7 @@ import { ChipRow } from '@/components/ui/chip-row';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SignalsMap } from '@/components/signals-map';
 import { FeedFreshness } from '@/components/feed-freshness';
+import { FeedAutoCorroboration } from '@/components/feed-auto-corroboration';
 import { logProductEvent } from '@/lib/product-events';
 import { applyMutes, decorateSignals, type SignalRowRaw } from '@/lib/signals';
 import { signalGeoPoints, type SignalGeoPoint } from '@/lib/signal-geo';
@@ -156,6 +157,18 @@ export default async function FeedPage({
     corroboration === 'multi_plus'
       ? mutedApplied.filter((s) => Number(s.source_count ?? 0) <= 1).length
       : 0;
+  const autoCorroborateSignalIds =
+    isGlobalFeed && corroboration === 'multi_plus'
+      ? mutedApplied
+          .filter((s) => Number(s.source_count ?? 0) <= 1)
+          .sort((a, b) => {
+            const sev = Number(b.severity ?? 0) - Number(a.severity ?? 0);
+            if (sev !== 0) return sev;
+            return Date.parse(b.first_seen_at ?? '') - Date.parse(a.first_seen_at ?? '');
+          })
+          .slice(0, 3)
+          .map((s) => s.id)
+      : [];
   const geoPoints: SignalGeoPoint[] = signals.flatMap((s) => signalGeoPoints(s));
   const singleSourceCount =
     corroboration === 'all'
@@ -443,6 +456,11 @@ export default async function FeedPage({
             Switch to "All coverage" to include them.
           </p>
         )}
+        {isGlobalFeed && corroboration === 'multi_plus' && (
+          <FeedAutoCorroboration
+            signalIds={autoCorroborateSignalIds}
+          />
+        )}
       </section>
 
       {error && <p className="text-sm text-danger-600">Error: {error.message}</p>}
@@ -504,10 +522,10 @@ function parseView(view: string | undefined): FeedView | null {
 }
 
 function parseCorroboration(value: string | undefined): CorroborationFilter {
-  if (!value) return 'all';
+  if (!value) return 'multi_plus';
   return CORROBORATION_FILTERS.includes(value as CorroborationFilter)
     ? (value as CorroborationFilter)
-    : 'all';
+    : 'multi_plus';
 }
 
 function SaveViewButton({
