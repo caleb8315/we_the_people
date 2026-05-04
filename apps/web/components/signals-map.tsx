@@ -1,7 +1,5 @@
 'use client';
 
- 'use client';
-
 import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
 import type { MapSourceClass, SignalGeoPoint } from '@/lib/signal-geo';
@@ -30,11 +28,13 @@ const SignalsMapClient = dynamic(
 
 export function SignalsMap({
   points,
+  pressurePoints = [],
   context,
   mapHeightClass = 'h-[52vh] min-h-[360px]',
   emptyMessage,
 }: {
   points: SignalGeoPoint[];
+  pressurePoints?: SignalGeoPoint[];
   context: 'feed' | 'intel';
   mapHeightClass?: string;
   emptyMessage?: string;
@@ -42,24 +42,59 @@ export function SignalsMap({
   const [verificationFilter, setVerificationFilter] = useState<'all' | 'verified' | 'developing' | 'unverified'>('all');
   const [precisionFilter, setPrecisionFilter] = useState<'all' | 'exact' | 'approximate'>('all');
   const [sourceFilter, setSourceFilter] = useState<'all' | MapSourceClass>('all');
+  const [layerFilter, setLayerFilter] = useState<'corroborated' | 'pressure' | 'both'>('both');
 
-  const filtered = useMemo(
-    () =>
-      points.filter((p) => {
+  const hasPressure = pressurePoints.length > 0;
+
+  const filteredCorroboratedPoints = useMemo(
+    () => {
+      const base = points.filter((p) => Number(p.source_count ?? 0) >= 2);
+      return base.filter((p) => {
         if (verificationFilter !== 'all' && p.verification_status !== verificationFilter) return false;
         if (precisionFilter === 'exact' && p.isApproximate) return false;
         if (precisionFilter === 'approximate' && !p.isApproximate) return false;
         if (sourceFilter !== 'all' && p.source_class !== sourceFilter) return false;
         return true;
-      }),
+      });
+    },
     [points, precisionFilter, sourceFilter, verificationFilter],
   );
+  const filteredPressurePoints = useMemo(
+    () => {
+      if (!hasPressure) return [] as SignalGeoPoint[];
+      return pressurePoints.filter((p) => {
+        if (verificationFilter !== 'all' && p.verification_status !== verificationFilter) return false;
+        if (precisionFilter === 'exact' && p.isApproximate) return false;
+        if (precisionFilter === 'approximate' && !p.isApproximate) return false;
+        if (sourceFilter !== 'all' && p.source_class !== sourceFilter) return false;
+        return true;
+      });
+    },
+    [hasPressure, pressurePoints, precisionFilter, sourceFilter, verificationFilter],
+  );
+
+  const mapPrimaryPoints =
+    layerFilter === 'corroborated'
+      ? filteredCorroboratedPoints
+      : layerFilter === 'pressure'
+        ? []
+        : filteredCorroboratedPoints;
+  const mapPressurePoints =
+    layerFilter === 'corroborated'
+      ? []
+      : layerFilter === 'pressure'
+        ? filteredPressurePoints
+        : filteredPressurePoints;
+  const filtered = [...mapPrimaryPoints, ...mapPressurePoints];
 
   const filteredExact = filtered.filter((p) => !p.isApproximate).length;
   const filteredApprox = filtered.length - filteredExact;
-  const filteredCorroborated = filtered.filter((p) => p.verification_status === 'verified').length;
+  const filteredVerifiedCount = mapPrimaryPoints.filter((p) => p.verification_status === 'verified').length;
+  const filteredPressureCount = mapPressurePoints.length;
+  const corroboratedTotal = points.filter((p) => Number(p.source_count ?? 0) >= 2).length;
+  const hiddenSingleSourceTotal = pressurePoints.length;
 
-  if (points.length === 0) {
+  if (points.length === 0 && pressurePoints.length === 0) {
     return (
       <div className="rounded-card border border-ink-100 bg-paper p-5 text-sm text-ink-500">
         {emptyMessage ?? 'No map points available for this filter set yet.'}
@@ -71,14 +106,32 @@ export function SignalsMap({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 text-xs text-ink-600">
         <span className="rounded-full border border-ink-100 px-2 py-1">
-          {filtered.length} shown · {points.length} total
+          {filtered.length} shown · {corroboratedTotal + hiddenSingleSourceTotal} total
         </span>
         <span className="rounded-full border border-ink-100 px-2 py-1">{filteredExact} exact</span>
         <span className="rounded-full border border-ink-100 px-2 py-1">{filteredApprox} approximate</span>
-        <span className="rounded-full border border-ink-100 px-2 py-1">{filteredCorroborated} corroborated</span>
+        <span className="rounded-full border border-ink-100 px-2 py-1">
+          {filteredVerifiedCount} corroborated
+        </span>
+        {hasPressure && (
+          <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-1 text-violet-700">
+            {filteredPressureCount} pressure hotspot
+            {filteredPressureCount === 1 ? '' : 's'}
+          </span>
+        )}
       </div>
 
-      <div className="grid gap-2 rounded-card border border-ink-100 bg-paper p-2.5 text-xs sm:grid-cols-3 sm:gap-3 sm:p-3">
+      <div className="grid gap-2 rounded-card border border-ink-100 bg-paper p-2.5 text-xs sm:grid-cols-4 sm:gap-3 sm:p-3">
+        <FilterGroup
+          label="Layer"
+          value={layerFilter}
+          onChange={(value) => setLayerFilter(value as 'corroborated' | 'pressure' | 'both')}
+          options={[
+            { value: 'both', label: 'Corroborated + Pressure' },
+            { value: 'corroborated', label: 'Corroborated only' },
+            { value: 'pressure', label: 'Pressure hotspots' },
+          ]}
+        />
         <FilterGroup
           label="Verification"
           value={verificationFilter}
@@ -115,12 +168,23 @@ export function SignalsMap({
           ]}
         />
       </div>
+      {hasPressure && (
+        <p className="rounded-card border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-700">
+          Pressure hotspots mark hidden single-source stories waiting for corroboration. Auto-search runs in
+          the background to upgrade these first.
+        </p>
+      )}
       <div className={`overflow-hidden rounded-card border border-ink-100 bg-black/20 ${mapHeightClass}`}>
-        <SignalsMapClient points={filtered} allPointsCount={points.length} context={context} />
+        <SignalsMapClient
+          points={mapPrimaryPoints}
+          pressurePoints={mapPressurePoints}
+          allPointsCount={corroboratedTotal + hiddenSingleSourceTotal}
+          context={context}
+        />
       </div>
       {filtered.length === 0 && (
         <div className="rounded-card border border-ink-100 bg-paper p-3 text-xs text-ink-500">
-          No points match current filters. Broaden verification, precision, or source class filters.
+          No points match current filters. Broaden layer, verification, precision, or source class filters.
         </div>
       )}
     </div>

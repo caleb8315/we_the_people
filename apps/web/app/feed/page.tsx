@@ -10,7 +10,7 @@ import { FeedFreshness } from '@/components/feed-freshness';
 import { FeedAutoCorroboration } from '@/components/feed-auto-corroboration';
 import { logProductEvent } from '@/lib/product-events';
 import { applyMutes, decorateSignals, type SignalRowRaw } from '@/lib/signals';
-import { signalGeoPoints, type SignalGeoPoint } from '@/lib/signal-geo';
+import { signalGeoPoints, type SignalGeoPoint, type SignalGeoPressurePoint } from '@/lib/signal-geo';
 import { groupSignalsForFeed, rankGlobalFeedStories } from '@/lib/signal-feed';
 
 export const metadata = { title: 'Feed · Crosscheck' };
@@ -170,6 +170,17 @@ export default async function FeedPage({
           .map((s) => s.id)
       : [];
   const geoPoints: SignalGeoPoint[] = signals.flatMap((s) => signalGeoPoints(s));
+  const pressureGeoPoints: SignalGeoPressurePoint[] =
+    isGlobalFeed && corroboration === 'multi_plus'
+      ? mutedApplied
+          .filter((s) => Number(s.source_count ?? 0) <= 1)
+          .flatMap((s) => signalGeoPoints(s))
+          .map((p) => ({
+            ...p,
+            map_layer: 'pressure' as const,
+            pressure_reason: 'hidden_single_source' as const,
+          }))
+      : [];
   const singleSourceCount =
     corroboration === 'all'
       ? signals.filter((s) => Number(s.source_count ?? 0) <= 1).length
@@ -485,6 +496,7 @@ export default async function FeedPage({
         <div className="space-y-3">
           <SignalsMap
             points={geoPoints}
+            pressurePoints={pressureGeoPoints}
             context="feed"
             mapHeightClass="h-[42vh] min-h-[260px] sm:h-[52vh] sm:min-h-[360px]"
             emptyMessage="No mappable signals in this filter window yet."
