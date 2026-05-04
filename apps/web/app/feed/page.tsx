@@ -504,10 +504,10 @@ function parseView(view: string | undefined): FeedView | null {
 }
 
 function parseCorroboration(value: string | undefined): CorroborationFilter {
-  if (!value) return 'multi_plus';
+  if (!value) return 'all';
   return CORROBORATION_FILTERS.includes(value as CorroborationFilter)
     ? (value as CorroborationFilter)
-    : 'multi_plus';
+    : 'all';
 }
 
 function SaveViewButton({
