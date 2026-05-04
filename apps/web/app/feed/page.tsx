@@ -10,7 +10,7 @@ import { FeedFreshness } from '@/components/feed-freshness';
 import { logProductEvent } from '@/lib/product-events';
 import { applyMutes, decorateSignals, type SignalRowRaw } from '@/lib/signals';
 import { signalGeoPoints, type SignalGeoPoint } from '@/lib/signal-geo';
-import { groupSignalsForFeed } from '@/lib/signal-feed';
+import { groupSignalsForFeed, rankGlobalFeedStories } from '@/lib/signal-feed';
 
 export const metadata = { title: 'Feed · Crosscheck' };
 export const dynamic = 'force-dynamic';
@@ -94,6 +94,7 @@ export default async function FeedPage({
   const focusTopicsList: string[] = (prefs?.topics ?? []) as string[];
   const countriesList: string[] = (prefs?.countries_of_focus ?? []) as string[];
 
+  const isGlobalFeed = mode === 'global';
   let q = sb
     .from('signals')
     .select(
@@ -102,7 +103,7 @@ export default async function FeedPage({
     .gte('first_seen_at', since)
     .in('verification_status', ['verified', 'developing', 'unverified'])
     .order('severity', { ascending: false })
-    .limit(80);
+    .limit(isGlobalFeed ? 140 : 80);
   if (topic !== 'all') q = q.eq('topic', topic);
   if (minSeverity > 0) q = q.gte('severity', minSeverity);
 
@@ -141,10 +142,11 @@ export default async function FeedPage({
       ? mutedApplied.filter((s) => Number(s.source_count ?? 0) >= 2)
       : mutedApplied;
   const grouped = groupSignalsForFeed(filtered);
+  const rankedGroups = isGlobalFeed ? rankGlobalFeedStories(grouped) : grouped;
   const groupedCountById = new Map(grouped.map((g) => [g.primary.id, g.groupedCount]));
   const signals = (await decorateSignals(
     sb,
-    grouped.map((g) => g.primary),
+    rankedGroups.map((g) => g.primary),
   )).map((s) => ({
     ...s,
     related_updates_count: Math.max(0, (groupedCountById.get(s.id) ?? 1) - 1),

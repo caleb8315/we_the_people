@@ -26,7 +26,7 @@ const STOP_WORDS = new Set([
   'with',
 ]);
 
-interface GroupedSignalResult<T extends SignalRowRaw> {
+export interface GroupedSignalResult<T extends SignalRowRaw> {
   primary: T;
   groupedCount: number;
   groupedSignalIds: string[];
@@ -78,6 +78,20 @@ export function groupSignalsForFeed<T extends SignalRowRaw>(rows: T[]): GroupedS
   });
 }
 
+/**
+ * Ranks grouped signals for the global feed so the list behaves like
+ * a "head stories" surface: important, corroborated, fresh events first.
+ */
+export function rankGlobalFeedStories<T extends SignalRowRaw>(
+  groups: GroupedSignalResult<T>[],
+): GroupedSignalResult<T>[] {
+  return [...groups].sort((a, b) => {
+    const scoreDelta = globalHeadStoryScore(b) - globalHeadStoryScore(a);
+    if (scoreDelta !== 0) return scoreDelta;
+    return recencyScore(b.primary) - recencyScore(a.primary);
+  });
+}
+
 export function recencyScore(row: Pick<SignalRowRaw, 'occurred_at' | 'first_seen_at'>): number {
   const ts = Date.parse(row.occurred_at ?? row.first_seen_at);
   if (!Number.isFinite(ts)) return 0;
@@ -95,6 +109,51 @@ function pickPrimary<T extends SignalRowRaw>(cluster: T[]): T {
     if (bSources !== aSources) return bSources - aSources;
     return recencyScore(b) - recencyScore(a);
   })[0]!;
+}
+
+function globalHeadStoryScore<T extends SignalRowRaw>(group: GroupedSignalResult<T>): number {
+  const row = group.primary;
+  const severity = safeNum(row.severity);
+  const sourceCount = safeNum(row.source_count);
+  const credibleCount = safeNum(row.credible_source_count);
+  const distinctDomainCount = Array.isArray(row.distinct_domains) ? row.distinct_domains.length : 0;
+  const groupedCount = Math.max(1, safeNum(group.groupedCount));
+
+  const verificationBonus =
+    row.verification_status === 'verified'
+      ? 12
+      : row.verification_status === 'developing'
+        ? 6
+        : 0;
+
+  const hoursOld = ageHours(row);
+  const freshnessBonus =
+    hoursOld <= 12
+      ? 26
+      : hoursOld <= 24
+        ? 18
+        : hoursOld <= 48
+          ? 10
+          : hoursOld <= 72
+            ? 4
+            : 0;
+
+  const corroborationScore =
+    Math.min(30, sourceCount * 3) +
+    Math.min(18, credibleCount * 3) +
+    Math.min(12, distinctDomainCount * 2);
+
+  const coverageBreadthScore = Math.min(15, (groupedCount - 1) * 3);
+  const thinCoveragePenalty = sourceCount <= 1 ? 12 : 0;
+
+  return (
+    severity * 2.2 +
+    verificationBonus +
+    freshnessBonus +
+    corroborationScore +
+    coverageBreadthScore -
+    thinCoveragePenalty
+  );
 }
 
 function isComparable(a: SignalRowRaw, b: SignalRowRaw): boolean {
@@ -124,4 +183,10 @@ function tokenSimilarity(a: Set<string>, b: Set<string>): number {
 
 function safeNum(v: unknown): number {
   return Number.isFinite(Number(v)) ? Number(v) : 0;
+}
+
+function ageHours(row: Pick<SignalRowRaw, 'occurred_at' | 'first_seen_at'>): number {
+  const ts = recencyScore(row);
+  if (!ts) return Number.POSITIVE_INFINITY;
+  return Math.max(0, (Date.now() - ts) / 3_600_000);
 }
