@@ -16,12 +16,11 @@ on:
   workflow_dispatch:
 
 concurrency:
-  # We keep the same group as the main ingest so the two workflows don't
-  # race on the same `sources` rows. `cancel-in-progress: true` means a
-  # newer fast-lane run will preempt an older one, which is fine because
-  # adapters re-fetch from source on every run.
+  # Use the same group as main ingest so runs serialize against each other.
+  # This avoids race conditions on shared source/signal rows and prevents
+  # scheduled runs from canceling each other mid-flight.
   group: ingest
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   run:

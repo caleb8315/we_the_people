@@ -13,10 +13,9 @@ on:
 
 concurrency:
   group: ingest
-  # Newer ingests are more useful than older ones in flight; cancelling
-  # an old run shaves end-to-end latency without losing data because
-  # adapters re-fetch from source on the next run.
-  cancel-in-progress: true
+  # Queue instead of cancel so long-running runs don't get killed by the
+  # next schedule tick (which shows up as "operation was canceled").
+  cancel-in-progress: false
 
 jobs:
   run:
