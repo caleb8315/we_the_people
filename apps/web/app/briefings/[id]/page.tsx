@@ -84,7 +84,18 @@ export default async function BriefingPage({ params }: { params: { id: string } 
   );
 }
 
-type SectionKind = 'happened' | 'supported' | 'disputed' | 'changed' | 'watch' | 'evidence' | 'other';
+type SectionKind =
+  | 'summary'
+  | 'matters'
+  | 'confirmed'
+  | 'disputed'
+  | 'watch'
+  | 'source_note'
+  | 'changed'
+  | 'happened'
+  | 'supported'
+  | 'evidence'
+  | 'other';
 
 interface BriefingSection {
   heading: string | null;
@@ -95,12 +106,13 @@ interface BriefingSection {
 /**
  * Parse the LLM briefing markdown into structured sections.
  *
- * The worker prompt asks for these exact bold headings, in order:
- *   1. **What happened**
- *   2. **What is widely supported**
- *   3. **What is disputed or unclear**
- *   4. **What changed in the last <window>**
- *   5. **What to watch next**
+ * The worker prompt asks for these exact headings, in order:
+ *   1. **Summary**
+ *   2. **Why it matters**
+ *   3. **Confirmed**
+ *   4. **Disputed / uncertain**
+ *   5. **Watch next**
+ *   6. **Source note**
  *
  * The deterministic evidence list is appended below the LLM output as
  * `### <kind> — key signals`. We split on bold-headings and on `###`
@@ -149,6 +161,11 @@ function parseBriefingSections(text: string): BriefingSection[] {
 
 function classifyHeading(heading: string): SectionKind {
   const h = heading.toLowerCase();
+  if (/^summary$/.test(h)) return 'summary';
+  if (/why it matters/.test(h)) return 'matters';
+  if (/^confirmed$/.test(h)) return 'confirmed';
+  if (/disputed \/ uncertain|disputed\/uncertain|disputed or uncertain/.test(h)) return 'disputed';
+  if (/^source note$/.test(h)) return 'source_note';
   if (/widely supported|what is supported|what is widely/.test(h)) return 'supported';
   if (/disputed|unclear|conflict|disagree/.test(h)) return 'disputed';
   if (/what changed|changed in the last/.test(h)) return 'changed';
@@ -160,12 +177,20 @@ function classifyHeading(heading: string): SectionKind {
 
 function sectionToneClass(kind: SectionKind): string {
   switch (kind) {
+    case 'summary':
+      return 'border-ink-100 bg-paper';
+    case 'matters':
+      return 'border-amber-200 bg-amber-50/60';
+    case 'confirmed':
+      return 'border-emerald-200 bg-emerald-50/60';
     case 'supported':
       return 'border-emerald-200 bg-emerald-50/60';
     case 'disputed':
       return 'border-danger-200 bg-danger-50/60';
     case 'watch':
       return 'border-amber-200 bg-amber-50/60';
+    case 'source_note':
+      return 'border-ink-100 bg-canvas-50';
     case 'evidence':
       return 'border-ink-100 bg-canvas-50';
     case 'changed':
@@ -179,12 +204,20 @@ function sectionToneClass(kind: SectionKind): string {
 
 function sectionDotClass(kind: SectionKind): string {
   switch (kind) {
+    case 'summary':
+      return 'bg-ink-500';
+    case 'matters':
+      return 'bg-amber-500';
+    case 'confirmed':
+      return 'bg-emerald-500';
     case 'supported':
       return 'bg-emerald-500';
     case 'disputed':
       return 'bg-danger-500';
     case 'watch':
       return 'bg-amber-500';
+    case 'source_note':
+      return 'bg-ink-400';
     case 'evidence':
       return 'bg-ink-300';
     case 'changed':
