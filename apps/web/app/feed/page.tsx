@@ -177,6 +177,7 @@ export default async function FeedPage({
           .flatMap((s) => signalGeoPoints(s))
           .map((p) => ({
             ...p,
+            isPressurePoint: true as const,
             map_layer: 'pressure' as const,
             pressure_reason: 'hidden_single_source' as const,
           }))

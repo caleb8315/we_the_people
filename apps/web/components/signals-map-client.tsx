@@ -363,7 +363,7 @@ export function SignalsMapClient({
       for (const cluster of pressureClusters) {
         const sorted = [...cluster.points].sort((a, b) => {
           if (b.severity !== a.severity) return b.severity - a.severity;
-          return Date.parse(b.first_seen_at ?? '') - Date.parse(a.first_seen_at ?? '');
+          return Date.parse(b.occurred_at ?? '') - Date.parse(a.occurred_at ?? '');
         });
         const primary = sorted[0]!;
         const icon =
