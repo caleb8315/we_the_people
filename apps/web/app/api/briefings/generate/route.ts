@@ -7,6 +7,7 @@ import { getClientKey, limit } from '@/lib/rate-limit';
 import { consumeUserDailyLimit } from '@/lib/daily-limits';
 import { serverEnv } from '@/lib/env';
 import { logProductEvent } from '@/lib/product-events';
+import { BRIEFING_SYSTEM_PROMPT } from '@/lib/prompts/humanVoice';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -64,31 +65,22 @@ export async function POST(req: Request) {
     .slice(0, 12);
 
   const prompt = [
-    'You are the Crosscheck analyst writing a concise personal briefing that describes how public reporting and sensor evidence agree, conflict, and where evidence is missing.',
-    'Hard rules:',
-    '- Never tell the reader what is correct or what happened. Describe how credible public sources are reporting it.',
-    '- Prefer the words agreement, conflict, corroboration, confidence, evidence, and limitation.',
-    '- When sources disagree, surface both sides rather than picking one.',
-    '- Never accuse any person, group, or state of anything.',
-    '- When sensor networks have not detected supporting evidence, say so plainly — never phrase absence as a denial of the event.',
-    'Structure (use these exact section headings, in order):',
-    '1. **Summary** — short orientation first. No more than 2 bullets.',
-    '2. **Why it matters** — user-impact context in plain language. No hype.',
-    '3. **Confirmed** — use only points supported by multiple independent sources or matching sensor evidence.',
-    '4. **Disputed / uncertain** — list disagreements and evidence gaps without choosing a side.',
-    '5. **Watch next** — concrete neutral checks readers should watch for.',
-    '6. **Source note** — explain source count quality, republishing risk, and what evidence types were checked.',
-    'Label each bullet with one of: Confirmed, Multiple independent sources, One source, Disputed, Missing evidence.',
-    'Hard length cap: 350 words total.',
+    'Write a personalized morning briefing using the stories below.',
+    'Do not use bullets. Write in flowing prose with short paragraphs.',
+    'Lead with the biggest story, explain what is confirmed, what is still disputed, and why it matters.',
+    'End with one sentence that starts with "What to watch:"',
+    'Hard cap: 300 words.',
     '',
-    'Signals:',
+    'Stories in this user context:',
     ...filtered.map(
       (s, i) =>
-        `${i + 1}. [${s.topic}] ${s.title} | sev=${s.severity} conf=${s.confidence} reliability=${statusShortLabel(s.verification_status as VerificationStatus)} | ${s.url ?? '-'}`,
+        `${i + 1}. [${s.topic}] ${s.title} | reliability=${statusShortLabel(
+          s.verification_status as VerificationStatus,
+        )} | severity=${s.severity} | ${s.url ?? '-'}`,
     ),
   ].join('\n');
 
-  const text = await callBriefingModel(prompt);
+  const text = await callBriefingModel(BRIEFING_SYSTEM_PROMPT, prompt);
   await logProductEvent(sb, {
     userId: auth.user.id,
     eventName: 'briefing_generated',
@@ -101,14 +93,17 @@ export async function POST(req: Request) {
   return NextResponse.json({ briefing: text, signals_used: filtered.length, remaining_estimate: cap.limit - cap.used });
 }
 
-async function callBriefingModel(prompt: string): Promise<string> {
+async function callBriefingModel(systemPrompt: string, prompt: string): Promise<string> {
   const env = serverEnv();
   const result = await runAiCompletion({
     providers: [
       { provider: 'gemini', apiKey: env.GEMINI_API_KEY },
       { provider: 'groq', apiKey: env.GROQ_API_KEY },
     ],
-    messages: [{ role: 'user', content: prompt }],
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: prompt },
+    ],
     temperature: 0.35,
     maxTokens: 900,
   });

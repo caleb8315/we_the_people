@@ -38,6 +38,24 @@ import {
 
 const MAX_PREENRICH = 5;
 const PREENRICH_STALE_HOURS = 2;
+const BRIEFING_SYSTEM_PROMPT = `
+You are writing a morning intelligence briefing for someone who wants to
+understand what's actually happening in the world — cutting through the noise,
+propaganda, and spin.
+
+Write like a trusted journalist friend summarizing their morning read over coffee.
+Not a news ticker. Not a data report. A real explanation.
+
+STRUCTURE:
+- Open with the one thing that matters most today (1-2 sentences, direct)
+- Cover each major story: what happened, what's confirmed, what's being disputed
+  or spun, and why it matters to a regular person
+- End with what to watch — not as a bullet list of topics, but as a
+  "keep your eye on this because..." sentence
+
+TONE: Warm, smart, direct. Like a friend who happens to be an expert.
+Never robotic. Never start a section with a statistic.
+`.trim();
 
 export async function runBriefing(kind: 'daily' | 'weekly'): Promise<{ briefing_id: string | null }> {
   const runId = await startEngineRun('brief');
@@ -278,46 +296,16 @@ function buildPrompt(kind: 'daily' | 'weekly', items: EnrichedSignal[]): string 
           .join('\n');
 
   return `
-You are the Crosscheck analyst writing a ${kind} briefing. Crosscheck describes how public
-reporting and open sensor evidence agree, where they conflict, and where evidence is missing.
-It is not an OSINT investigation tool and not a news app.
+${BRIEFING_SYSTEM_PROMPT}
 
-Hard rules:
-- Never tell the reader what happened or what is correct. Describe how credible public sources
-  are reporting it, and cite them by outlet name when possible.
-- Prefer the words agreement, conflict, corroboration, confidence, evidence, and limitation.
-- Neutral tone. Never accuse. Prefer language like "reports indicate", "sources disagree",
-  "observed data suggests", "corroboration is developing", "no sensor confirmation detected".
-- Forbidden phrasing: "verified facts", "fact-checked", "debunked", "AI verified",
-  "this is true/false", "this is propaganda", "this side is lying", "confirmed motive"
-  (except when the underlying evidence record explicitly carries that wording).
-- When sources disagree, surface the disagreement (both sides + citations) rather than picking one.
-- When a signal shows "freshly corroborated", it means our live-search fan-out surfaced additional
-  sources after the initial ingest — treat that as legitimate growth of coverage, not as a new event.
+Write a ${kind} briefing from these stories.
+Use short paragraphs in flowing prose. Do not return section headings or bullet lists.
+Keep it under 300 words.
 
-Required structure (use these exact section headings, in order):
-1. **Summary** — 3–4 bullets, each starting with the event in plain language.
-2. **Why it matters** — short bullets that explain impact/risk without hype.
-3. **Confirmed** — bullets for what is clearly supported right now.
-4. **Disputed / uncertain** — bullets for active disagreements or evidence gaps.
-5. **Watch next** — neutral, concrete checks for the next update window.
-6. **Source note** — one short paragraph explaining source independence and any republishing caveat.
-
-Evidence-state labels:
-- Prefix EACH bullet in Confirmed / Disputed / Watch next with one of:
-  - Confirmed
-  - Reported by multiple independent sources
-  - Reported by one source
-  - Disputed
-  - Missing evidence
-- If many outlets are republishing the same original article, say so explicitly in Source note.
-
-Hard length cap: 350 words total. Group by topic where it makes sense.
-
-Signals (format: topic/reliability, with credible/total source count and top domains):
+Stories:
 ${list}
 
-Source disagreements flagged this window:
+Disagreements to account for:
 ${contradictionsBlock}
 `.trim();
 }

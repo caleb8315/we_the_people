@@ -31,7 +31,7 @@ export function NavBarClient({
     ...(signedIn ? [{ href: '/dashboard', label: 'Dashboard' }] : []),
   ];
 
-  const greeting = displayName ? `Hello, ${displayName}` : 'Hello there';
+  const greeting = signedIn && displayName ? `Hello, ${displayName}` : null;
 
   return (
     <header className="sticky top-0 z-40 border-b border-ink-100 bg-canvas/95 backdrop-blur">
@@ -45,9 +45,11 @@ export function NavBarClient({
             ✓
           </span>
           <span className="hidden flex-col leading-tight sm:flex">
-            <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-ink-400">
-              {greeting}
-            </span>
+            {greeting && (
+              <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-ink-400">
+                {greeting}
+              </span>
+            )}
             <span className="text-sm font-semibold text-ink">Crosscheck</span>
           </span>
         </Link>
@@ -55,7 +57,7 @@ export function NavBarClient({
         {/* Mobile: compact greeting stack */}
         <div className="flex min-w-0 flex-col leading-tight sm:hidden">
           <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-ink-400">
-            {greeting}
+            {greeting ?? 'Crosscheck'}
           </span>
           <span className="truncate text-[12px] font-semibold text-ink">Live coverage feed</span>
         </div>

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import ReactMarkdown from 'react-markdown';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { logProductEvent } from '@/lib/product-events';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +22,8 @@ export default async function BriefingPage({ params }: { params: { id: string } 
   }
 
   const sections = parseBriefingSections(String(data.body_markdown ?? ''));
+  const visibleSections = sections.filter((section) => section.kind !== 'evidence');
+  const rawSourceSections = sections.filter((section) => section.kind === 'evidence');
 
   return (
     <article className="prose-osint space-y-5 sm:space-y-6">
@@ -46,9 +49,9 @@ export default async function BriefingPage({ params }: { params: { id: string } 
         </p>
       </header>
 
-      {sections.length > 0 ? (
+      {visibleSections.length > 0 ? (
         <div className="space-y-3.5 sm:space-y-4">
-          {sections.map((section, i) => (
+          {visibleSections.map((section, i) => (
             <section
               key={i}
               className={`rounded-card border p-5 shadow-card ${sectionToneClass(section.kind)}`}
@@ -61,18 +64,34 @@ export default async function BriefingPage({ params }: { params: { id: string } 
                   </h2>
                 </header>
               )}
-              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-ink-700">
-                {section.body}
-              </pre>
+              <div className="prose prose-sm max-w-none text-ink-700">
+                <ReactMarkdown>{section.body}</ReactMarkdown>
+              </div>
             </section>
           ))}
         </div>
       ) : (
         <div className="rounded-card border border-ink-100 bg-paper p-5">
-          <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-ink-700">
-            {data.body_markdown}
-          </pre>
+          <div className="prose prose-sm max-w-none text-ink-700">
+            <ReactMarkdown>{String(data.body_markdown ?? '')}</ReactMarkdown>
+          </div>
         </div>
+      )}
+
+      {rawSourceSections.length > 0 && (
+        <details className="rounded-card border border-ink-100 bg-canvas-50 p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-ink-700">View raw sources</summary>
+          <div className="mt-3 space-y-3">
+            {rawSourceSections.map((section, i) => (
+              <section key={`raw-${i}`} className="rounded-xl border border-ink-100 bg-paper p-3">
+                {section.heading && <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-500">{section.heading}</h3>}
+                <div className="prose prose-sm mt-2 max-w-none text-ink-700">
+                  <ReactMarkdown>{section.body}</ReactMarkdown>
+                </div>
+              </section>
+            ))}
+          </div>
+        </details>
       )}
 
       <p className="text-xs text-ink-400">

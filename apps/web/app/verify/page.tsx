@@ -1,8 +1,13 @@
 import { VerifyClient } from './verify-client';
+import { getServerSupabase } from '@/lib/supabase-server';
 
 export const metadata = { title: 'Compare a claim · Crosscheck' };
 
-export default function VerifyPage() {
+export default async function VerifyPage() {
+  const sb = getServerSupabase();
+  const { data: auth } = await sb.auth.getUser();
+  const signedIn = Boolean(auth.user);
+
   return (
     <div className="space-y-6 sm:space-y-7">
       <header>
@@ -20,7 +25,7 @@ export default function VerifyPage() {
           score. Social posts cap at <strong className="text-ink-700">medium</strong> on their own.
         </p>
       </header>
-      <VerifyClient />
+      <VerifyClient signedIn={signedIn} />
     </div>
   );
 }
