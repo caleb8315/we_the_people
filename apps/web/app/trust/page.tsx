@@ -14,6 +14,16 @@ export default function TrustPage() {
         </p>
       </header>
 
+      <section className="mb-8 rounded-lg bg-gray-50 p-6">
+        <h2>Our promise</h2>
+        <p>
+          Crosscheck doesn&apos;t tell you what to think. We tell you what&apos;s confirmed, what&apos;s
+          contested, and where someone might be trying to manipulate the story. Then you decide.
+          Every score, label, and AI summary links back to the original sources — no black boxes,
+          no hidden verdicts.
+        </p>
+      </section>
+
       <section>
         <h2>Reliability labels</h2>
         <p className="text-ink-600">

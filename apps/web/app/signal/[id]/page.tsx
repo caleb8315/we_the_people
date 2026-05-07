@@ -24,6 +24,7 @@ import {
 } from '@/lib/contradictions-display';
 import { SignalFeedbackButtons } from '@/components/signal-feedback';
 import { DevelopStoryButton } from '@/components/develop-story';
+import { SignalShareButton } from '@/components/signal-share-button';
 import { prettyOutletName } from '@/lib/reader-report';
 
 export const revalidate = 30;
@@ -129,6 +130,7 @@ export default async function SignalPage({ params }: PageProps) {
     complex_signal: isComplexSignal,
     title: signal.title,
   });
+  const humanVerdict = trustExplanation.reader_summary || trustExplanation.summary || bottomLine;
   return (
     <article className="space-y-4 sm:space-y-5">
       {/* Reader-first header: what happened → what we think about it →
@@ -184,7 +186,6 @@ export default async function SignalPage({ params }: PageProps) {
           signalId={signal.id}
           band={report.band}
           bandTone={bandTone}
-          totalSourceCount={signal.source_count ?? 0}
           explanation={trustExplanation}
           bottomLine={bottomLine}
         />
@@ -210,7 +211,7 @@ export default async function SignalPage({ params }: PageProps) {
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <SignalFeedbackButtons signalId={signal.id} />
-          <ShareButton title={signal.title} signalId={signal.id} />
+          <SignalShareButton title={signal.title} verdict={humanVerdict} />
           <LearnMoreLinks title={signal.title} topic={signal.topic} />
         </div>
       </header>
@@ -627,18 +628,6 @@ function liveDiscoveryLabel(discoveredVia: string | null | undefined): string | 
   }
 }
 
-function ShareButton({ title, signalId }: { title: string; signalId: string }) {
-  const url = `/signal/${signalId}`;
-  return (
-    <a
-      href={url}
-      className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-ink-100 bg-paper px-3 py-1.5 text-xs text-ink-600 hover:border-ink-200 hover:text-ink"
-    >
-      Share this result
-    </a>
-  );
-}
-
 function extractDetectionMeta(
   raw: Record<string, unknown> | null,
 ): {
@@ -839,14 +828,12 @@ function TrustHero({
   signalId,
   band,
   bandTone,
-  totalSourceCount,
   explanation,
   bottomLine,
 }: {
   signalId: string;
   band: ConfidenceBand;
   bandTone: { wrap: string; label: string };
-  totalSourceCount: number;
   explanation: TrustExplanation;
   bottomLine: string;
 }) {
@@ -870,9 +857,6 @@ function TrustHero({
         <p className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${bandTone.label}`}>
           {bottomLineLabelForBand(band)}
         </p>
-        <span className="ml-auto text-[11px] text-ink-500">
-          {totalSourceCount} source{totalSourceCount === 1 ? '' : 's'}
-        </span>
       </div>
       <p className="mt-2.5 text-[15px] leading-relaxed text-ink sm:text-base">
         {explanation.reader_summary || explanation.summary || bottomLine}
@@ -918,6 +902,56 @@ function TrustHero({
           })}
         </ul>
       )}
+
+      <div className="mt-4 space-y-3">
+        <section className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2.5">
+          <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+            What you know for certain
+          </p>
+          <ul className="mt-1.5 space-y-1 text-[13px] text-ink-700">
+            {explanation.confirmed_points.slice(0, 3).map((item, i) => (
+              <li key={i} className="flex gap-1.5">
+                <span aria-hidden="true" className="mt-[6px] h-1 w-1 shrink-0 rounded-full bg-emerald-500" />
+                <span>{item.text}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+        {explanation.disputed_or_uncertain_points.length > 0 && (
+          <section className="rounded-xl border border-danger-200 bg-danger-50/60 px-3 py-2.5">
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-danger-700">
+              What&apos;s murky or disputed
+            </p>
+            <ul className="mt-1.5 space-y-1 text-[13px] text-ink-700">
+              {explanation.disputed_or_uncertain_points.slice(0, 3).map((item, i) => (
+                <li key={i} className="flex gap-1.5">
+                  <span aria-hidden="true" className="mt-[6px] h-1 w-1 shrink-0 rounded-full bg-danger-500" />
+                  <span>{item.text}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {explanation.headline_chips.length > 0 && (
+          <section className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2.5">
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-amber-700">
+              The spin / propaganda signal
+            </p>
+            <p className="mt-1 text-[13px] text-ink-700">
+              {explanation.headline_chips
+                .slice(0, 2)
+                .map((chip) => chip.hint ?? chip.label)
+                .join(' ')}
+            </p>
+          </section>
+        )}
+        <section className="rounded-xl border border-ink-100 bg-paper/70 px-3 py-2.5">
+          <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+            What to do
+          </p>
+          <p className="mt-1 text-[13px] text-ink-700">{bottomLine}</p>
+        </section>
+      </div>
 
       {/* Reader-first brief: top-loaded for scan speed on mobile. */}
       <div className="mt-4 grid gap-3 sm:grid-cols-2">

@@ -21,23 +21,11 @@ const TOPIC_TILES: Array<{ label: string; slug: string; tile: string; kicker: st
 
 export default async function LandingPage() {
   let signedIn = false;
-  let totalSignals = 0;
-  let totalSources = 0;
-  let totalBriefings = 0;
 
   try {
     const sb = getServerSupabase();
     const { data } = await sb.auth.getUser();
     signedIn = !!data.user;
-
-    const [signalCount, sourceCount, briefingCount] = await Promise.all([
-      sb.from('signals_public').select('id', { count: 'exact', head: true }),
-      sb.from('sources').select('id', { count: 'exact', head: true }).eq('enabled', true),
-      sb.from('briefings').select('id', { count: 'exact', head: true }),
-    ]);
-    totalSignals = signalCount.count ?? 0;
-    totalSources = sourceCount.count ?? 0;
-    totalBriefings = briefingCount.count ?? 0;
   } catch {
     // Anonymous fallback when env/auth isn't available.
   }
@@ -52,14 +40,12 @@ export default async function LandingPage() {
           Evidence comparison platform
         </p>
         <h1 className="mt-3 max-w-3xl text-[40px] font-semibold leading-[1.05] tracking-tight text-ink sm:text-[56px]">
-          Compare sources. <br className="hidden sm:block" />
-          <span className="text-ink-500">See where they agree, conflict, and shape the narrative.</span>
+          Is it propaganda? Is it real? Find out.
         </h1>
         <p className="mt-5 max-w-2xl text-base text-ink-500 sm:text-lg">
-          Crosscheck is not a truth detector. It is an evidence comparison platform that ranks
-          sources, classifies their disagreements, surfaces bias signals separately from the
-          verdict, and explains every score so you can decide what is supported, what is disputed,
-          and where bias may be shaping the story.
+          Crosscheck reads the news so you don&apos;t get played. Paste any headline, claim, or URL
+          and we&apos;ll tell you if it holds up, where it&apos;s being twisted, and what you can safely
+          share.
         </p>
 
         <form action="/feed" className="mt-6 flex max-w-xl items-center gap-3">
@@ -107,12 +93,6 @@ export default async function LandingPage() {
 
         <div className="mt-5 flex flex-wrap gap-3">
           <Link
-            href={signedIn ? '/dashboard' : '/login'}
-            className="rounded-full bg-ink-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-ink-700"
-          >
-            {signedIn ? 'Open dashboard' : 'Get your workspace'}
-          </Link>
-          <Link
             href="/verify"
             className="rounded-full border border-ink-100 bg-paper px-5 py-2.5 text-sm font-medium text-ink hover:border-ink-200"
           >
@@ -125,14 +105,6 @@ export default async function LandingPage() {
             Methodology
           </Link>
         </div>
-      </section>
-
-      {/* ── Live platform stats — immediate proof ── */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-        <LiveStat value={totalSignals} label="Signals tracked" icon={SignalIcon} />
-        <LiveStat value={totalSources} label="Active sources" icon={SourceIcon} />
-        <LiveStat value={totalBriefings} label="Briefings produced" icon={BriefingIcon} />
-        <LiveStat value={TOPIC_TILES.length} label="Topic domains" icon={TopicIcon} />
       </section>
 
       {/* ── How it works — step-by-step proof of the pipeline ── */}
@@ -333,30 +305,29 @@ export default async function LandingPage() {
         </ul>
       </section>
 
-      {/* ── Built for professionals — use-case proof ── */}
       <section>
         <div className="text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">
-            Built for professionals
+            Built for anyone who wants the truth
           </p>
           <h2 className="mt-2 text-xl font-semibold tracking-tight text-ink sm:text-2xl">
-            Designed for the people who need to get it right
+            Built for anyone who wants the truth
           </h2>
         </div>
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           <UseCaseCard
-            title="Newsrooms"
-            body="Verify breaking stories before publishing. See which outlets are reporting from primary sources and which are aggregating. Identify framing differences across wires in seconds."
+            title="That headline in your group chat"
+            body="Someone just shared something shocking. Before you react or repost, check it here. 30 seconds to know if it's real."
             icon={NewsroomIcon}
           />
           <UseCaseCard
-            title="Analysts & researchers"
-            body="Track signals across geopolitical, economic, and environmental domains. Get structured briefings that separate what changed from what is disputed — with source traces."
+            title="When the news feels like spin"
+            body="We flag when outlets are choosing words or angles that other sources don't use so you can see bias instead of absorbing it."
             icon={AnalystIcon}
           />
           <UseCaseCard
-            title="NGOs & humanitarian orgs"
-            body="Monitor disaster signals, conflict escalation, and humanitarian corridor changes. Prioritize response based on corroborated severity, not headline volume."
+            title="Breaking news you can't verify"
+            body="Early reports are often wrong or incomplete. We show which details are confirmed and which are still moving."
             icon={NgoIcon}
           />
         </div>
@@ -472,13 +443,11 @@ export default async function LandingPage() {
         <section className="grid gap-5 rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:grid-cols-[1.1fr_0.9fr] sm:p-6">
           <div className="space-y-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">
-              Private beta access
+              Get early access
             </p>
-            <h2 className="text-2xl font-semibold tracking-tight text-ink">Request an invite for user testing</h2>
+            <h2 className="text-2xl font-semibold tracking-tight text-ink">Get early access</h2>
             <p className="max-w-xl text-sm text-ink-500">
-              Crosscheck is opening carefully so we can validate source quality, briefing usefulness,
-              and onboarding friction with real users. Request access here and operators can review it
-              from the built-in ops queue.
+              Crosscheck is in private beta. Request access and we&apos;ll let you in.
             </p>
             <ul className="space-y-2 text-sm text-ink-600">
               <li>Approved testers can sign in with email/password immediately.</li>

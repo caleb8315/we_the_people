@@ -49,6 +49,8 @@ export interface SignalRow {
   tags?: string[] | null;
   confidence_report?: ConfidenceReport;
   trust_explanation?: TrustExplanation;
+  humanSummary?: string;
+  featured?: boolean;
   physical_evidence?: PhysicalEvidence | null;
   contradictions_inline?: ContradictionInline[];
   related_updates_count?: number;
@@ -94,7 +96,9 @@ export function SignalCard({ s }: { s: SignalRow }) {
   return (
     <Link
       href={`/signal/${s.id}`}
-      className="group block overflow-hidden rounded-card border border-ink-100 bg-paper shadow-card transition hover:shadow-card-hover focus-visible:border-amber-400"
+      className={`group block overflow-hidden rounded-card border border-ink-100 bg-paper shadow-card transition hover:shadow-card-hover focus-visible:border-amber-400 ${
+        s.severity >= 85 ? 'border-l-4 border-l-amber-400' : ''
+      } ${s.featured ? 'ring-1 ring-amber-200' : ''}`}
     >
       <div className="flex flex-col sm:flex-row">
         {/* Topic tile — acts as the "image" in the reference's Travel Package
@@ -116,9 +120,9 @@ export function SignalCard({ s }: { s: SignalRow }) {
           <h3 className="text-[18px] font-semibold leading-snug tracking-tight text-ink clamp-2 group-hover:text-ink-700 sm:text-[20px]">
             {s.title}
           </h3>
-          {s.summary && (
+          {(s.humanSummary || s.summary) && (
             <p className="mt-1.5 text-[14px] leading-relaxed text-ink-500 clamp-2 sm:text-[15px]">
-              {cleanCardSummary(s.summary)}
+              {s.humanSummary ?? cleanCardSummary(s.summary ?? '')}
             </p>
           )}
 

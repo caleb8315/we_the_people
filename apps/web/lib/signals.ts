@@ -57,6 +57,7 @@ export interface DecoratedSignal extends SignalRowRaw {
   has_satellite_confirmation: boolean;
   confidence_report: ConfidenceReport;
   trust_explanation: TrustExplanation;
+  humanSummary: string;
   community_feedback: CommunityFeedback;
 }
 
@@ -255,6 +256,7 @@ export async function decorateSignals(
       complex_signal: isComplex,
       title: s.title,
     });
+    const humanSummary = buildHumanSummary(trust_explanation);
     return {
       ...s,
       contradictions_count: count,
@@ -266,6 +268,7 @@ export async function decorateSignals(
       has_satellite_confirmation: readBoolFlag(s.raw_data ?? null, 'eonet_match'),
       confidence_report,
       trust_explanation,
+      humanSummary,
       community_feedback: feedbackBySignal.get(s.id) ?? { helpful: 0, unclear: 0, inaccurate: 0, total: 0 },
     };
   });
@@ -290,6 +293,14 @@ function detectSyndicationFromEvidence(evidence: EvidenceItem[]): boolean {
   if (max >= 3) return true;
   if (distinct > 0 && distinct * 3 < evidence.length) return true;
   return false;
+}
+
+function buildHumanSummary(explanation: TrustExplanation): string {
+  const verdict = explanation.reader_summary || explanation.summary || 'Coverage is still developing.';
+  const watch = explanation.watch_for ? ` ${explanation.watch_for}` : '';
+  const singleLine = `${verdict}${watch}`.replace(/\s+/g, ' ').trim();
+  if (singleLine.length <= 140) return singleLine;
+  return `${singleLine.slice(0, 137).trimEnd()}...`;
 }
 
 export interface PreferenceFilter {

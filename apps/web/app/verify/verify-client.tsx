@@ -64,7 +64,7 @@ interface VerifyResponse {
   };
 }
 
-export function VerifyClient() {
+export function VerifyClient({ signedIn }: { signedIn: boolean }) {
   const [kind, setKind] = useState<Kind>('url');
   const [url, setUrl] = useState('');
   const [text, setText] = useState('');
@@ -337,8 +337,47 @@ export function VerifyClient() {
         </div>
       </div>
 
+      <ExampleVerificationResult />
       {loading && <VerifyProgress />}
-      {result && <VerifyResult data={result} />}
+      {!signedIn && result && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-medium text-amber-800">Sign in to see the full analysis</p>
+          <p className="mt-1 text-sm text-amber-700">
+            We checked your claim against our sources. Sign in to see which outlets corroborate
+            it, where they conflict, and whether the framing is being twisted.
+          </p>
+          <a
+            href="/login?next=/verify"
+            className="mt-3 inline-block text-sm font-medium text-amber-900 underline"
+          >
+            Sign in to see results &#8594;
+          </a>
+        </div>
+      )}
+      {signedIn && result && <VerifyResult data={result} />}
+    </section>
+  );
+}
+
+function ExampleVerificationResult() {
+  return (
+    <section className="rounded-card border border-ink-100 bg-canvas-50 p-5 shadow-card sm:p-6">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-400">
+        Example result
+      </p>
+      <h2 className="mt-1 text-lg font-semibold leading-snug text-ink sm:text-xl">
+        Cruise ship hantavirus death reports
+      </h2>
+      <p className="mt-2 text-sm leading-relaxed text-ink-600">
+        This story is real, but details moved fast and early headlines overstated key facts.
+        Multiple outlets confirm a passenger died after a cruise, and health officials did open an
+        investigation. What changed is the cause label: some reports called it a confirmed
+        hantavirus case before lab confirmation was public.
+      </p>
+      <p className="mt-2 text-sm leading-relaxed text-ink-600">
+        Best takeaway: share that there is a confirmed death and investigation, but avoid posting
+        definitive cause language until official pathology results are released.
+      </p>
     </section>
   );
 }

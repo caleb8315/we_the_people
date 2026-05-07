@@ -5,12 +5,11 @@ import { SignalCard } from '@/components/signal-card';
 import { Segmented } from '@/components/ui/segmented';
 import { ChipRow } from '@/components/ui/chip-row';
 import { EmptyState } from '@/components/ui/empty-state';
-import { SignalsMap } from '@/components/signals-map';
 import { FeedFreshness } from '@/components/feed-freshness';
 import { FeedAutoCorroboration } from '@/components/feed-auto-corroboration';
+import { FeedOrientationBanner } from '@/components/feed-orientation-banner';
 import { logProductEvent } from '@/lib/product-events';
 import { applyMutes, decorateSignals, type SignalRowRaw } from '@/lib/signals';
-import { signalGeoPoints, type SignalGeoPoint, type SignalGeoPressurePoint } from '@/lib/signal-geo';
 import { groupSignalsForFeed, rankGlobalFeedStories } from '@/lib/signal-feed';
 
 export const metadata = { title: 'Feed · Crosscheck' };
@@ -18,7 +17,8 @@ export const dynamic = 'force-dynamic';
 
 const TOPICS = ['all', 'war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'tech', 'finance'] as const;
 const MODES = ['personalized', 'global'] as const;
-const VIEWS = ['list', 'map'] as const;
+// const VIEWS = ['list', 'map'] as const;
+const VIEWS = ['list'] as const;
 const CORROBORATION_FILTERS = ['all', 'multi_plus'] as const;
 type FeedMode = (typeof MODES)[number];
 type FeedView = (typeof VIEWS)[number];
@@ -152,6 +152,24 @@ export default async function FeedPage({
     ...s,
     related_updates_count: Math.max(0, (groupedCountById.get(s.id) ?? 1) - 1),
   }));
+  const featuredSignal =
+    signals
+      .filter((s) => (s.contradictions_count ?? 0) > 0)
+      .sort((a, b) => {
+        const sev = Number(b.severity ?? 0) - Number(a.severity ?? 0);
+        if (sev !== 0) return sev;
+        return Date.parse(b.first_seen_at ?? '') - Date.parse(a.first_seen_at ?? '');
+      })[0] ?? null;
+  const displaySignals = signals.map((s) => ({
+    ...s,
+    featured: featuredSignal ? s.id === featuredSignal.id : false,
+  }));
+  const featuredCard = featuredSignal
+    ? displaySignals.find((s) => s.id === featuredSignal.id) ?? null
+    : null;
+  const remainingSignals = featuredCard
+    ? displaySignals.filter((s) => s.id !== featuredCard.id)
+    : displaySignals;
   const mergedAwayCount = Math.max(0, filtered.length - signals.length);
   const hiddenSingleSourceCount =
     corroboration === 'multi_plus'
@@ -169,19 +187,6 @@ export default async function FeedPage({
           .slice(0, 3)
           .map((s) => s.id)
       : [];
-  const geoPoints: SignalGeoPoint[] = signals.flatMap((s) => signalGeoPoints(s));
-  const pressureGeoPoints: SignalGeoPressurePoint[] =
-    isGlobalFeed && corroboration === 'multi_plus'
-      ? mutedApplied
-          .filter((s) => Number(s.source_count ?? 0) <= 1)
-          .flatMap((s) => signalGeoPoints(s))
-          .map((p) => ({
-            ...p,
-            isPressurePoint: true as const,
-            map_layer: 'pressure' as const,
-            pressure_reason: 'hidden_single_source' as const,
-          }))
-      : [];
   const singleSourceCount =
     corroboration === 'all'
       ? signals.filter((s) => Number(s.source_count ?? 0) <= 1).length
@@ -198,7 +203,6 @@ export default async function FeedPage({
         hours,
         min_severity: minSeverity,
         is_mobile: isMobile,
-        map_points: geoPoints.length,
         personalized_result_count: signals.length,
       },
     });
@@ -219,13 +223,6 @@ export default async function FeedPage({
         .from('preferences')
         .update({ feed_view_preference: requestedView })
         .eq('user_id', userId);
-    }
-    if (view === 'map') {
-      void logProductEvent(sb, {
-        userId,
-        eventName: 'map_opened',
-        eventProps: { context: 'feed', topic, points: geoPoints.length, min_severity: minSeverity },
-      });
     }
     void logProductEvent(sb, {
       userId,
@@ -308,6 +305,8 @@ export default async function FeedPage({
         </form>
       </section>
 
+      <FeedOrientationBanner />
+
       {/* Topic browser row. */}
       <section>
         <div className="flex items-end justify-between gap-3">
@@ -370,7 +369,8 @@ export default async function FeedPage({
               active={view}
               options={[
                 { label: 'List', value: 'list', href: qp(mode, topic, 'list') },
-                { label: `Map (${geoPoints.length})`, value: 'map', href: qp(mode, topic, 'map') },
+                // Map view disabled until geo-coordinates are populated.
+                // { label: `Map (${geoPoints.length})`, value: 'map', href: qp(mode, topic, 'map') },
               ]}
             />
             <Link
@@ -478,7 +478,7 @@ export default async function FeedPage({
 
       {error && <p className="text-sm text-danger-600">Error: {error.message}</p>}
 
-      {signals.length === 0 ? (
+      {displaySignals.length === 0 ? (
         <EmptyState
           icon="∅"
           title="No signals in this window."
@@ -493,28 +493,30 @@ export default async function FeedPage({
               : undefined
           }
         />
-      ) : view === 'map' ? (
-        <div className="space-y-3">
-          <SignalsMap
-            points={geoPoints}
-            pressurePoints={pressureGeoPoints}
-            context="feed"
-            mapHeightClass="h-[42vh] min-h-[260px] sm:h-[52vh] sm:min-h-[360px]"
-            emptyMessage="No mappable signals in this filter window yet."
-          />
-          <div className="rounded-card border border-ink-100 bg-paper p-3 text-xs text-ink-500 shadow-card">
-            Tip: markers without exact coordinates are placed at country centroids and labeled as
-            approximate.
-          </div>
-        </div>
       ) : (
-        <ul className="space-y-4">
-          {signals.map((s) => (
-            <li key={s.id}>
-              <SignalCard s={s} />
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-4">
+          {featuredCard && (
+            <section className="rounded-card border border-amber-200 bg-amber-50/50 p-3 sm:p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">
+                Featured
+              </p>
+              <p className="mt-1 text-sm text-amber-800">
+                This story is leading the feed because sources are actively contradicting each
+                other on key details.
+              </p>
+              <div className="mt-3">
+                <SignalCard s={featuredCard} />
+              </div>
+            </section>
+          )}
+          <ul className="space-y-4">
+            {remainingSignals.map((s) => (
+              <li key={s.id}>
+                <SignalCard s={s} />
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );
