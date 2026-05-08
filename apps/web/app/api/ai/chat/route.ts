@@ -311,7 +311,7 @@ async function buildCaseGroundingContext(
     '- Answer from the active case file first.',
     '- Do not add facts that are not in the mapped evidence.',
     '- If the case file is missing evidence, say what is missing and what source type would help.',
-    '- Use supported / partly supported / unsupported / unresolved wording, not absolute true/false.',
+    '- When evidence is strong, give a clear conclusion first; when mixed, explain what is unresolved.',
   );
 
   return lines.join('\n');

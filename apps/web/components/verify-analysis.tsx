@@ -95,7 +95,7 @@ function CaseFileCard({ caseFile }: { caseFile: EvidenceCaseFile }) {
           </h3>
           <p className="mt-2 max-w-prose text-[13.5px] leading-relaxed text-ink-600">
             We split the submission into checkable claims, then mapped source evidence to each claim.
-            This is evidence-bound analysis, not an AI truth verdict.
+            The verdict is evidence-bound and claim-by-claim, with unresolved gaps called out explicitly.
           </p>
         </div>
         <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${verdictClass(caseFile.overall_verdict)}`}>

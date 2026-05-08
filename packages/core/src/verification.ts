@@ -4,12 +4,12 @@ import { extractDomain, isCredibleDomain } from './domains';
 /**
  * Reliability / corroboration scoring.
  *
- * We never assert "truth" or "fact". We describe how many independent public
- * sources are reporting a given signal and how credible those sources are.
+ * We summarize corroboration strength from independent public sources.
+ * Strong corroboration supports firmer conclusions; thin evidence stays
+ * explicitly provisional.
  * The enum values below are internal identifiers (they map to DB rows and
  * RLS policies) — user-facing copy must always go through `statusLabel()`
- * / `statusDescription()` so the product never publicly claims that anything
- * has been "verified" or "fact-checked".
+ * / `statusDescription()` so product language stays consistent.
  */
 
 const CORROBORATED_MIN_SOURCES = 2;
@@ -39,7 +39,7 @@ export const STATUS_SHORT_LABEL: Record<VerificationStatus, string> = {
 
 export const STATUS_DESCRIPTION: Record<VerificationStatus, string> = {
   verified:
-    'Two or more credible, independent sources are reporting this event consistently. We still present the underlying sources; we do not assert factual truth.',
+    'Two or more credible, independent sources are reporting this event consistently. Strongly supported, with source links available for direct review.',
   developing:
     'Reported by at least one credible source, but not yet independently corroborated by two or more credible outlets. Treat with caution and read the evidence directly.',
   unverified:

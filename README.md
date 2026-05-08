@@ -15,9 +15,8 @@ them by event, and shows three things for each:
    limitations that apply.
 
 Crosscheck is deliberately **not** an OSINT investigation tool and **not**
-a news app. It does not tell you what happened. It describes how the
-public record about an event is lining up across sources and sensors, so
-that readers can look into the parts that don't.
+a news app. It summarizes what is strongly supported, what is disputed, and
+what remains unclear by comparing public records across sources and sensors.
 
 ## Monorepo layout
 
@@ -91,7 +90,7 @@ npm run backfill -- 48 --dry-run
 - Per-signal **physical evidence** record (confirmed / partial / none
   detected) with explicit coverage limitations
 - Per-signal **plain-language trust explanation** ("What this means")
-  with deterministic, LLM-free copy and a forbidden-phrasing test in CI
+  with deterministic, LLM-free copy and CI tests for evidence-grounded wording
 - Public trust surface: `/terms`, `/privacy`, `/contact`, `/dmca`,
   `/corrections`, `/status`, `/sources`, `/reliability`, `/trust`,
   `/changelog`, and `/.well-known/security.txt`
@@ -121,8 +120,7 @@ Still intentionally pending:
 
 ## What Crosscheck does not do
 
-- It does not tell you what happened. It describes how public reporting and
-  sensor data are shaped around an event.
+- It does not replace primary reporting. It summarizes evidence and links to sources.
 - It does not accuse. Conflicts are shown with both sides and citations.
 - It does not investigate people, geolocate imagery, or produce dossiers.
 - It does not use classified sources or paywalled content.

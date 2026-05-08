@@ -341,7 +341,7 @@ export default async function LandingPage() {
               AI as evidence assistant
             </p>
             <h2 className="mt-1 text-xl font-semibold tracking-tight text-ink sm:text-2xl">
-              An analyst that explains the evidence — not a chatbot, not a fact-checker.
+              An analyst that explains the evidence and gives clear, grounded conclusions.
             </h2>
           </div>
           <Link
@@ -359,11 +359,11 @@ export default async function LandingPage() {
         <div className="mt-5 grid gap-4 sm:grid-cols-3">
           <AiFeature
             title="Plain-language trust card"
-            body="Every signal carries a deterministic, LLM-free explanation: what's widely supported, what's disputed, and what to watch. Tested in CI to never claim 'verified facts' or 'fact-checked'."
+            body="Every signal carries a deterministic, LLM-free explanation: what is solid, what is disputed, and what to watch next."
           />
           <AiFeature
             title="Structured AI briefings"
-            body="Daily and personal briefings are organised into five sections — what happened, what is supported, what is disputed, what changed, what to watch — never adjudicating the story."
+            body="Daily and personal briefings are organised into five sections — what happened, what is confirmed, what is disputed, what changed, what to watch."
           />
           <AiFeature
             title="Signal-grounded analyst"
@@ -407,7 +407,7 @@ export default async function LandingPage() {
           />
           <TransparencyCard
             title="AI guardrails"
-            body="AI never claims 'verified' or 'fact-checked.' Every AI surface falls back to deterministic, LLM-free copy if the model is unavailable."
+            body="AI is required to ground conclusions in visible evidence and call out uncertainty where facts are still moving. Every AI surface falls back to deterministic, LLM-free copy if the model is unavailable."
           />
           <TransparencyCard
             title="Bias separation"

@@ -55,6 +55,8 @@ STRUCTURE:
 
 TONE: Warm, smart, direct. Like a friend who happens to be an expert.
 Never robotic. Never start a section with a statistic.
+When evidence is strong, state the core event directly.
+When details are still moving, separate confirmed facts from open questions.
 `.trim();
 
 export async function runBriefing(kind: 'daily' | 'weekly'): Promise<{ briefing_id: string | null }> {

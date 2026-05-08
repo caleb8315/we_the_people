@@ -10,9 +10,8 @@
  *   what_sources_disagree_on  conflicts surfaced by the analyzer
  *
  * Each section is a list of plain-English bullets. Bullets are
- * deterministic, never claim truth, and never re-paraphrase source
- * text — they're composed from the structured data the upstream layers
- * produced.
+ * deterministic and never re-paraphrase source text — they're composed
+ * from the structured data the upstream layers produced.
  */
 
 import type { ConfidenceBreakdown } from './confidence-breakdown';
@@ -49,7 +48,7 @@ export interface BuildResultExplanationInput {
 }
 
 const POSITIONING =
-  'Crosscheck compares what sources are saying. It does not decide what is true — read the evidence, weigh the agreement, and account for any bias signals.';
+  'Crosscheck compares what sources are saying and states the strongest supported conclusion, with uncertainty called out when evidence is incomplete.';
 
 function buildWhy(input: BuildResultExplanationInput): string[] {
   const out: string[] = [];
@@ -67,7 +66,7 @@ function buildWhy(input: BuildResultExplanationInput): string[] {
       break;
     case 'contested':
       out.push(
-        `Confidence is ${breakdown.composite}/100 because at least one source materially disagrees with another. The verdict here is "compare the sides", not "this is true / false".`,
+        `Confidence is ${breakdown.composite}/100 because at least one source materially disagrees with another. Key details are still contested.`,
       );
       break;
     case 'low':

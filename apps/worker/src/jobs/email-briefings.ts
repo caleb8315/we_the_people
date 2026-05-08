@@ -188,7 +188,7 @@ function buildUserBriefingBody(input: {
     'Top signals for your profile',
     cards || '- No high-priority signals matched your current topics today.',
     '',
-    'Labels describe how many independent sources are reporting each signal and how many match our rated-outlet set. They are not claims of factual truth.',
+    'Labels summarize source coverage strength so you can judge confidence quickly while reading the linked evidence.',
   ]
     .filter(Boolean)
     .join('\n');

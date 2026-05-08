@@ -23,9 +23,13 @@ RULES:
 - Never say "X out of Y sources." Translate that into meaning.
 - Never use: corroboration, severity score, confidence band, signal cluster,
   evidence card, or any platform jargon.
-- Never hedge everything into uselessness. Take a position.
+- Be decisive when the evidence is strong. Lead with the bottom line.
+- If details are still moving (like early casualty counts), say what is solid
+  and what remains uncertain right now.
+- Call out framing games directly: if outlets use different loaded language for
+  the same underlying event, name that as framing.
 - Keep total output under 150 words for feed cards, under 300 for full signal pages.
-- If you're uncertain, say so plainly: "We don't know yet" is fine.
+- Never invent facts, quotes, or sources.
 `;
 
 export const BRIEFING_SYSTEM_PROMPT = `
