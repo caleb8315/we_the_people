@@ -109,13 +109,14 @@ export function buildReaderReport(input: ReaderReportInput): ReaderReport {
   const { confidence, input: ctx, corroboration, provenance_limits } = input;
 
   const headline = pickHeadline(ctx);
+  const subject = storySubject(headline);
   const kind_label = pickKindLabel(ctx);
   const one_liner = pickOneLiner(ctx, corroboration);
 
   const source_mix = buildSourceMix(confidence, corroboration);
-  const what_we_found = buildFindings(confidence, corroboration, source_mix);
+  const what_we_found = buildFindings(confidence, corroboration, source_mix, subject);
   const what_is_unclear = buildUnclear(confidence, corroboration, provenance_limits, ctx);
-  const bottom_line = buildBottomLine(confidence.band, source_mix, corroboration);
+  const bottom_line = buildBottomLine(confidence.band, source_mix, corroboration, subject);
 
   return {
     headline,
@@ -134,6 +135,12 @@ export function buildReaderReport(input: ReaderReportInput): ReaderReport {
     source_mix,
     source_trace_friendly: friendlySourceTrace(confidence.source_trace),
   };
+}
+
+function storySubject(headline: string): string {
+  const h = (headline ?? '').trim().replace(/\s+/g, ' ');
+  if (!h) return 'this submission';
+  return `"${h.slice(0, 120)}"`;
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -217,6 +224,7 @@ function buildFindings(
   confidence: ConfidenceReport,
   corroboration: ReaderReportInput['corroboration'],
   mix: SourceMix,
+  subject: string,
 ): ReaderBullet[] {
   const out: ReaderBullet[] = [];
 
@@ -227,8 +235,8 @@ function buildFindings(
     let body: string;
     if (ms.credible_source_count >= 2) {
       body = others > 0
-        ? `${ms.credible_source_count} rated outlets are independently covering this event, plus ${others} additional source${others === 1 ? '' : 's'}. That level of independent coverage is a strong sign the core event is real.`
-        : `${ms.credible_source_count} rated outlets are independently covering this event. When multiple independent outlets report the same thing, the basic facts are usually solid.`;
+        ? `${subject} is independently covered by ${ms.credible_source_count} rated outlets, plus ${others} additional source${others === 1 ? '' : 's'}. That level of independent coverage is a strong signal for the core event.`
+        : `${subject} is independently covered by ${ms.credible_source_count} rated outlets. When multiple outlets match, the core facts are usually solid.`;
     } else if (ms.credible_source_count === 1) {
       body = others > 0
         ? `One rated outlet is reporting this, along with ${others === 1 ? 'one other source' : `${others} other sources`} we haven\u2019t rated yet. That is a start, but watch for more independent pickup.`
@@ -397,13 +405,14 @@ function buildBottomLine(
   band: ConfidenceBand,
   mix: SourceMix,
   corroboration: ReaderReportInput['corroboration'],
+  subject: string,
 ): string {
   switch (band) {
     case 'high':
       if (mix.sensor_events > 0) {
-        return 'This event is well-supported. Multiple rated outlets are independently reporting the same thing, and physical sensor data lines up with the claims. You can share this with reasonable confidence in the basic facts.';
+        return `${subject} is well-supported. Multiple rated outlets report the same event and physical sensor data lines up. You can share the core claim with reasonable confidence.`;
       }
-      return 'This event is well-supported. Multiple rated outlets are independently reporting the same thing. The core facts are likely accurate, though specific details may still evolve as coverage continues.';
+      return `${subject} is well-supported. Multiple rated outlets independently report the same core event, though details may still evolve.`;
     case 'contested':
       return 'Sources are contradicting each other on key details. The event itself may be real, but the specifics are in dispute. We\u2019d recommend waiting before sharing \u2014 the picture should become clearer as reporting settles.';
     case 'medium':

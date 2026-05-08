@@ -68,6 +68,8 @@ export async function POST(req: Request) {
     'Write a personalized morning briefing using the stories below.',
     'Do not use bullets. Write in flowing prose with short paragraphs.',
     'Lead with the biggest story, explain what is confirmed, what is still disputed, and why it matters.',
+    'Name the specific story in each paragraph using concrete details from the title (who/what/where).',
+    'Avoid vague phrasing like "this story" unless you immediately specify the event details.',
     'End with one sentence that starts with "What to watch:"',
     'Hard cap: 300 words.',
     '',

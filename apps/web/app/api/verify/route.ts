@@ -415,6 +415,8 @@ export async function POST(req: Request) {
     has_anchor: Boolean(canonical_url),
     is_text_only: body.kind === 'text',
     is_social: Boolean(social),
+    subject:
+      (searchedTitle ?? title ?? body.text?.slice(0, 120) ?? '').trim() || null,
   });
   const caseFile = buildEvidenceCaseFile({
     title: searchedTitle ?? title,

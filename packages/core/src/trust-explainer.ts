@@ -165,31 +165,38 @@ export function buildTrustExplanation(
 const FALLBACK_SUMMARY =
   'Read the underlying sources before sharing specifics — corroboration is still developing.';
 
+function storySubject(title: string | undefined): string {
+  const t = (title ?? '').trim().replace(/\s+/g, ' ');
+  if (!t) return 'this story';
+  return `"${t.slice(0, 140)}"`;
+}
+
 function buildSummary(input: TrustExplanationInput): string {
   const { report, contradictions_count: cc } = input;
+  const subject = storySubject(input.title);
   if (cc > 0) {
-    return 'Different sites are reporting different things about important parts of this story. We have flagged the specific points where they disagree below.';
+    return `${subject} is being reported with conflicting details. We flagged the exact points of disagreement below.`;
   }
   switch (report.band) {
     case 'high':
       if (input.syndicated) {
-        return `${input.source_count} sites are carrying this story, but most of them appear to be running the same article. Fewer outlets are reporting it independently than the count suggests.`;
+        return `${subject} is being carried by ${input.source_count} sites, but many appear to be running the same article. Independent confirmation is thinner than the raw count suggests.`;
       }
       return input.source_count >= 4
-        ? `${input.source_count} different newsrooms are reporting this, and they describe the event the same way.`
-        : 'A few different newsrooms are reporting this and they agree on the basic shape of the event.';
+        ? `${subject} is reported by ${input.source_count} different newsrooms with matching core details.`
+        : `${subject} is reported by multiple newsrooms that agree on the basic event.`;
     case 'medium':
       if (input.syndicated) {
-        return 'A lot of sites are running this story, but most of them appear to be republishing the same article rather than reporting it themselves. Treat the source count as smaller than it looks.';
+        return `${subject} has broad pickup, but much of it appears to be republished copy rather than independent reporting.`;
       }
-      return 'This story is still developing. A few sources are reporting it, but the details are not all settled yet.';
+      return `${subject} looks real but is still developing. Core details are reported, while specifics remain unsettled.`;
     case 'low':
       if (input.source_count <= 1) {
-        return 'We have only seen one source for this so far. Read it directly and watch for others picking it up.';
+        return `${subject} currently has only one source. Read it directly and wait for independent pickup before trusting specifics.`;
       }
-      return `${input.source_count} sources are reporting this, but we have not been able to confirm the details with other independent reporting yet.`;
+      return `${subject} has ${input.source_count} mentions, but independent confirmation is still thin for key details.`;
     case 'contested':
-      return 'Different sites are reporting different things about important parts of this story. We have flagged the specific points where they disagree below.';
+      return `${subject} is being reported with conflicting details. We flagged the exact points of disagreement below.`;
   }
 }
 
@@ -428,18 +435,19 @@ function buildHeadlineChips(input: TrustExplanationInput): TrustHeadlineChip[] {
 function buildWhatsSupported(input: TrustExplanationInput): string[] {
   const out: string[] = [];
   const total = input.source_count;
+  const subject = storySubject(input.title);
   if (input.syndicated) {
     // Important: do NOT call these "independent" — that's the lie the
     // user spotted. State the bare fact (X sites are carrying it) and
     // leave the corroboration verdict to the disputed/unclear sections.
     if (total >= 2) {
-      out.push(`${total} sites are carrying this story.`);
+      out.push(`${subject} is being carried by ${total} sites.`);
     }
-    out.push('The basic shape of the event (what, where, roughly when) is consistent everywhere it is reported.');
+    out.push(`Across coverage of ${subject}, the basic event shape (what/where/roughly when) is consistent.`);
   } else if (total >= 5) {
-    out.push(`${total} different newsrooms are reporting the same event independently.`);
+    out.push(`${subject} is reported independently by ${total} different newsrooms.`);
   } else if (total >= 2) {
-    out.push(`${total} sources are reporting this and they describe the event the same way.`);
+    out.push(`${subject} is reported by ${total} sources with matching core details.`);
   }
   if (input.physical_evidence?.status === 'confirmed') {
     out.push('Public sensor networks recorded a matching event.');
@@ -457,12 +465,13 @@ function buildWhatsDisputed(
   contraTypes: string[],
 ): string[] {
   const out: string[] = [];
+  const subject = storySubject(input.title);
   if (input.contradictions_count > 0) {
     const kinds = [...new Set(contraTypes.map(shortConflictKind))].filter(Boolean);
     if (kinds.length > 0) {
-      out.push(`Reports disagree on ${kinds.join(', ')}. The exact disagreement is listed below with citations.`);
+      out.push(`For ${subject}, reports disagree on ${kinds.join(', ')}. The exact disagreement is listed below with citations.`);
     } else {
-      out.push('Reports disagree on a material detail of this story. The exact disagreement is listed below with citations.');
+      out.push(`For ${subject}, reports disagree on a material detail. The exact disagreement is listed below with citations.`);
     }
   }
   if (input.syndicated) {
@@ -484,8 +493,9 @@ function buildWhatsDisputed(
  */
 function buildWhatsUnclear(input: TrustExplanationInput): string[] {
   const out: string[] = [];
+  const subject = storySubject(input.title);
   if (input.contradictions_count > 0) {
-    out.push('Whether the disputed details settle as more sources report or revise their numbers.');
+    out.push(`Whether disputed details in ${subject} settle as more outlets publish updates or revise numbers.`);
   }
   if (input.syndicated) {
     out.push('Whether other newsrooms pick this up and report it independently, or whether it stays one article being republished everywhere.');
@@ -738,9 +748,10 @@ function buildWatchNextPoints(
 }
 
 function buildSourceNote(input: TrustExplanationInput): string {
+  const subject = storySubject(input.title);
   const sourceShape = input.syndicated
-    ? `${input.source_count} sites are carrying this story, but many appear to republish the same original article.`
-    : `${input.source_count} sources are in this cluster, including ${input.credible_source_count} rated outlets.`;
+    ? `${subject} appears across ${input.source_count} sites, but many republish the same original article.`
+    : `${subject} has ${input.source_count} sources in this cluster, including ${input.credible_source_count} rated outlets.`;
   const evidenceChecked =
     input.physical_evidence?.status === 'confirmed'
       ? 'Checked: outlet agreement, contradiction scan, and matching sensor evidence.'

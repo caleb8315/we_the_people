@@ -303,6 +303,8 @@ ${BRIEFING_SYSTEM_PROMPT}
 Write a ${kind} briefing from these stories.
 Use short paragraphs in flowing prose. Do not return section headings or bullet lists.
 Keep it under 300 words.
+Every paragraph must name concrete story details (who/what/where) from the list below.
+Avoid generic phrasing like "this story" or "the event" unless immediately followed by the specific title details.
 
 Stories:
 ${list}
