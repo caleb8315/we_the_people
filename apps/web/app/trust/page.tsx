@@ -28,8 +28,8 @@ export default function TrustPage() {
         <h2>Reliability labels</h2>
         <p className="text-ink-600">
           A reliability label reflects how many independent, credible public sources are
-          reporting the same underlying event. It is a description of coverage, not an
-          assessment of whether the event occurred.
+          reporting the same underlying event. Stronger labels mean stronger support for
+          the core event, while lower labels mean details are still uncertain.
         </p>
         <ul>
           <li>
@@ -73,8 +73,8 @@ export default function TrustPage() {
           </li>
         </ul>
         <p className="text-xs text-ink-500">
-          &quot;Likely accurate&quot; describes how well the reporting is corroborated — it is
-          not a judgment about the event itself.
+          &quot;Likely accurate&quot; means the event is strongly supported by independent reporting.
+          It does not mean every detail is final.
         </p>
       </section>
 
@@ -114,8 +114,7 @@ export default function TrustPage() {
       <section id="ai-transparency">
         <h2>Where AI is and is not used</h2>
         <p className="text-ink-600">
-          Crosscheck uses AI as an assistant around the verification core, never as the
-          arbiter of truth. The deterministic reliability scorer, the source-disagreement
+          Crosscheck uses AI as an assistant around the verification core. The deterministic reliability scorer, the source-disagreement
           detector, the corroboration scorer, the confidence band, and every label you see
           on a card or signal page are computed without an LLM call.
         </p>
@@ -148,8 +147,8 @@ export default function TrustPage() {
         </p>
         <ul>
           <li>writes or overrides a signal&apos;s reliability label, confidence band, or verification status;</li>
-          <li>creates a parallel truth score outside the deterministic core;</li>
-          <li>declares a story to be &quot;verified facts&quot;, &quot;fact-checked&quot;, &quot;debunked&quot;, or &quot;propaganda&quot;;</li>
+          <li>creates a parallel scoring system outside the deterministic core;</li>
+          <li>invents evidence or conclusions not supported by the cited sources;</li>
           <li>accuses a person, group, or state of anything;</li>
           <li>frames a sensor network&apos;s lack of detection as evidence the event did not happen;</li>
           <li>claims to have read content behind paywalls or classified sources.</li>
@@ -166,7 +165,7 @@ export default function TrustPage() {
       <section>
         <h2>What Crosscheck does not do</h2>
         <ul>
-          <li>It does not tell you what happened. It describes how the public record is shaped.</li>
+          <li>It does not replace primary reporting. It summarizes evidence and links you to sources.</li>
           <li>It does not accuse. Conflicts are shown with both sides and citations.</li>
           <li>It does not use classified sources or paywalled content.</li>
           <li>It does not investigate people, geolocate imagery, or produce dossiers.</li>

@@ -21,7 +21,7 @@ import {
  * the underlying columns; it composes them into one stable shape.
  *
  * Design rules:
- *   - Never assert factual truth — we describe *corroboration*, not truth.
+ *   - Express conclusions in proportion to evidence strength.
  *   - Confidence is expressed as one of four bands, not a bare number. The
  *     numeric reliability_score is still available for advanced surfaces
  *     but is never the primary UX unit.

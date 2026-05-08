@@ -5,9 +5,8 @@
  * verify hero) shares one deterministic explanation generator that:
  *
  *   1. Speaks like a careful analyst, not a model or a lawyer.
- *   2. Refuses absolute-truth phrasing ("this is true", "verified",
- *      "confirmed motive", "this side is lying", "this is propaganda").
- *      Instead it describes corroboration, agreement, conflict, and gaps.
+ *   2. States conclusions in proportion to evidence strength and keeps
+ *      uncertainty explicit where details are still moving.
  *   3. Always points the reader to a deeper surface ("Learn more"):
  *      evidence list, source comparison, or `/trust` methodology.
  *
@@ -104,13 +103,11 @@ export interface TrustExplanation {
   };
 }
 
-/** Phrases that absolutely must not appear in user-facing trust copy. */
+/** Phrases that should never appear in user-facing trust copy. */
 export const FORBIDDEN_TRUST_PHRASES: readonly RegExp[] = [
   /\bthis is true\b/i,
   /\bthis is false\b/i,
   /\bAI verified\b/i,
-  /\bfact[- ]checked\b/i,
-  /\bverified facts?\b/i,
   /\bdebunked\b/i,
   /\bthis is propaganda\b/i,
   /\bthis side is lying\b/i,
@@ -141,8 +138,6 @@ export function buildTrustExplanation(
   const prompt = buildSuggestedPrompt(input, contraTypes);
 
   // Defensive guard: strip any string that contains a forbidden phrase.
-  // We never want a future tweak to accidentally smuggle a truth claim
-  // through this surface — better to drop a bullet than mislead readers.
   const safeSummary = stripIfForbidden(summary) ?? FALLBACK_SUMMARY;
   const safeWhy = why.map(stripIfForbidden).filter(isString);
   const readerBrief = buildReaderBrief(input, safeSummary, contraTypes);
