@@ -112,6 +112,7 @@ export default async function SignalPage({ params }: PageProps) {
 
   const bandTone = bandToneClasses(report.band);
   const bottomLine = bottomLineForSignal(
+    signal.title,
     report.band,
     signal.source_count ?? 0,
     signal.credible_source_count ?? 0,
@@ -560,40 +561,42 @@ function roleChipClass(role: 'primary' | 'corroborating' | 'conflicting' | 'sens
  * the signal-detail analog of the verify flow's bottom-line block.
  */
 function bottomLineForSignal(
+  title: string,
   band: ConfidenceBand,
   sourceCount: number,
   _credibleSourceCount: number,
   contradictionsCount: number,
   isComplexSignal: boolean,
 ): string {
+  const subject = `"${title.trim().replace(/\s+/g, ' ').slice(0, 120)}"`;
   // Guiding principle: describe all-source corroboration shape, not a
   // source-tier verdict.
   if (contradictionsCount > 0) {
-    return 'Sources disagree on important details. Read both sides carefully before sharing specific claims.';
+    return `${subject} has important details in dispute. Read both sides carefully before sharing specifics.`;
   }
   if (isComplexSignal) {
-    return 'This event has many sources and moving parts. Our automatic disagreement detection was skipped — review the evidence list below before relying on any single claim.';
+    return `${subject} has many moving parts. Automatic disagreement detection was skipped — review the evidence list before relying on any single claim.`;
   }
   switch (band) {
     case 'high':
       return sourceCount >= 2
-        ? `${sourceCount} independent sources are reporting this. The basic shape of the event is well-supported.`
-        : 'Multiple independent sources are reporting this. The basic shape of the event is well-supported.';
+        ? `${subject} is reported by ${sourceCount} independent sources. The core event is well-supported.`
+        : `${subject} is reported by multiple independent sources. The core event is well-supported.`;
     case 'medium':
       if (sourceCount >= 5) {
-        return `${sourceCount} independent sources are reporting this. Promising, but check each one before trusting specifics.`;
+        return `${subject} is reported by ${sourceCount} independent sources. Promising, but verify specifics before sharing.`;
       }
-      return 'This is still developing. The basic shape looks real, but specific claims need more corroboration.';
+      return `${subject} is still developing. The basic shape looks real, but specific claims need more corroboration.`;
     case 'contested':
-      return 'Sources are giving conflicting accounts. The underlying event may still be real — hold off on sharing specifics until it settles.';
+      return `${subject} has conflicting accounts. The core event may be real, but hold off on specifics until reports settle.`;
     case 'low':
       if (sourceCount === 0) {
-        return 'We haven\u2019t found anyone reporting this yet. Treat as unconfirmed until more sources surface.';
+        return `We haven\u2019t found reporting for ${subject} yet. Treat as unconfirmed until more sources surface.`;
       }
       if (sourceCount === 1) {
-        return 'We\u2019ve only found one source so far. Read it directly, check who wrote it, and watch for others picking it up.';
+        return `${subject} currently has one source. Read it directly, check who wrote it, and watch for independent pickup.`;
       }
-      return `${sourceCount} sources are reporting this. Read them yourself before treating any specifics as confirmed.`;
+      return `${subject} has ${sourceCount} sources reporting it. Read them before treating specifics as confirmed.`;
   }
 }
 

@@ -23,6 +23,8 @@ RULES:
 - Never say "X out of Y sources." Translate that into meaning.
 - Never use: corroboration, severity score, confidence band, signal cluster,
   evidence card, or any platform jargon.
+- Always name the actual story details (who/what/where) in your first 1-2 lines.
+- Avoid vague lines like "this story" unless immediately followed by specific event details.
 - Be decisive when the evidence is strong. Lead with the bottom line.
 - If details are still moving (like early casualty counts), say what is solid
   and what remains uncertain right now.

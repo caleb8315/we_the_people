@@ -92,7 +92,7 @@ describe('buildTrustExplanation', () => {
       contradictions_count: 1,
       contradiction_types: ['cause_conflict'],
     });
-    assert.match(exp.summary, /different/i);
+    assert.match(exp.summary, /conflicting|disagree/i);
     assert.ok(exp.watch_for, 'watch_for should be set on contested signals');
     assert.match(String(exp.watch_for), /motive|disputed|cause/i);
     assert.ok(

@@ -45,34 +45,43 @@ export interface BuildResultExplanationInput {
   has_anchor: boolean;
   is_text_only: boolean;
   is_social: boolean;
+  /** Story/claim subject for concrete wording in output lines. */
+  subject?: string | null;
 }
 
 const POSITIONING =
   'Crosscheck compares what sources are saying and states the strongest supported conclusion, with uncertainty called out when evidence is incomplete.';
 
+function subjectPrefix(subject?: string | null): string {
+  const s = (subject ?? '').trim().replace(/\s+/g, ' ');
+  if (!s) return 'For this submission';
+  return `For "${s.slice(0, 120)}"`;
+}
+
 function buildWhy(input: BuildResultExplanationInput): string[] {
   const out: string[] = [];
   const { band, breakdown, ranked_summary: r } = input;
+  const scoped = subjectPrefix(input.subject);
   switch (band) {
     case 'high':
       out.push(
-        `Confidence is ${breakdown.composite}/100 because ${r.primaries + r.officials > 0 ? 'primary / official sources are present' : 'multiple rated outlets agree on the basic shape'} and no material disagreements were detected.`,
+        `${scoped}, confidence is ${breakdown.composite}/100 because ${r.primaries + r.officials > 0 ? 'primary / official sources are present' : 'multiple rated outlets agree on the basic shape'} and no material disagreements were detected.`,
       );
       break;
     case 'medium':
       out.push(
-        `Confidence is ${breakdown.composite}/100 — there is real corroboration, but the comparison is still missing pieces (see "What would resolve this").`,
+        `${scoped}, confidence is ${breakdown.composite}/100 — there is real corroboration, but the comparison is still missing pieces (see "What would resolve this").`,
       );
       break;
     case 'contested':
       out.push(
-        `Confidence is ${breakdown.composite}/100 because at least one source materially disagrees with another. Key details are still contested.`,
+        `${scoped}, confidence is ${breakdown.composite}/100 because at least one source materially disagrees with another. Key details are still contested.`,
       );
       break;
     case 'low':
     default:
       out.push(
-        `Confidence is ${breakdown.composite}/100 because the corpus is too thin or too one-sided to draw a useful comparison yet.`,
+        `${scoped}, confidence is ${breakdown.composite}/100 because the corpus is too thin or too one-sided to draw a useful comparison yet.`,
       );
       break;
   }
@@ -142,8 +151,9 @@ function buildResolve(input: BuildResultExplanationInput): string[] {
 function buildAgreeOn(input: BuildResultExplanationInput): string[] {
   const out: string[] = [];
   const { ranked_summary: r, cards_summary: c } = input;
+  const scoped = subjectPrefix(input.subject);
   if (c.supports >= 2) {
-    out.push(`${c.supports} source${c.supports === 1 ? '' : 's'} describe the event the same way at the basic level.`);
+    out.push(`${scoped}, ${c.supports} source${c.supports === 1 ? '' : 's'} describe the event the same way at the basic level.`);
   }
   if (r.primaries > 0) {
     out.push('Primary observation(s) confirm the underlying event occurred.');
