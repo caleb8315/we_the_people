@@ -14,7 +14,6 @@ const ServerEnv = PublicEnv.extend({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
   GEMINI_API_KEY: emptyToUndef(z.string().optional()),
   GROQ_API_KEY: emptyToUndef(z.string().optional()),
-  BETA_ALLOWLIST: emptyToUndef(z.string().optional()),
   UPSTASH_REDIS_REST_URL: emptyToUndef(z.string().url().optional()),
   UPSTASH_REDIS_REST_TOKEN: emptyToUndef(z.string().optional()),
   WORKER_SHARED_SECRET: emptyToUndef(z.string().min(16).optional()),
