@@ -1,5 +1,4 @@
 import { LoginForm } from '@/components/login-form';
-import { AccessRequestForm } from '@/components/access-request-form';
 import { redirect } from 'next/navigation';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { sanitizeNextPath } from '@/lib/safe-redirect';
@@ -32,8 +31,7 @@ export default async function LoginPage({
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink">Sign in</h1>
         <p className="mt-1 text-sm text-ink-500">
-          Create an account, complete onboarding once, then you land in your personal dashboard
-          workspace.
+          Create an account or sign in to land in your personal Crosscheck workspace.
         </p>
       </header>
       {searchParams.reason === 'auth_unavailable' && (
@@ -48,21 +46,6 @@ export default async function LoginPage({
       )}
       <div className="rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
         <LoginForm next={next} />
-      </div>
-      <div className="rounded-card border border-ink-100 bg-canvas-50 p-5 shadow-card sm:p-6">
-        <div className="space-y-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-400">
-              Private beta
-            </p>
-            <h2 className="mt-1 text-lg font-semibold text-ink">Need access?</h2>
-            <p className="mt-1 text-sm text-ink-500">
-              Request an invite for testing. Approved emails can sign in as soon as they are added
-              to the beta allowlist.
-            </p>
-          </div>
-          <AccessRequestForm />
-        </div>
       </div>
     </div>
   );

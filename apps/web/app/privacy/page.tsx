@@ -37,7 +37,7 @@ export default function PrivacyPage() {
           <li>Your email address for account authentication.</li>
           <li>Your account profile, preferences, saved views, and feedback.</li>
           <li>Your AI chats, verification submissions, and product events tied to your account.</li>
-          <li>Operational request metadata needed for rate limiting and access-request review.</li>
+          <li>Operational request metadata needed for rate limiting and abuse prevention.</li>
         </ul>
       </section>
 

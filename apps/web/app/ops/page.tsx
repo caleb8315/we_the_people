@@ -74,12 +74,6 @@ export default async function OpsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Ops dashboard</h1>
           <p className="text-sm text-ink-500">Observability for ingest / brief / alert workers.</p>
         </div>
-        <a
-          href="/ops/requests"
-          className="rounded-full border border-ink-100 bg-canvas-50 px-3 py-1.5 text-sm hover:bg-ink-100"
-        >
-          Access requests →
-        </a>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-4">

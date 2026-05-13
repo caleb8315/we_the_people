@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { getClientKey, limit } from '@/lib/rate-limit';
-import { isEmailAllowed } from '@/lib/allowlist';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -14,7 +13,7 @@ const Body = z.object({
 
 /**
  * POST /api/auth/signin
- * Simple email/password login for MVP (no SMTP required).
+ * Simple email/password login. Open to any registered Supabase user.
  */
 export async function POST(req: Request) {
   const rl = limit(getClientKey(req, 'signin'), 10, 10 * 60_000);
@@ -24,9 +23,6 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: 'invalid_credentials' }, { status: 400 });
 
   const email = parsed.data.email.toLowerCase();
-  if (!(await isEmailAllowed(email))) {
-    return NextResponse.json({ error: 'access_pending' }, { status: 403 });
-  }
 
   const sb = getServerSupabase();
   const { error } = await sb.auth.signInWithPassword({

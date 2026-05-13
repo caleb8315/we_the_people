@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getServerSupabase } from '@/lib/supabase-server';
-import { AccessRequestForm } from '@/components/access-request-form';
 
 export const metadata = {
   title:
@@ -438,25 +437,36 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* ── Private beta access ── */}
+      {/* ── Sign up / sign in CTA ── */}
       {!signedIn && (
-        <section className="grid gap-5 rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:grid-cols-[1.1fr_0.9fr] sm:p-6">
-          <div className="space-y-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">
-              Get early access
-            </p>
-            <h2 className="text-2xl font-semibold tracking-tight text-ink">Get early access</h2>
-            <p className="max-w-xl text-sm text-ink-500">
-              Crosscheck is in private beta. Request access and we&apos;ll let you in.
-            </p>
-            <ul className="space-y-2 text-sm text-ink-600">
-              <li>Approved testers can sign in with email/password immediately.</li>
-              <li>Requests stay private and are reviewed manually during the beta cohorts.</li>
-              <li>Need institutional access? Include your newsroom, NGO, or research use case.</li>
-            </ul>
-          </div>
-          <div className="rounded-card border border-ink-100 bg-canvas-50 p-4">
-            <AccessRequestForm />
+        <section className="rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">
+                Get started
+              </p>
+              <h2 className="text-2xl font-semibold tracking-tight text-ink">
+                Create your free account
+              </h2>
+              <p className="max-w-xl text-sm text-ink-500">
+                Sign up with an email and password to get a personalized feed, save signals, and
+                run AI-grounded verifications. Already have an account? Sign in below.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/login?next=/dashboard"
+                className="rounded-full bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(245,158,11,0.55)] hover:bg-amber-600"
+              >
+                Sign up
+              </Link>
+              <Link
+                href="/login?next=/dashboard"
+                className="rounded-full border border-ink-100 bg-paper px-5 py-2.5 text-sm font-medium text-ink hover:border-ink-200"
+              >
+                Sign in
+              </Link>
+            </div>
           </div>
         </section>
       )}

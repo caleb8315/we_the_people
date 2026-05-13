@@ -34,17 +34,12 @@ export function LoginForm({ next }: { next: string }) {
       const body = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        const message =
-          body.error === 'invite_required'
-            ? 'This beta is invite-only right now. Request access below and we will review your email for the next cohort.'
-            : body.error === 'access_pending'
-              ? 'That email is not approved for beta access yet. Request access below if you have not already.'
-              : body.error ?? 'Authentication failed.';
-        setResult({ ok: false, message });
+        setResult({ ok: false, message: body.error ?? 'Authentication failed.' });
       } else if (mode === 'signup') {
         setResult({
           ok: true,
-          message: 'Account created. You can sign in immediately if your project does not require email confirmation.',
+          message:
+            'Account created. You can sign in immediately if your project does not require email confirmation.',
         });
         setMode('signin');
       } else {
@@ -122,8 +117,7 @@ export function LoginForm({ next }: { next: string }) {
       )}
 
       <p className="text-xs text-ink-400">
-        Beta access is restricted to approved emails. If your project requires email confirmation,
-        finish that step before signing in.
+        If your Supabase project requires email confirmation, finish that step before signing in.
       </p>
 
       <style jsx>{`
