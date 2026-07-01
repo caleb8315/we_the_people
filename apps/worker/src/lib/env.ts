@@ -12,7 +12,13 @@ const Env = z.object({
   GROQ_API_KEY: emptyToUndef(z.string().optional()),
 
   RESEND_API_KEY: emptyToUndef(z.string().optional()),
+  BREVO_API_KEY: emptyToUndef(z.string().optional()),
   BRIEFING_FROM_EMAIL: emptyToUndef(z.string().email().optional()),
+
+  // Operator self-monitoring (job failure / crash alerts).
+  ALERT_FROM_EMAIL: emptyToUndef(z.string().email().optional()),
+  OPERATOR_ALERT_EMAIL: emptyToUndef(z.string().email().optional()),
+  OPERATOR_ALERT_THROTTLE_MINUTES: emptyToUndef(z.coerce.number().int().positive().optional()),
 
   TELEGRAM_BOT_TOKEN: emptyToUndef(z.string().optional()),
   TELEGRAM_OPERATOR_CHAT_ID: emptyToUndef(z.string().optional()),

@@ -5,6 +5,8 @@ import { runUserNotifications } from './jobs/email-briefings';
 import { runBackfill } from './jobs/backfill';
 import { runDevelop } from './jobs/develop';
 import { runMaintenance } from './jobs/maintenance';
+import { runWatchdog } from './jobs/watchdog';
+import { sendOperatorAlert } from './lib/operator-alert';
 
 /**
  * CLI dispatcher. Invoked by GitHub Actions with a single command plus
@@ -24,6 +26,7 @@ import { runMaintenance } from './jobs/maintenance';
  *   tsx src/index.ts develop --max=12         # override max signals per run
  *   tsx src/index.ts develop --thin=2         # prioritise low-source signals first
  *   tsx src/index.ts maintenance              # prune retention-managed rows
+ *   tsx src/index.ts watchdog                 # alert if the pipeline stalls
  */
 const args = process.argv.slice(2);
 const [cmd, arg] = args;
@@ -74,6 +77,19 @@ async function main() {
       });
       return;
     }
+    case 'watchdog': {
+      const ingestArg = args.find((a) => a.startsWith('--ingest-stale='));
+      const signalArg = args.find((a) => a.startsWith('--signal-stale='));
+      await runWatchdog({
+        ingestStaleMinutes: ingestArg
+          ? Number(ingestArg.slice('--ingest-stale='.length))
+          : undefined,
+        signalStaleMinutes: signalArg
+          ? Number(signalArg.slice('--signal-stale='.length))
+          : undefined,
+      });
+      return;
+    }
     case 'maintenance': {
       const dryRun = args.includes('--dry-run');
       const usageArg = args.find((a) => a.startsWith('--usage-days='));
@@ -87,13 +103,31 @@ async function main() {
     }
     default:
       console.error(
-        `unknown command: ${cmd}. use: ingest [--fast] | brief [weekly] | alert | notifications (or email alias) | backfill [hours] [--dry-run] [--limit=N] | develop [--dry-run] [--max=N] [--cooldown=MIN] [--window=HRS] [--thin=N] | maintenance [--dry-run] [--usage-days=N] [--signal-hours=N]`,
+        `unknown command: ${cmd}. use: ingest [--fast] | brief [weekly] | alert | notifications (or email alias) | backfill [hours] [--dry-run] [--limit=N] | develop [--dry-run] [--max=N] [--cooldown=MIN] [--window=HRS] [--thin=N] | maintenance [--dry-run] [--usage-days=N] [--signal-hours=N] | watchdog [--ingest-stale=MIN] [--signal-stale=MIN]`,
       );
       process.exit(2);
   }
 }
 
-main().catch((err) => {
+main().catch(async (err) => {
   console.error('[worker] fatal:', err);
+  // A thrown error escapes the per-job engine_run bookkeeping (e.g. bad env,
+  // network death, an adapter throwing before startEngineRun). Page the
+  // operator directly so a hard crash is never silent, then exit non-zero so
+  // the GitHub Actions run is also marked failed.
+  try {
+    await sendOperatorAlert({
+      subject: `worker crashed on "${cmd ?? 'unknown'}"`,
+      severity: 'error',
+      dedupeKey: `worker-crash:${cmd ?? 'unknown'}`,
+      body: [
+        `The worker command "${cmd ?? 'unknown'}" threw an unhandled error and exited.`,
+        '',
+        String((err as Error)?.stack ?? err),
+      ].join('\n'),
+    });
+  } catch {
+    // never let alerting mask the original failure
+  }
   process.exit(1);
 });

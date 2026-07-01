@@ -53,19 +53,38 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // `'unsafe-eval'` is only needed by the Next.js dev server (React Fast
+  // Refresh). Production builds don't need it, so we drop it outside dev to
+  // shrink the XSS surface. `'unsafe-inline'` on scripts stays because the App
+  // Router emits inline bootstrap scripts without nonces on Vercel/CF Pages.
+  const isDev = process.env.NODE_ENV !== 'production';
+  const scriptSrc = isDev
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+    : "script-src 'self' 'unsafe-inline'";
+
   response.headers.set(
     'Content-Security-Policy',
     [
       "default-src 'self'",
       "img-src 'self' data: https:",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      scriptSrc,
       "style-src 'self' 'unsafe-inline'",
       "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co",
       "font-src 'self' data:",
+      "object-src 'none'",
+      "frame-src 'none'",
       "frame-ancestors 'none'",
+      "form-action 'self'",
       "base-uri 'self'",
+      'upgrade-insecure-requests',
     ].join('; '),
   );
+
+  // Defense-in-depth headers that complement the static ones in
+  // next.config.mjs (this covers the middleware-touched responses too).
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
 
   return response;
 }

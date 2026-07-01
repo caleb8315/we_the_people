@@ -1,18 +1,26 @@
-name: Alerts
+name: Watchdog
+
+# Proactive pipeline health check. Reads recent engine_runs + signal freshness
+# and emails the operator if ingest has silently stalled (a cron stopped, or is
+# "succeeding" without producing rows). Writes nothing. Alerts are throttled by
+# the operator-alert dedupe window, so a sustained outage pages once per window,
+# not once per run.
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # every 30 minutes
+    - cron: '20,50 * * * *'  # twice an hour, offset from ingest/develop
   workflow_dispatch:
 
 concurrency:
-  group: alerts
+  group: watchdog
   cancel-in-progress: false
 
 jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -29,12 +37,12 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run --workspace apps/worker alert
+      - run: npm run watchdog
       - name: Alert operator on failure
         if: failure()
         uses: ./.github/actions/notify-operator
         with:
-          job: Alerts
+          job: Watchdog
           resend_api_key: ${{ secrets.RESEND_API_KEY }}
           brevo_api_key: ${{ secrets.BREVO_API_KEY }}
           alert_email: ${{ vars.OPERATOR_ALERT_EMAIL || 'calebphillips.ai@gmail.com' }}

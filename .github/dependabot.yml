@@ -1,0 +1,38 @@
+version: 2
+
+# Automatic dependency + security update PRs. Grouped so the weekly noise is a
+# couple of PRs, not dozens. Security updates are raised immediately regardless
+# of schedule by GitHub's security-update mechanism.
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      production-dependencies:
+        applies-to: version-updates
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      development-dependencies:
+        applies-to: version-updates
+        dependency-type: development
+    labels:
+      - dependencies
+
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - '*'
+    labels:
+      - dependencies
+      - github-actions

@@ -11,6 +11,7 @@ const routes = [
   '/dmca',
   '/feed',
   '/login',
+  '/pricing',
   '/privacy',
   '/status',
   '/terms',

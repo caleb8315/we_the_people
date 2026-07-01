@@ -14,6 +14,7 @@
     "backfill": "tsx src/index.ts backfill",
     "develop": "tsx src/index.ts develop",
     "maintenance": "tsx src/index.ts maintenance",
+    "watchdog": "tsx src/index.ts watchdog",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

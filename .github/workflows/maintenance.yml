@@ -23,6 +23,12 @@ jobs:
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+      OPERATOR_ALERT_EMAIL: ${{ vars.OPERATOR_ALERT_EMAIL || 'calebphillips.ai@gmail.com' }}
+      ALERT_FROM_EMAIL: ${{ vars.ALERT_FROM_EMAIL || 'alerts@crosscheck.news' }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_OPERATOR_CHAT_ID: ${{ secrets.TELEGRAM_OPERATOR_CHAT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,3 +42,13 @@ jobs:
           args=""
           if [ "$dry" = "true" ]; then args="--dry-run"; fi
           npm run maintenance -- $args
+      - name: Alert operator on failure
+        if: failure()
+        uses: ./.github/actions/notify-operator
+        with:
+          job: Maintenance
+          resend_api_key: ${{ secrets.RESEND_API_KEY }}
+          brevo_api_key: ${{ secrets.BREVO_API_KEY }}
+          alert_email: ${{ vars.OPERATOR_ALERT_EMAIL || 'calebphillips.ai@gmail.com' }}
+          from_email: ${{ vars.ALERT_FROM_EMAIL || 'alerts@crosscheck.news' }}
+          run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

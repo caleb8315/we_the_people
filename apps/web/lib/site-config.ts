@@ -12,4 +12,9 @@ export const siteConfig = {
   privacyEmail: process.env.PRIVACY_EMAIL || 'privacy@crosscheck.news',
   securityEmail: process.env.SECURITY_EMAIL || 'security@crosscheck.news',
   legalEmail: process.env.LEGAL_EMAIL || 'legal@crosscheck.news',
+  // Optional "support the project" links. Empty string = hide the button.
+  // These are plain outbound links (GitHub Sponsors / Stripe Payment Link /
+  // Open Collective). No billing backend is wired.
+  sponsorUrl: process.env.NEXT_PUBLIC_SPONSOR_URL || '',
+  donateUrl: process.env.NEXT_PUBLIC_DONATE_URL || '',
 };

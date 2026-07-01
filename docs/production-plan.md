@@ -113,7 +113,7 @@ Repo hygiene:
 - [x] Add `CODE_OF_CONDUCT.md` (Contributor Covenant).
 - [x] Add `SECURITY.md` with how to report vulns (must match `security.txt`).
 - [x] Add `ci.yml` workflow running `npm run typecheck`, `npm run lint`, `npm test` on every PR.
-- [ ] Enable Dependabot (or Renovate) for security and dependency updates.
+- [x] Enable Dependabot (or Renovate) for security and dependency updates (`.github/dependabot.yml`).
 
 Exit gate for Phase 0: every link in the footer resolves, repo is public, CI is green on main.
 
@@ -143,6 +143,7 @@ What we can't see, we can't debug, and grants expect to see uptime numbers.
 - [ ] **Sentry Free** wired into `apps/web` (browser + server) and `apps/worker`. Alerts to email + Telegram (`TELEGRAM_OPERATOR_CHAT_ID` already in env).
 - [ ] **Better Stack / UptimeRobot** pinging `/`, `/feed`, `/api/signals` every 10 min from 3 regions.
 - [ ] **Vercel log retention** is short; port logs to Cloudflare Logpush or Logtail (both free tiers) as part of the Phase 5 migration.
+- [x] **Automatic operator failure alerts (email + Telegram)** — the worker pages the operator on any job failure/crash (`apps/worker/src/lib/operator-alert.ts`, wired via `finishEngineRun` and the fatal handler), every scheduled workflow emails on infra failure (`.github/actions/notify-operator`), and a twice-hourly watchdog (`.github/workflows/watchdog.yml`) catches a silently stalled pipeline. De-duplicated via `030_operator_alerts.sql`. Recipient: `OPERATOR_ALERT_EMAIL`.
 - [ ] **Uptime + error webhooks → Telegram operator channel** (already have the credential plumbing).
 - [ ] `**/ops` polish** — verify every KPI tile renders; add ingest-success-per-day chart if not already there.
 - [x] **Prune cron** — nightly job to drop `usage_ledger` rows older than 60 days (per `docs/security.md`) and expired signals beyond `computeExpiry`. Added to `.github/workflows/maintenance.yml`.
@@ -205,7 +206,7 @@ The lightest touch that keeps the civic core free.
 
 - **GitHub Sponsors button** in repo + footer. Zero integration.
 - **Stripe Payment Link** for one-time donations. Zero code. Paste URL into `/about` and footer.
-- `**/pricing` page** — "free forever" primary message + optional "Supporter" ($5/mo) framed as "supports the project" not "removes ads" (we never run ads).
+- [x] `**/pricing` page** — "free forever" primary message + optional "Supporter" ($5/mo) framed as "supports the project" not "removes ads" (we never run ads). Live at `/pricing`; sponsor/donate buttons appear when `NEXT_PUBLIC_SPONSOR_URL` / `NEXT_PUBLIC_DONATE_URL` are set. No billing backend yet.
 
 Only *after* 50+ WAU and at least a handful of donors:
 
