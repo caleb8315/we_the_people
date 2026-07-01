@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@osint/core": "*",
-    "@supabase/ssr": "^0.5.1",
+    "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.49.1",
     "exifr": "^7.1.3",
     "leaflet": "^1.9.4",
