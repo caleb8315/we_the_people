@@ -19,7 +19,8 @@
     "email": "npm run notifications --workspace apps/worker",
     "backfill": "npm run backfill --workspace apps/worker",
     "develop": "npm run develop --workspace apps/worker",
-    "maintenance": "npm run maintenance --workspace apps/worker"
+    "maintenance": "npm run maintenance --workspace apps/worker",
+    "watchdog": "npm run watchdog --workspace apps/worker"
   },
   "engines": {
     "node": ">=20.0.0"
