@@ -18,6 +18,7 @@ import { getClientKey, limit } from '@/lib/rate-limit';
 import { developSignal } from '@/lib/develop-signal';
 import { logProductEvent } from '@/lib/product-events';
 import { serverEnv } from '@/lib/env';
+import { secureEquals } from '@/lib/secure-compare';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -56,10 +57,13 @@ export async function POST(
     const sharedSecret = serverEnv().WORKER_SHARED_SECRET;
     const bearer = req.headers.get('authorization');
     const direct = req.headers.get('x-worker-secret');
+    const presentedBearer = bearer?.startsWith('Bearer ')
+      ? bearer.slice('Bearer '.length)
+      : null;
+    // Constant-time comparison to avoid leaking the secret via timing.
     workerAuthorized = Boolean(
       sharedSecret &&
-        ((bearer?.startsWith('Bearer ') && bearer.slice('Bearer '.length) === sharedSecret) ||
-          direct === sharedSecret),
+        (secureEquals(presentedBearer, sharedSecret) || secureEquals(direct, sharedSecret)),
     );
   } catch {
     workerAuthorized = false;
