@@ -40,6 +40,6 @@
     "test": "tsx --test src/__tests__/*.test.ts"
   },
   "devDependencies": {
-    "typescript": "^5.7.3"
+    "typescript": "^6.0.3"
   }
 }
