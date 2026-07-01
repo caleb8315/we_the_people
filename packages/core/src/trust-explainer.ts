@@ -641,6 +641,15 @@ function buildConfirmedPoints(input: TrustExplanationInput): TrustBriefPoint[] {
       text: `${input.source_count} sources report the same core event description.`,
       state: 'multi_source',
     });
+  } else if (input.credible_source_count >= 2) {
+    // Multiple independent credible outlets are reporting, but syndication or a
+    // detail-level disagreement kept us out of the "same core description"
+    // branch above. The event's occurrence is still corroborated even when the
+    // specifics are disputed — surface that as the confirmed baseline.
+    out.push({
+      text: `${input.credible_source_count} independent credible sources report that the event occurred, even if some details are still disputed.`,
+      state: 'multi_source',
+    });
   }
   if (input.physical_evidence?.status === 'confirmed') {
     out.push({
