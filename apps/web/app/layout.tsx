@@ -6,22 +6,35 @@ import './globals.css';
 // `'use client'` files and will fail the production build silently.
 import 'leaflet/dist/leaflet.css';
 import type { Metadata } from 'next';
+import { Figtree, Syne } from 'next/font/google';
 import Link from 'next/link';
 import { NavBar } from '@/components/nav-bar';
 import { MobileBottomNav } from '@/components/mobile-bottom-nav';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { siteConfig } from '@/lib/site-config';
 
+const display = Syne({
+  subsets: ['latin'],
+  variable: '--font-display',
+  display: 'swap',
+});
+
+const body = Figtree({
+  subsets: ['latin'],
+  variable: '--font-body',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
-  title: 'Crosscheck — see where reporting agrees, conflicts, and lacks evidence',
+  title: 'Crosscheck — built for the people who want the truth',
   description:
-    'Crosscheck clusters public reporting and open sensor data by event, then shows how sources agree, where they conflict, and which pieces of evidence are missing.',
+    'Crosscheck helps everyday people see which stories look trustworthy, which ones clash, and where evidence is still thin — across public reporting and open sensor networks.',
   metadataBase: new URL(siteConfig.siteUrl),
   robots: { index: true, follow: true },
   openGraph: {
     title: 'Crosscheck',
     description:
-      'See where reporting agrees, conflicts, and lacks evidence across public sources and sensor networks.',
+      'See which stories look trustworthy, which ones clash, and where evidence is still thin.',
     url: siteConfig.siteUrl,
     siteName: 'Crosscheck',
     type: 'website',
@@ -30,7 +43,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Crosscheck',
     description:
-      'See where reporting agrees, conflicts, and lacks evidence across public sources and sensor networks.',
+      'See which stories look trustworthy, which ones clash, and where evidence is still thin.',
   },
 };
 
@@ -47,8 +60,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
 
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-canvas text-ink antialiased">
+    <html lang="en" className={`${display.variable} ${body.variable}`}>
+      <body className="min-h-screen bg-canvas font-sans text-ink antialiased">
         <NavBar />
         <main className="mx-auto max-w-6xl px-4 pb-28 pt-3 sm:px-6 sm:pb-16 sm:pt-6">
           {children}
@@ -85,7 +98,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               Changelog
             </Link>
             <Link href="/trust" className="hover:text-ink-700">
-              Methodology
+              How it works
             </Link>
             <Link href="/corrections" className="hover:text-ink-700">
               Corrections
@@ -99,14 +112,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {userEmail && <span className="ml-auto text-ink-300">Signed in as {userEmail}</span>}
           </div>
           <p className="mt-3 max-w-2xl">
-            Crosscheck describes how public reporting agrees, conflicts, and where evidence is
-            missing across sources and sensor networks. Every signal links to the underlying
-            reports; every disagreement shows both sides. It is not an investigation tool and not
-            a news app.
+            Crosscheck is built for the people — clear calls when reporting lines up, both sides
+            when sources clash, and honest gaps when evidence is thin. Every signal links back to
+            the underlying reports.
           </p>
           <p className="mt-2 max-w-2xl">
-            Contact: <a href={`mailto:${siteConfig.supportEmail}`} className="underline hover:text-ink-700">{siteConfig.supportEmail}</a>{' '}
-            · Security: <a href={`mailto:${siteConfig.securityEmail}`} className="underline hover:text-ink-700">{siteConfig.securityEmail}</a>
+            Contact:{' '}
+            <a href={`mailto:${siteConfig.supportEmail}`} className="underline hover:text-ink-700">
+              {siteConfig.supportEmail}
+            </a>{' '}
+            · Security:{' '}
+            <a href={`mailto:${siteConfig.securityEmail}`} className="underline hover:text-ink-700">
+              {siteConfig.securityEmail}
+            </a>
           </p>
         </footer>
       </body>

@@ -29,10 +29,13 @@ export default async function OnboardingPage() {
   return (
     <div className="mx-auto max-w-xl space-y-5">
       <header>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-700">Welcome</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Set up your workspace</h1>
+        <p className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-signal">
+          Welcome, Newcomer
+        </p>
+        <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight">Set up your HQ</h1>
         <p className="mt-2 text-sm text-ink-600">
-          One-time setup. Pick your identity, focus topics, and delivery defaults. You can change anything later.
+          One-time setup. Pick your name, focus topics, and how you want alerts. Earn XP as you check claims —
+          you can change anything later.
         </p>
       </header>
       <div className="rounded-card border border-ink-100 bg-paper p-5">

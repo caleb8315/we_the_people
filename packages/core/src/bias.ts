@@ -145,7 +145,7 @@ const EMOTIONAL_PATTERNS: ReadonlyArray<RegExp> = [
 const ALL_CAPS_RX = /\b[A-Z]{4,}\b/g;
 
 const DISCLAIMER =
-  'Bias signals describe how the text is written. They are not a judgement of whether the underlying claim is true.';
+  'Bias signals describe how the text is written — loaded words, framing, tone — separate from whether the claim itself checks out.';
 
 function intensityFromHits(hits: number, perHit: number, cap: number): number {
   return Math.min(cap, hits * perHit);

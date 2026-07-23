@@ -25,6 +25,7 @@ import {
 import { SignalFeedbackButtons } from '@/components/signal-feedback';
 import { DevelopStoryButton } from '@/components/develop-story';
 import { SignalShareButton } from '@/components/signal-share-button';
+import { AwardProgress } from '@/components/award-progress';
 import { prettyOutletName } from '@/lib/reader-report';
 
 export const revalidate = 30;
@@ -134,6 +135,7 @@ export default async function SignalPage({ params }: PageProps) {
   const humanVerdict = trustExplanation.reader_summary || trustExplanation.summary || bottomLine;
   return (
     <article className="space-y-4 sm:space-y-5">
+      <AwardProgress action="open_signal" disputed={contradictionsCount > 0} />
       {/* Reader-first header: what happened → what we think about it →
           the technical chrome. The event title is the hero because it's
           the thing you're here to read; the verdict sits right below it
@@ -159,7 +161,7 @@ export default async function SignalPage({ params }: PageProps) {
             {statusLabel(signal.verification_status)}
           </Badge>
           {contradictionsCount > 0 && (
-            <Badge variant="disputed">Sources disagree ({contradictionsCount})</Badge>
+            <Badge variant="disputed">Sources clash ({contradictionsCount})</Badge>
           )}
         </div>
 

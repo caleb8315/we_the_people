@@ -79,7 +79,7 @@ describe('buildConfidenceReport', () => {
     });
     assert.equal(report.band, 'high');
     assert.equal(report.label_short, 'HIGH');
-    assert.equal(report.label_display, 'High confidence');
+    assert.equal(report.label_display, 'Looks solid');
     assert.ok(report.explanation_bullets.length >= 1);
     assert.ok(report.explanation_bullets.length <= 3);
     assert.ok(report.source_trace.length >= 1);
@@ -214,7 +214,7 @@ describe('buildConfidenceReport', () => {
       physical_evidence: null,
     });
     assert.equal(report.band, 'medium');
-    assert.match(report.summary, /2 rated outlets/);
+    assert.match(report.summary, /2 rated/);
   });
 
   it('floors band to `medium` on volume alone when 5+ unrated sources agree (bias guard)', () => {
@@ -293,10 +293,10 @@ describe('buildConfidenceReport', () => {
 });
 
 describe('confidenceBandDisplay', () => {
-  it('maps bands to stable display strings', () => {
-    assert.equal(confidenceBandDisplay('high'), 'High confidence');
-    assert.equal(confidenceBandDisplay('medium'), 'Mixed evidence');
-    assert.equal(confidenceBandDisplay('low'), 'Limited evidence');
-    assert.equal(confidenceBandDisplay('contested'), 'Sources disagree');
+  it('maps bands to people-first display strings', () => {
+    assert.equal(confidenceBandDisplay('high'), 'Looks solid');
+    assert.equal(confidenceBandDisplay('medium'), 'Still forming');
+    assert.equal(confidenceBandDisplay('low'), 'Thin so far');
+    assert.equal(confidenceBandDisplay('contested'), 'Sources clash');
   });
 });

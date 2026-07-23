@@ -6,8 +6,10 @@ import { SignalCard } from '@/components/signal-card';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { decorateSignals, personalizeSignals, type SignalRowRaw } from '@/lib/signals';
+import { PlayerStatus } from '@/components/player-status';
+import { DailyMissions } from '@/components/daily-missions';
 
-export const metadata = { title: 'Dashboard · Crosscheck' };
+export const metadata = { title: 'HQ · Crosscheck' };
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
@@ -51,7 +53,7 @@ export default async function DashboardPage() {
   if (!profile?.onboarded_at) redirect('/onboarding');
 
   const lastVisit = profile.last_dashboard_visit_at ?? null;
-  const personal = personalizeSignals(((rawSignals ?? []) as SignalRowRaw[]), prefs);
+  const personal = personalizeSignals((rawSignals ?? []) as SignalRowRaw[], prefs);
   const decoratedPersonal = await decorateSignals(sb, personal.slice(0, 12), { newSince: lastVisit });
 
   const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
@@ -71,63 +73,77 @@ export default async function DashboardPage() {
     .eq('bucket', 'priority_alert');
   const alertsSentToday = (alertUsage ?? []).reduce((sum, r) => sum + Number(r.calls ?? 0), 0);
 
-  // Fire-and-forget: mark the new last-visit time so "New" badges re-baseline next visit.
   void sb
     .from('profiles')
     .update({ last_dashboard_visit_at: new Date().toISOString() })
     .eq('user_id', auth.user.id);
 
-  const name = profile.display_name || auth.user.email?.split('@')[0] || 'Analyst';
+  const name = profile.display_name || auth.user.email?.split('@')[0] || 'Citizen';
   const topics = (prefs?.topics ?? ['war', 'economy', 'climate']) as string[];
   const alertCap = Number(prefs?.max_alerts_per_day_preference ?? 3);
 
   return (
     <div className="space-y-5 sm:space-y-7">
-      {/* Hero — warm cream panel with an inline "today" strip on the right. */}
-      <header className="relative overflow-hidden rounded-card border border-ink-100 bg-gradient-to-br from-brand-50/60 via-paper to-paper p-5 sm:p-7">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-brand-200/40 blur-3xl" aria-hidden />
-        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <header className="relative overflow-hidden rounded-[28px] border border-ink-100 bg-ink-900 px-5 py-6 text-white sm:px-7 sm:py-8">
+        <div
+          className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full bg-signal/30 blur-3xl animate-drift"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -bottom-20 left-10 h-48 w-48 rounded-full bg-flare/20 blur-3xl"
+          aria-hidden
+        />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-brand-700">Workspace</p>
-            <h1 className="mt-1.5 text-[28px] font-semibold leading-[1.15] tracking-tight sm:text-[34px]">
+            <p className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-signal-300">
+              Command HQ
+            </p>
+            <h1 className="mt-2 font-display text-[30px] font-semibold leading-[1.1] tracking-tight sm:text-[38px]">
               Welcome back, {name}.
             </h1>
-            <p className="mt-2 max-w-xl text-sm text-ink-500">
-              Your consistency-check workspace. Fresh signals, how sources agree, and what to watch next.
+            <p className="mt-2 max-w-xl text-sm text-white/70">
+              Clear calls for the people. Missions today, stories that matter, and what looks solid vs what clashes.
             </p>
             <Link
               href="/verify"
-              className="mt-4 inline-flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2.5 text-sm font-medium text-white shadow-[0_8px_20px_-6px_rgba(245,158,11,0.55)] transition hover:bg-amber-600"
+              className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-flare px-5 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_-8px_rgba(228,87,46,0.65)] transition hover:bg-flare-600"
             >
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 3 4 6v6c0 4.5 3.3 8.3 8 9 4.7-.7 8-4.5 8-9V6l-8-3z" />
-                <path d="m9 12 2 2 4-4" />
-              </svg>
-              Verify a claim
+              Verify a claim · +25 XP
             </Link>
           </div>
-          <dl className="grid grid-cols-3 gap-3 text-center sm:shrink-0 sm:text-right">
-            <HeroStat label="Corroborated" value={newCorroboratedCount} tone="accent" />
-            <HeroStat label="Disputed" value={disputedCount} tone={disputedCount > 0 ? 'warn' : 'neutral'} />
-            <HeroStat label="Alerts" value={`${alertsSentToday}/${alertCap}`} tone="neutral" />
+          <dl className="grid grid-cols-3 gap-3 text-center">
+            <HeroStat label="Solid today" value={newCorroboratedCount} />
+            <HeroStat label="Clashes" value={disputedCount} warn={disputedCount > 0} />
+            <HeroStat label="Alerts" value={`${alertsSentToday}/${alertCap}`} />
           </dl>
         </div>
       </header>
 
-      {/* Priority workspace + top signal — side by side on desktop */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <PlayerStatus />
+        <DailyMissions />
+      </div>
+
       <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
         <Link
           href="/dashboard/intel"
-          className="group flex items-start gap-4 rounded-card border border-amber-200 bg-gradient-to-br from-amber-50/80 via-paper to-paper p-5 shadow-card transition hover:shadow-card-hover"
+          className="group flex items-start gap-4 rounded-[28px] border border-flare/25 bg-flare/5 p-5 shadow-card transition hover:shadow-card-hover"
         >
-          <span className="mt-0.5 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-xl text-white shadow-sm">
-            ⚡
+          <span className="mt-0.5 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-flare text-lg font-bold text-white">
+            !
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">Intel center</p>
-            <p className="mt-1 text-sm font-semibold text-ink group-hover:text-amber-700">High-severity signals for your focus topics</p>
+            <p className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-flare-700">
+              Hot zone
+            </p>
+            <p className="mt-1 text-sm font-semibold text-ink group-hover:text-flare-700">
+              High-severity signals for your focus topics
+            </p>
             <p className="mt-1 text-xs text-ink-500">
-              {criticalCount > 0 ? `${criticalCount} critical signal${criticalCount === 1 ? '' : 's'} right now` : 'Filtered to your interests'} · {disputedCount > 0 ? `${disputedCount} disputed` : 'no disputes'}
+              {criticalCount > 0
+                ? `${criticalCount} critical right now`
+                : 'Filtered to your interests'}{' '}
+              · {disputedCount > 0 ? `${disputedCount} clashes` : 'no clashes'}
             </p>
           </div>
         </Link>
@@ -143,7 +159,7 @@ export default async function DashboardPage() {
           <Card tone="neutral">
             <p className="text-sm text-ink-500">
               No personalized signals yet — adjust your topics or try the{' '}
-              <Link href="/feed?mode=global" className="text-brand-700 underline-offset-2 hover:underline">
+              <Link href="/feed?mode=global" className="text-signal underline-offset-2 hover:underline">
                 global feed
               </Link>
               .
@@ -152,18 +168,19 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      {/* Two-column body: signals on the left, sidebar rail on the right. */}
       <div className="grid gap-5 lg:grid-cols-3">
         <section className="lg:col-span-2">
           <header className="mb-3 flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-ink-600">My top signals</h2>
+              <h2 className="font-display text-sm font-semibold uppercase tracking-[0.16em] text-ink-600">
+                Your top stories
+              </h2>
               <p className="mt-0.5 text-xs text-ink-400">
-                Filtered to your focus: {topics.slice(0, 4).join(' · ')}
+                Focus: {topics.slice(0, 4).join(' · ')}
                 {topics.length > 4 && ` · +${topics.length - 4}`}
               </p>
             </div>
-            <Link href="/feed" className="text-sm font-medium text-brand-700 hover:underline">
+            <Link href="/feed" className="text-sm font-medium text-signal hover:underline">
               View all →
             </Link>
           </header>
@@ -190,7 +207,7 @@ export default async function DashboardPage() {
               {topics.map((t) => (
                 <span
                   key={t}
-                  className="rounded-full border border-ink-100 bg-canvas-50 px-2.5 py-0.5 text-[11px] font-medium text-ink-600"
+                  className="rounded-xl border border-ink-100 bg-canvas-50 px-2.5 py-0.5 text-[11px] font-medium text-ink-600"
                 >
                   {t}
                 </span>
@@ -205,7 +222,7 @@ export default async function DashboardPage() {
               />
               <FocusRow label="Alert intensity" value={prefs?.alert_intensity_preference ?? 'critical_only'} />
             </dl>
-            <Link href="/settings" className="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline">
+            <Link href="/settings" className="mt-3 inline-block text-sm font-medium text-signal hover:underline">
               Update preferences →
             </Link>
           </Card>
@@ -223,7 +240,7 @@ export default async function DashboardPage() {
                 </p>
                 <Link
                   href={`/briefings/${briefing.id}`}
-                  className="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline"
+                  className="mt-3 inline-block text-sm font-medium text-signal hover:underline"
                 >
                   Open briefing →
                 </Link>
@@ -253,34 +270,25 @@ export default async function DashboardPage() {
   );
 }
 
-/** Small numeric tile used inside the hero strip. Stays readable on the
- * cream hero without competing with the main heading. */
 function HeroStat({
   label,
   value,
-  tone,
+  warn = false,
 }: {
   label: string;
   value: React.ReactNode;
-  tone: 'neutral' | 'accent' | 'warn';
+  warn?: boolean;
 }) {
-  const toneClass =
-    tone === 'accent'
-      ? 'text-brand-700'
-      : tone === 'warn'
-        ? 'text-amber-700'
-        : 'text-ink-700';
   return (
-    <div className="rounded-xl border border-ink-100/80 bg-paper/80 px-3 py-2 backdrop-blur-sm">
-      <dt className="text-[10px] font-medium uppercase tracking-wider text-ink-400">{label}</dt>
-      <dd className={`mt-0.5 text-xl font-semibold tabular-nums ${toneClass}`}>{value}</dd>
+    <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 backdrop-blur-sm">
+      <dt className="text-[10px] font-medium uppercase tracking-wider text-white/50">{label}</dt>
+      <dd className={`mt-0.5 text-xl font-semibold tabular-nums ${warn ? 'text-flare-200' : 'text-white'}`}>
+        {value}
+      </dd>
     </div>
   );
 }
 
-/** Featured card for the user's single top-priority signal. Pulls it out
- * of the at-a-glance grid so it actually gets the visual weight it
- * deserves. */
 function TopPriorityCard({
   id,
   title,
@@ -295,32 +303,40 @@ function TopPriorityCard({
   verification: string;
 }) {
   const severe = severity >= 85;
-  const accent = severe ? 'from-danger-50 via-paper to-paper border-danger-200' : 'from-brand-50/70 via-paper to-paper border-brand-200';
-  const pillTone = severe ? 'bg-danger-100 text-danger-700' : 'bg-brand-100 text-brand-700';
   return (
     <Link
       href={`/signal/${id}`}
-      className={`group relative block overflow-hidden rounded-card border bg-gradient-to-br p-5 shadow-card transition hover:shadow-lg sm:p-6 ${accent}`}
+      className={`group relative block overflow-hidden rounded-[28px] border p-5 shadow-card transition hover:shadow-card-hover sm:p-6 ${
+        severe
+          ? 'border-danger-200 bg-gradient-to-br from-danger-50 via-paper to-paper'
+          : 'border-signal/25 bg-gradient-to-br from-signal/10 via-paper to-paper'
+      }`}
     >
       <div className="flex items-start gap-4 sm:gap-5">
-        <div className={`flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-2xl ${pillTone} sm:h-20 sm:w-20`}>
+        <div
+          className={`flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-2xl sm:h-20 sm:w-20 ${
+            severe ? 'bg-danger-100 text-danger-700' : 'bg-signal/15 text-signal-700'
+          }`}
+        >
           <span className="text-2xl font-semibold leading-none tabular-nums sm:text-3xl">{severity}</span>
           <span className="mt-0.5 text-[9px] font-medium uppercase tracking-wider opacity-80">severity</span>
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500">Top priority</span>
-            <span className="rounded-full border border-ink-100 bg-paper/70 px-2 py-0.5 text-[10px] font-medium text-ink-600">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500">
+              Top priority
+            </span>
+            <span className="rounded-xl border border-ink-100 bg-paper/70 px-2 py-0.5 text-[10px] font-medium text-ink-600">
               {topic}
             </span>
-            <span className="rounded-full border border-ink-100 bg-paper/70 px-2 py-0.5 text-[10px] font-medium text-ink-600">
+            <span className="rounded-xl border border-ink-100 bg-paper/70 px-2 py-0.5 text-[10px] font-medium text-ink-600">
               {verification.replace(/_/g, ' ')}
             </span>
           </div>
-          <p className="mt-2 text-[17px] font-semibold leading-snug text-ink clamp-2 sm:text-lg">{title}</p>
-          <p className="mt-2 text-xs text-ink-500">
-            Open signal for evidence, contradictions, and the live source trace →
+          <p className="mt-2 font-display text-[17px] font-semibold leading-snug text-ink clamp-2 sm:text-lg">
+            {title}
           </p>
+          <p className="mt-2 text-xs text-ink-500">Open for evidence, clashes, and the live source trail →</p>
         </div>
       </div>
     </Link>
@@ -344,10 +360,13 @@ function QuickTool({ href, title, body }: { href: string; title: string; body: s
         className="group -mx-1 flex items-start justify-between gap-3 rounded-lg px-1 py-2 transition hover:bg-canvas-50"
       >
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-ink-700 group-hover:text-brand-700">{title}</p>
+          <p className="text-sm font-semibold text-ink-700 group-hover:text-signal">{title}</p>
           <p className="mt-0.5 text-xs text-ink-500">{body}</p>
         </div>
-        <span className="mt-0.5 text-ink-300 transition group-hover:translate-x-0.5 group-hover:text-brand-700" aria-hidden>
+        <span
+          className="mt-0.5 text-ink-300 transition group-hover:translate-x-0.5 group-hover:text-signal"
+          aria-hidden
+        >
           →
         </span>
       </Link>

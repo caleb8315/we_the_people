@@ -68,9 +68,9 @@ export function MobileBottomNav({ signedIn }: { signedIn: boolean }) {
                 className="flex min-h-[44px] items-center justify-center"
               >
                 <span
-                  className={`inline-flex h-11 w-11 items-center justify-center rounded-full transition ${
+                  className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl transition ${
                     isActive
-                      ? 'bg-amber-500 text-white shadow-[0_6px_16px_-4px_rgba(245,158,11,0.6)]'
+                      ? 'bg-signal text-white shadow-[0_6px_16px_-4px_rgba(15,155,142,0.55)]'
                       : 'text-white/65 hover:bg-white/10 hover:text-white'
                   }`}
                 >

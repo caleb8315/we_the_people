@@ -214,9 +214,9 @@ export function SignalCard({ s }: { s: SignalRow }) {
               {disputed && (
                 <Badge
                   variant="disputed"
-                  title="Sources disagree on a material detail of this signal"
+                  title="Sources clash on a material detail of this signal"
                 >
-                  Sources disagree
+                  Sources clash
                 </Badge>
               )}
               {s.is_new_since && (
@@ -243,7 +243,7 @@ export function SignalCard({ s }: { s: SignalRow }) {
             </div>
             <span
               aria-hidden="true"
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white shadow-[0_6px_16px_-4px_rgba(245,158,11,0.55)] transition group-hover:bg-amber-600"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-signal text-white shadow-[0_6px_16px_-4px_rgba(15,155,142,0.45)] transition group-hover:bg-signal-600"
             >
               <svg
                 viewBox="0 0 24 24"

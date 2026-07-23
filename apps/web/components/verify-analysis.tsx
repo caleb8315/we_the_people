@@ -549,7 +549,7 @@ function BiasCard({ bias }: { bias: CorpusBiasReport }) {
           </h3>
         </div>
         <span className="rounded-full border border-ink-100 bg-canvas-50 px-2.5 py-1 text-[11px] font-medium text-ink-600">
-          Signal · not a verdict
+          Writing style · separate from the claim
         </span>
       </header>
       <p className="mt-2 text-[13.5px] leading-relaxed text-ink-600">{bias.summary}</p>
@@ -808,13 +808,13 @@ function EvidenceCardRow({ card }: { card: EvidenceCard }) {
 function bandFriendly(band: ConfidenceBreakdown['band']): string {
   switch (band) {
     case 'high':
-      return 'Well-supported comparison';
+      return 'Looks trustworthy';
     case 'medium':
-      return 'Mixed evidence';
+      return 'Still forming';
     case 'contested':
-      return 'Sources disagree';
+      return 'Sources clash';
     case 'low':
-      return 'Comparison too thin';
+      return 'Thin so far';
   }
 }
 

@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { FeedFreshness } from '@/components/feed-freshness';
 import { FeedAutoCorroboration } from '@/components/feed-auto-corroboration';
 import { FeedOrientationBanner } from '@/components/feed-orientation-banner';
+import { PlayerStatus } from '@/components/player-status';
 import { logProductEvent } from '@/lib/product-events';
 import { applyMutes, decorateSignals, type SignalRowRaw } from '@/lib/signals';
 import { groupSignalsForFeed, rankGlobalFeedStories } from '@/lib/signal-feed';
@@ -242,67 +243,72 @@ export default async function FeedPage({
 
   return (
     <div className="space-y-6 sm:space-y-7">
-      {/* Greeting hero — mirrors the reference "let's go trip to africa" header. */}
-      <section>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">
-          {userName ? `Hello, ${userName}` : 'Live coverage'}
-        </p>
-        <h1 className="mt-2 max-w-2xl text-[34px] font-semibold leading-[1.1] tracking-tight text-ink sm:text-[44px]">
-          what&apos;s moving
-          <br />
-          <span className="text-ink-500">the world right now.</span>
-        </h1>
+      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-[11px] font-semibold uppercase tracking-[0.22em] text-signal">
+            {userName ? `Hey, ${userName}` : 'Live coverage'}
+          </p>
+          <h1 className="mt-2 max-w-2xl font-display text-[34px] font-semibold leading-[1.1] tracking-tight text-ink sm:text-[44px]">
+            What&apos;s moving
+            <br />
+            <span className="text-ink-500">the world right now.</span>
+          </h1>
+          <p className="mt-2 max-w-xl text-sm text-ink-500">
+            Scout stories for XP. Open three to clear today&apos;s mission.
+          </p>
 
-        {/* Search + filter button. The amber square on the right matches the
-            reference's filter affordance. */}
-        <form action="/feed" className="mt-5 flex max-w-xl items-center gap-3">
-          <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-ink-100 bg-paper px-4 py-3 shadow-card">
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              className="h-4 w-4 shrink-0 text-ink-400"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          <form action="/feed" className="mt-5 flex max-w-xl items-center gap-3">
+            <label className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-ink-100 bg-paper px-4 py-3 shadow-card">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="h-4 w-4 shrink-0 text-ink-400"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              <input
+                name="topic"
+                type="search"
+                defaultValue={topic !== 'all' ? topic : ''}
+                placeholder="Search topics, countries, outlets"
+                className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-ink-400 focus:outline-none"
+              />
+              <input type="hidden" name="hours" value={String(hours)} />
+              <input type="hidden" name="view" value={view} />
+              <input type="hidden" name="mode" value={mode} />
+              <input type="hidden" name="corroboration" value={corroboration} />
+            </label>
+            <button
+              type="submit"
+              aria-label="Apply search"
+              className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-signal text-white shadow-[0_8px_20px_-6px_rgba(15,155,142,0.45)] hover:bg-signal-600"
             >
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
-            <input
-              name="topic"
-              type="search"
-              defaultValue={topic !== 'all' ? topic : ''}
-              placeholder="Search topics, countries, outlets"
-              className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-ink-400 focus:outline-none"
-            />
-            <input type="hidden" name="hours" value={String(hours)} />
-            <input type="hidden" name="view" value={view} />
-            <input type="hidden" name="mode" value={mode} />
-            <input type="hidden" name="corroboration" value={corroboration} />
-          </label>
-          <button
-            type="submit"
-            aria-label="Apply search"
-            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-[0_8px_20px_-6px_rgba(245,158,11,0.55)] hover:bg-amber-600"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="4" y1="6" x2="20" y2="6" />
-              <line x1="7" y1="12" x2="17" y2="12" />
-              <line x1="10" y1="18" x2="14" y2="18" />
-            </svg>
-          </button>
-        </form>
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="4" y1="6" x2="20" y2="6" />
+                <line x1="7" y1="12" x2="17" y2="12" />
+                <line x1="10" y1="18" x2="14" y2="18" />
+              </svg>
+            </button>
+          </form>
+        </div>
+        <div className="w-full max-w-sm lg:shrink-0">
+          <PlayerStatus compact />
+        </div>
       </section>
 
       <FeedOrientationBanner />
