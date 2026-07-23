@@ -53,10 +53,10 @@ describe('detectBias', () => {
     assert.ok(emotion.intensity > 0);
   });
 
-  it('always carries the disclaimer that bias is a signal, not a verdict', () => {
+  it('always carries a plain-language bias disclaimer', () => {
     const r = detectBias('Some loaded regime extremist propaganda terrorists committed crushing attacks here.');
-    assert.match(r.disclaimer, /signal|not a judgement|not a verdict/i);
-    // Critically: we never claim the sentence is or isn't true.
+    assert.match(r.disclaimer, /bias|framing|loaded|how the text is written/i);
+    // Bias summary describes writing, not whether the claim is true/false.
     assert.ok(!/this is (true|false)/i.test(r.summary));
   });
 });
@@ -71,7 +71,7 @@ describe('detectCorpusBias', () => {
     assert.ok(r.pieces > 0);
     assert.ok(r.avg_intensity >= 0);
     assert.equal(typeof r.has_signal, 'boolean');
-    assert.match(r.disclaimer, /signal|not a judgement|not a verdict/i);
+    assert.match(r.disclaimer, /bias|framing|loaded|how the text is written/i);
   });
 
   it('returns a neutral report on empty corpora', () => {

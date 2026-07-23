@@ -4,12 +4,20 @@
 
 :root {
   color-scheme: light;
+  --ink: #0b1f3a;
+  --signal: #0f9b8e;
+  --flare: #e4572e;
+  --canvas: #eef3f7;
 }
 
 html,
 body {
-  background: #f6f7fa;
-  color: #0f172a;
+  background:
+    radial-gradient(1200px 500px at 10% -10%, rgba(15, 155, 142, 0.12), transparent 55%),
+    radial-gradient(900px 420px at 90% 0%, rgba(228, 87, 46, 0.08), transparent 50%),
+    linear-gradient(180deg, #f4f8fb 0%, var(--canvas) 40%, #e8eef4 100%);
+  background-attachment: fixed;
+  color: var(--ink);
   min-height: 100%;
   font-feature-settings: 'ss01', 'cv11';
   font-size: 16px;
@@ -22,49 +30,63 @@ a {
   color: inherit;
 }
 
-/* Consistent focus ring — amber matches the new accent */
 :where(button, a, input, select, textarea, [role='button']):focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.55);
+  box-shadow: 0 0 0 2px rgba(15, 155, 142, 0.55);
   border-radius: 8px;
 }
 
-/* Line-clamp utilities for scannable cards */
 .clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 .clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-/* Hide scrollbar on horizontal chip rows while keeping scroll behavior */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Indeterminate progress sweep — used by the verify loading card when the
-   fan-out goes past its expected p95 window. */
 @keyframes progressSweep {
   0%   { left: -33%; }
   50%  { left: 50%; }
   100% { left: 100%; }
 }
 
-/* Article typography used on briefing detail + long pages */
-.prose-osint p { line-height: 1.7; color: #1f2937; }
+.xp-fill {
+  animation: pulseBar 2.4s ease-in-out infinite;
+  transition: width 0.7s ease-out;
+}
+
+@keyframes pulseBar {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.08); }
+}
+
+/* Mesh pattern for hero atmosphere — not a flat fill */
+.hero-mesh {
+  background-color: #0b1f3a;
+  background-image:
+    radial-gradient(circle at 18% 22%, rgba(15, 155, 142, 0.45), transparent 34%),
+    radial-gradient(circle at 78% 18%, rgba(228, 87, 46, 0.28), transparent 32%),
+    radial-gradient(circle at 60% 78%, rgba(15, 155, 142, 0.2), transparent 40%),
+    linear-gradient(160deg, #071525 0%, #0b1f3a 45%, #12304a 100%);
+}
+
+.prose-osint p { line-height: 1.7; color: #163255; }
 .prose-osint h1, .prose-osint h2, .prose-osint h3 {
   letter-spacing: -0.01em;
-  color: #0f172a;
+  color: #0b1f3a;
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
 }
 .prose-osint h2 { font-size: 20px; font-weight: 600; margin-top: 1.25em; }
 .prose-osint h3 { font-size: 16px; font-weight: 600; margin-top: 1em; }
 .prose-osint ul { padding-left: 1.15em; list-style: disc; }
 .prose-osint li { margin-top: 0.25em; }
 
-/* Topic tile gradients — used for SignalCard header tiles + topic chips. */
 .tile-war       { background: linear-gradient(135deg, #fff1f2 0%, #fecdd3 60%, #fda4af 100%); }
 .tile-economy   { background: linear-gradient(135deg, #ecfeff 0%, #a5f3fc 60%, #67e8f9 100%); }
 .tile-climate   { background: linear-gradient(135deg, #ecfdf5 0%, #a7f3d0 60%, #6ee7b7 100%); }
-.tile-health    { background: linear-gradient(135deg, #f5f3ff 0%, #ddd6fe 60%, #c4b5fd 100%); }
+.tile-health    { background: linear-gradient(135deg, #eef6ff 0%, #c7ddfe 60%, #93c5fd 100%); }
 .tile-civil     { background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 60%, #fdba74 100%); }
-.tile-cyber     { background: linear-gradient(135deg, #eef2ff 0%, #c7d2fe 60%, #a5b4fc 100%); }
-.tile-disaster  { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 55%, #f59e0b 100%); }
+.tile-cyber     { background: linear-gradient(135deg, #e7f8f6 0%, #8edfd5 60%, #0f9b8e 100%); }
+.tile-disaster  { background: linear-gradient(135deg, #fff1ec 0%, #ffb399 55%, #e4572e 100%); }
 .tile-tech      { background: linear-gradient(135deg, #f0f9ff 0%, #bae6fd 60%, #7dd3fc 100%); }
-.tile-finance   { background: linear-gradient(135deg, #faf5ff 0%, #e9d5ff 60%, #c084fc 100%); }
-.tile-default   { background: linear-gradient(135deg, #f1f5f9 0%, #cbd5e1 60%, #94a3b8 100%); }
+.tile-finance   { background: linear-gradient(135deg, #ecfdf5 0%, #6ee7b7 60%, #10b981 100%); }
+.tile-default   { background: linear-gradient(135deg, #e8eef4 0%, #c7d5e0 60%, #6b8296 100%); }

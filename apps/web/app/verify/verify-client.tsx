@@ -12,6 +12,7 @@ import type { ReaderReport } from '@/lib/reader-report';
 import type { ForensicReport, ForensicFinding } from '@/lib/image-forensics';
 import { Segmented } from '@/components/ui/segmented';
 import { VerifyAnalysis, type VerifyAnalysisData } from '@/components/verify-analysis';
+import { applyXpAction } from '@/lib/gamification';
 
 type Kind = 'url' | 'text' | 'image';
 
@@ -169,6 +170,7 @@ export function VerifyClient({ signedIn }: { signedIn: boolean }) {
       }
       const data = (await res.json()) as VerifyResponse;
       setResult(data);
+      applyXpAction('verify_claim');
       try {
         await fetch('/api/events', {
           method: 'POST',
@@ -799,14 +801,14 @@ function toneDotClass(tone: 'info' | 'good' | 'warn'): string {
 function friendlyBandLabel(band: string): string {
   switch (band) {
     case 'high':
-      return 'Well-supported';
+      return 'Looks trustworthy';
     case 'contested':
-      return 'Sources disagree';
+      return 'Sources clash';
     case 'medium':
-      return 'Developing \u2014 some support';
+      return 'Still forming';
     case 'low':
     default:
-      return 'Not enough to judge yet';
+      return 'Thin so far';
   }
 }
 

@@ -4,9 +4,9 @@
  * Goal: every user-facing surface (feed card, signal page, briefing,
  * verify hero) shares one deterministic explanation generator that:
  *
- *   1. Speaks like a careful analyst, not a model or a lawyer.
- *   2. States conclusions in proportion to evidence strength and keeps
- *      uncertainty explicit where details are still moving.
+ *   1. Speaks like a sharp friend who read everything — clear and human.
+ *   2. Calls it when evidence is strong ("this looks trustworthy") and
+ *      says so plainly when things are thin or disputed.
  *   3. Always points the reader to a deeper surface ("Learn more"):
  *      evidence list, source comparison, or `/trust` methodology.
  *
@@ -103,15 +103,17 @@ export interface TrustExplanation {
   };
 }
 
-/** Phrases that should never appear in user-facing trust copy. */
+/**
+ * Safety floor only — keep people safe, don't mute clear language.
+ *
+ * We deliberately allow decisive wording ("trustworthy", "true",
+ * "false", "debunked") when the evidence shape supports it. The only
+ * bans left are personal accusation and invented motive certainty.
+ */
 export const FORBIDDEN_TRUST_PHRASES: readonly RegExp[] = [
-  /\bthis is true\b/i,
-  /\bthis is false\b/i,
-  /\bAI verified\b/i,
-  /\bdebunked\b/i,
-  /\bthis is propaganda\b/i,
   /\bthis side is lying\b/i,
   /\b(confirmed|definitive|proven)\s+motive\b/i,
+  /\bAI verified\b/i,
 ];
 
 /**
@@ -163,7 +165,7 @@ export function buildTrustExplanation(
 }
 
 const FALLBACK_SUMMARY =
-  'Read the underlying sources before sharing specifics — corroboration is still developing.';
+  'Still early — open the sources and decide for yourself.';
 
 function storySubject(title: string | undefined): string {
   const t = (title ?? '').trim().replace(/\s+/g, ' ');
@@ -175,28 +177,28 @@ function buildSummary(input: TrustExplanationInput): string {
   const { report, contradictions_count: cc } = input;
   const subject = storySubject(input.title);
   if (cc > 0) {
-    return `${subject} is being reported with conflicting details. We flagged the exact points of disagreement below.`;
+    return `${subject} has conflicting details across sources. We flagged the exact disagreements below.`;
   }
   switch (report.band) {
     case 'high':
       if (input.syndicated) {
-        return `${subject} is being carried by ${input.source_count} sites, but many appear to be running the same article. Independent confirmation is thinner than the raw count suggests.`;
+        return `${subject} is everywhere online, but a lot of that is the same article copied around. Treat the crowd size as smaller than it looks.`;
       }
       return input.source_count >= 4
-        ? `${subject} is reported by ${input.source_count} different newsrooms with matching core details.`
-        : `${subject} is reported by multiple newsrooms that agree on the basic event.`;
+        ? `${subject} looks trustworthy — ${input.source_count} different newsrooms match on the core facts.`
+        : `${subject} looks solid — multiple newsrooms agree on what happened.`;
     case 'medium':
       if (input.syndicated) {
-        return `${subject} has broad pickup, but much of it appears to be republished copy rather than independent reporting.`;
+        return `${subject} has broad pickup, but much of it looks like republished copy rather than fresh reporting.`;
       }
-      return `${subject} looks real but is still developing. Core details are reported, while specifics remain unsettled.`;
+      return `${subject} looks real, but it's still forming. Core facts are in; some specifics can still move.`;
     case 'low':
       if (input.source_count <= 1) {
-        return `${subject} currently has only one source. Read it directly and wait for independent pickup before trusting specifics.`;
+        return `${subject} is still single-source. Interesting, but don't bet the farm on the details yet.`;
       }
-      return `${subject} has ${input.source_count} mentions, but independent confirmation is still thin for key details.`;
+      return `${subject} has ${input.source_count} mentions, but independent confirmation is still thin.`;
     case 'contested':
-      return `${subject} is being reported with conflicting details. We flagged the exact points of disagreement below.`;
+      return `${subject} has conflicting details across sources. We flagged the exact disagreements below.`;
   }
 }
 
@@ -214,16 +216,16 @@ function buildWhy(input: TrustExplanationInput): string[] {
       );
     } else if (input.source_count >= 5) {
       out.push(
-        `${input.source_count} different newsrooms are reporting this — that is meaningful corroboration when each one is reporting independently.`,
+        `${input.source_count} different newsrooms are on this — strong corroboration when each one is reporting independently.`,
       );
     } else if (input.source_count >= 3) {
       out.push(
-        `${input.source_count} sources are reporting this and the core event description is broadly consistent.`,
+        `${input.source_count} sources are reporting this and the core event description lines up.`,
       );
     } else if (input.source_count === 2) {
-      out.push('Two sources are reporting this so far. Helpful signal, but still early.');
+      out.push('Two sources are reporting this so far. Helpful, but still early.');
     } else {
-      out.push('Only one source is reporting this so far. That is not enough to judge reliability.');
+      out.push('Only one source so far — too early to call this settled.');
     }
   }
 
@@ -270,18 +272,18 @@ function buildWatchFor(
 ): string | null {
   if (input.contradictions_count > 0) {
     if (contraTypes.includes('cause_conflict')) {
-      return 'Be careful with posts that state the cause or motive as settled — that part is disputed.';
+      return 'Cause and motive are still fought over — skip posts that treat that part as settled.';
     }
     if (contraTypes.includes('numeric_conflict')) {
-      return 'Numbers (casualty counts, magnitudes, totals) are still moving. Wait for them to settle before sharing specifics.';
+      return 'Numbers (casualty counts, magnitudes, totals) are still moving. Wait a beat before sharing specifics.';
     }
-    return 'Hold off on sharing specific claims until the disagreement settles.';
+    return 'Hold the specifics until the disagreement settles.';
   }
   if (input.report.band === 'low' && input.source_count <= 1) {
-    return 'Single-source reports change a lot in the first hours. Wait for confirmation from other newsrooms before trusting the detail.';
+    return 'Single-source stories swing hard in the first hours. Wait for a second newsroom before trusting the detail.';
   }
   if (input.syndicated) {
-    return 'A high source count is misleading here — most of these sites are running the same article. Don\u2019t treat that as many newsrooms confirming it independently.';
+    return 'A big source count can fool you here — most sites are running the same article, not independently confirming it.';
   }
   return null;
 }
@@ -573,25 +575,25 @@ function buildReaderBrief(
   const sourceConfidence =
     input.report.band === 'high'
       ? {
-          label: 'High source consistency',
+          label: 'Looks trustworthy',
           detail: 'Multiple independent reports align on the core event.',
           level: 'high' as const,
         }
       : input.report.band === 'medium'
         ? {
-            label: 'Developing source consistency',
+            label: 'Still forming',
             detail: 'Some corroboration exists, but key details can still move.',
             level: 'medium' as const,
           }
         : input.report.band === 'contested'
           ? {
-              label: 'Disputed reporting',
-              detail: 'Sources disagree on important details. Check both sides below.',
+              label: 'Sources clash',
+              detail: 'Outlets disagree on important details. Check both sides below.',
               level: 'contested' as const,
             }
           : {
-              label: 'Limited source consistency',
-              detail: 'Coverage is thin or mostly single-source right now.',
+              label: 'Thin so far',
+              detail: 'Coverage is light or mostly single-source right now.',
               level: 'low' as const,
             };
 
@@ -613,9 +615,9 @@ function buildWhyItMatters(input: TrustExplanationInput): string[] {
       'Important decisions can change when key details are disputed across sources.',
     );
   } else if (input.report.band === 'high') {
-    out.push('Independent coverage is aligned, so this story is less likely to swing suddenly.');
+    out.push('Independent coverage lines up, so this one is less likely to flip overnight.');
   } else {
-    out.push('Coverage is still developing, so confidence can change quickly as new evidence arrives.');
+    out.push('Coverage is still developing — the picture can change fast as new evidence lands.');
   }
 
   if (input.syndicated) {

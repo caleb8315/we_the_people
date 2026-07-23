@@ -60,21 +60,21 @@ export default function TrustPage() {
         </p>
         <ul>
           <li>
-            <strong>Likely accurate (70+).</strong> Corroborated across credible, independent
-            sources with supporting sensor evidence.
+            <strong>Looks trustworthy (70+).</strong> Strong agreement across credible,
+            independent sources — often with supporting sensor evidence.
           </li>
           <li>
-            <strong>Unclear (40–69).</strong> Enough evidence to surface; corroboration may be
-            developing or sensor support may be partial.
+            <strong>Still unclear (40–69).</strong> Enough to surface; corroboration may still
+            be forming or sensor support may be partial.
           </li>
           <li>
-            <strong>Likely unreliable (&lt; 40).</strong> Caveat-heavy. Read the underlying
-            reports before relying on the event.
+            <strong>Weak support (&lt; 40).</strong> Thin coverage. Read the underlying reports
+            before relying on the event.
           </li>
         </ul>
         <p className="text-xs text-ink-500">
-          &quot;Likely accurate&quot; means the event is strongly supported by independent reporting.
-          It does not mean every detail is final.
+          &quot;Looks trustworthy&quot; means independent reporting strongly supports the event.
+          Some details can still move as coverage develops.
         </p>
       </section>
 

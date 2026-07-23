@@ -137,10 +137,15 @@ describe('buildTrustExplanation', () => {
     }
   });
 
-  it('isPlainTrustSafe rejects absolute-truth phrasing', () => {
+  it('isPlainTrustSafe only blocks personal accusation, motive certainty, and AI-verified badges', () => {
+    // Decisive truth language is allowed for people — we want clear calls.
+    assert.equal(isPlainTrustSafe('This is true based on multiple outlets.'), true);
+    assert.equal(isPlainTrustSafe('This is false; debunked by experts.'), true);
+    assert.equal(isPlainTrustSafe('This looks trustworthy.'), true);
+    // Safety floor still holds.
     assert.equal(isPlainTrustSafe('This is true and AI verified.'), false);
-    assert.equal(isPlainTrustSafe('This is false; debunked by experts.'), false);
     assert.equal(isPlainTrustSafe('Confirmed motive: state actor.'), false);
+    assert.equal(isPlainTrustSafe('This side is lying.'), false);
     assert.equal(
       isPlainTrustSafe('Multiple independent outlets are reporting this.'),
       true,

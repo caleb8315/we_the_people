@@ -107,10 +107,10 @@ const BAND_LABEL_SHORT: Record<ConfidenceBand, string> = {
 };
 
 const BAND_LABEL_DISPLAY: Record<ConfidenceBand, string> = {
-  high: 'High confidence',
-  medium: 'Mixed evidence',
-  low: 'Limited evidence',
-  contested: 'Sources disagree',
+  high: 'Looks solid',
+  medium: 'Still forming',
+  low: 'Thin so far',
+  contested: 'Sources clash',
 };
 
 /**
@@ -146,36 +146,34 @@ function bandSummary(
   const others = Math.max(0, total - credible);
   switch (band) {
     case 'contested':
-      return 'Different outlets are reporting different things about important parts of this story.';
+      return 'Outlets are telling different versions of the important parts. Compare both sides.';
     case 'high':
       if (credible >= 4) {
-        return `${credible} independent rated outlets are all reporting this.`;
+        return `This looks trustworthy — ${credible} independent rated outlets are all on it.`;
       }
-      return 'Multiple independent rated outlets are reporting the same thing.';
+      return 'This looks solid — multiple independent rated outlets report the same thing.';
     case 'medium':
       if (credible >= 2) {
         return others > 0
-          ? `${total} sources are reporting this (${credible} rated outlets) — story is still developing.`
-          : `${credible} rated outlets are reporting this — the story is still developing.`;
+          ? `${total} sources are on this (${credible} rated) — real, but still forming.`
+          : `${credible} rated outlets are on this — real, but still forming.`;
       }
       if (credible === 1) {
         return others > 0
-          ? `${total} sources are reporting this — one rated outlet and ${others} unrated source${others === 1 ? '' : 's'}. Judge each on its own merits.`
-          : 'One rated outlet is reporting this — watching for independent confirmation.';
+          ? `${total} sources are on this — one rated outlet and ${others} unrated. Read each and decide.`
+          : 'One rated outlet is on this — watching for a second confirmation.';
       }
       // credible === 0 but volume floor fired (5+ sources agree across tiers).
-      return `${total} independent sources are reporting this. None are rated yet, so read them and judge each on its merits.`;
+      return `${total} independent sources are on this. None are rated yet — open them and judge for yourself.`;
     case 'low':
       if (total === 0) {
-        return 'We haven\u2019t been able to find any reporting on this yet.';
+        return 'We haven\u2019t found reporting on this yet.';
       }
-      // Neutral framing: tell the reader what we found, not a verdict on the
-      // sources themselves. Curated credibility lists miss independent
-      // reporting all the time — saying "not major newsrooms" is itself
-      // a bias, not a neutral signal.
+      // Tell the reader what we found. Curated credibility lists miss
+      // independent reporting all the time — don't disparage unrated sources.
       return total === 1
-        ? 'We\u2019ve only found one source for this so far. Look at it yourself and watch for others.'
-        : `${total} sources are reporting this, but none are rated yet. Read them and judge for yourself.`;
+        ? 'Only one source so far. Read it yourself and watch for others.'
+        : `${total} sources are on this, but none are rated yet. Open them and decide.`;
   }
 }
 

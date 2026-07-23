@@ -292,9 +292,9 @@ export type ReliabilityPublicLabel =
  *   40–69       → UNCLEAR
  *   < 40        → LIKELY_UNRELIABLE
  *
- * Note: the label describes how well the **reporting** is corroborated across
- * public sources — it is not a factual judgment about the underlying event.
- * The word "accurate" is hedged with "LIKELY" per the contract.
+ * The enum stays machine-stable for storage/API compatibility. Display copy
+ * (see `reliabilityPublicLabelDisplay`) is people-first and decisive —
+ * "Looks trustworthy" when the corroboration is strong.
  */
 export function reliabilityPublicLabel(score: number): ReliabilityPublicLabel {
   if (score >= 70) return 'LIKELY_ACCURATE';
@@ -334,10 +334,10 @@ export function buildReliabilitySummary(input: ReliabilitySummaryInputs): string
 export function reliabilityPublicLabelDisplay(label: ReliabilityPublicLabel): string {
   switch (label) {
     case 'LIKELY_ACCURATE':
-      return 'Likely accurate';
+      return 'Looks trustworthy';
     case 'UNCLEAR':
-      return 'Unclear';
+      return 'Still unclear';
     case 'LIKELY_UNRELIABLE':
-      return 'Likely unreliable';
+      return 'Weak support';
   }
 }
