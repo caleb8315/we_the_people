@@ -2,10 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import React from 'react';
 import { getServerSupabase } from '@/lib/supabase-server';
-import { SignalCard } from '@/components/signal-card';
 import { Card } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
-import { decorateSignals, personalizeSignals, type SignalRowRaw } from '@/lib/signals';
 import { PlayerStatus } from '@/components/player-status';
 import { DailyMissions } from '@/components/daily-missions';
 
@@ -52,17 +49,12 @@ export default async function DashboardPage() {
 
   if (!profile?.onboarded_at) redirect('/onboarding');
 
-  const lastVisit = profile.last_dashboard_visit_at ?? null;
-  const personal = personalizeSignals((rawSignals ?? []) as SignalRowRaw[], prefs);
-  const decoratedPersonal = await decorateSignals(sb, personal.slice(0, 12), { newSince: lastVisit });
-
   const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   const newCorroboratedCount = (rawSignals ?? []).filter(
     (s) => s.verification_status === 'verified' && s.first_seen_at >= dayAgo,
   ).length;
-  const disputedCount = decoratedPersonal.reduce((n, s) => n + ((s.contradictions_count ?? 0) > 0 ? 1 : 0), 0);
-  const criticalCount = decoratedPersonal.filter((s) => s.severity >= 85).length;
-  const topPriority = decoratedPersonal[0] ?? null;
+  const disputedCount = (rawSignals ?? []).filter((s) => Number(s.contradictions_count ?? 0) > 0).length;
+  const criticalCount = (rawSignals ?? []).filter((s) => Number(s.severity ?? 0) >= 85).length;
 
   const today = new Date().toISOString().slice(0, 10);
   const { data: alertUsage } = await sb
@@ -112,7 +104,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
           <dl className="grid grid-cols-3 gap-3 text-center">
-            <HeroStat label="Solid today" value={newCorroboratedCount} />
+            <HeroStat label="Corroborated" value={newCorroboratedCount} />
             <HeroStat label="Clashes" value={disputedCount} warn={disputedCount > 0} />
             <HeroStat label="Alerts" value={`${alertsSentToday}/${alertCap}`} />
           </dl>
@@ -124,84 +116,26 @@ export default async function DashboardPage() {
         <DailyMissions />
       </div>
 
-      <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <Link
-          href="/dashboard/intel"
-          className="group flex items-start gap-4 rounded-[28px] border border-flare/25 bg-flare/5 p-5 shadow-card transition hover:shadow-card-hover"
+          href="/feed"
+          className="group rounded-[28px] border border-signal/25 bg-signal/5 p-5 shadow-card transition hover:shadow-card-hover lg:col-span-2"
         >
-          <span className="mt-0.5 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-flare text-lg font-bold text-white">
-            !
+          <p className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-signal">
+            Your next move
+          </p>
+          <h2 className="mt-2 font-display text-xl font-semibold text-ink">Open your feed and scout the stories that matter.</h2>
+          <p className="mt-2 text-sm text-ink-500">
+            {criticalCount > 0 ? `${criticalCount} high-severity stories are live. ` : ''}
+            {disputedCount > 0 ? `${disputedCount} source clashes are ready to inspect. ` : ''}
+            Open three stories to complete today&apos;s scout mission.
+          </p>
+          <span className="mt-4 inline-flex rounded-xl bg-signal px-3 py-2 text-sm font-semibold text-white">
+            Open my feed →
           </span>
-          <div className="min-w-0 flex-1">
-            <p className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-flare-700">
-              Hot zone
-            </p>
-            <p className="mt-1 text-sm font-semibold text-ink group-hover:text-flare-700">
-              High-severity signals for your focus topics
-            </p>
-            <p className="mt-1 text-xs text-ink-500">
-              {criticalCount > 0
-                ? `${criticalCount} critical right now`
-                : 'Filtered to your interests'}{' '}
-              · {disputedCount > 0 ? `${disputedCount} clashes` : 'no clashes'}
-            </p>
-          </div>
         </Link>
-        {topPriority ? (
-          <TopPriorityCard
-            id={topPriority.id}
-            title={topPriority.title}
-            severity={topPriority.severity}
-            topic={topPriority.topic ?? 'event'}
-            verification={topPriority.verification_status}
-          />
-        ) : (
-          <Card tone="neutral">
-            <p className="text-sm text-ink-500">
-              No personalized signals yet — adjust your topics or try the{' '}
-              <Link href="/feed?mode=global" className="text-signal underline-offset-2 hover:underline">
-                global feed
-              </Link>
-              .
-            </p>
-          </Card>
-        )}
-      </div>
 
-      <div className="grid gap-5 lg:grid-cols-3">
-        <section className="lg:col-span-2">
-          <header className="mb-3 flex items-center justify-between">
-            <div>
-              <h2 className="font-display text-sm font-semibold uppercase tracking-[0.16em] text-ink-600">
-                Your top stories
-              </h2>
-              <p className="mt-0.5 text-xs text-ink-400">
-                Focus: {topics.slice(0, 4).join(' · ')}
-                {topics.length > 4 && ` · +${topics.length - 4}`}
-              </p>
-            </div>
-            <Link href="/feed" className="text-sm font-medium text-signal hover:underline">
-              View all →
-            </Link>
-          </header>
-          {decoratedPersonal.length === 0 ? (
-            <EmptyState
-              title="No personalized signals yet."
-              body="Adjust your topics or try the global feed for now."
-              action={{ label: 'Open global feed', href: '/feed?mode=global' }}
-            />
-          ) : (
-            <ul className="space-y-3">
-              {decoratedPersonal.slice(0, 5).map((s) => (
-                <li key={s.id}>
-                  <SignalCard s={s} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <aside className="space-y-4 lg:space-y-5">
+        <aside className="space-y-4">
           <Card title="Your focus">
             <div className="flex flex-wrap gap-1.5">
               {topics.map((t) => (
@@ -253,9 +187,9 @@ export default async function DashboardPage() {
           <Card title="Quick tools">
             <ul className="-my-1 divide-y divide-ink-100">
               <QuickTool
-                href="/dashboard/sources"
+                href="/settings"
                 title="Source control"
-                body="Global map · credibility tiers · what's active."
+                body="Tune sources, topics, and alerts in one place."
               />
               <QuickTool
                 href="/dashboard/ai"
@@ -286,60 +220,6 @@ function HeroStat({
         {value}
       </dd>
     </div>
-  );
-}
-
-function TopPriorityCard({
-  id,
-  title,
-  severity,
-  topic,
-  verification,
-}: {
-  id: string;
-  title: string;
-  severity: number;
-  topic: string;
-  verification: string;
-}) {
-  const severe = severity >= 85;
-  return (
-    <Link
-      href={`/signal/${id}`}
-      className={`group relative block overflow-hidden rounded-[28px] border p-5 shadow-card transition hover:shadow-card-hover sm:p-6 ${
-        severe
-          ? 'border-danger-200 bg-gradient-to-br from-danger-50 via-paper to-paper'
-          : 'border-signal/25 bg-gradient-to-br from-signal/10 via-paper to-paper'
-      }`}
-    >
-      <div className="flex items-start gap-4 sm:gap-5">
-        <div
-          className={`flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-2xl sm:h-20 sm:w-20 ${
-            severe ? 'bg-danger-100 text-danger-700' : 'bg-signal/15 text-signal-700'
-          }`}
-        >
-          <span className="text-2xl font-semibold leading-none tabular-nums sm:text-3xl">{severity}</span>
-          <span className="mt-0.5 text-[9px] font-medium uppercase tracking-wider opacity-80">severity</span>
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500">
-              Top priority
-            </span>
-            <span className="rounded-xl border border-ink-100 bg-paper/70 px-2 py-0.5 text-[10px] font-medium text-ink-600">
-              {topic}
-            </span>
-            <span className="rounded-xl border border-ink-100 bg-paper/70 px-2 py-0.5 text-[10px] font-medium text-ink-600">
-              {verification.replace(/_/g, ' ')}
-            </span>
-          </div>
-          <p className="mt-2 font-display text-[17px] font-semibold leading-snug text-ink clamp-2 sm:text-lg">
-            {title}
-          </p>
-          <p className="mt-2 text-xs text-ink-500">Open for evidence, clashes, and the live source trail →</p>
-        </div>
-      </div>
-    </Link>
   );
 }
 

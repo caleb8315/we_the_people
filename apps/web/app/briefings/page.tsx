@@ -3,8 +3,6 @@ import { getServerSupabase } from '@/lib/supabase-server';
 import { PersonalizedBriefingPanel } from '@/components/personalized-briefing-panel';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { SignalCard } from '@/components/signal-card';
-import { decorateSignals, personalizeSignals, type SignalRowRaw } from '@/lib/signals';
 import { logProductEvent } from '@/lib/product-events';
 
 export const metadata = { title: 'Briefings · Crosscheck' };
@@ -20,31 +18,13 @@ export default async function BriefingsPage({ searchParams }: { searchParams: { 
   const userId = auth.user?.id ?? null;
   const mode: BriefingMode = userId ? requestedMode ?? 'my' : 'global';
 
-  const [{ data: globalBriefings }, { data: prefs }, { data: rawSignals }] = await Promise.all([
+  const [{ data: globalBriefings }] = await Promise.all([
     sb
       .from('briefings')
       .select('id, kind, period_start, headline, topics')
       .order('period_start', { ascending: false })
       .limit(20),
-    userId
-      ? sb
-          .from('preferences')
-          .select('topics, muted_sources, muted_topics, countries_of_focus')
-          .eq('user_id', userId)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    userId
-      ? sb
-          .from('signals_public')
-          .select('*')
-          .order('severity', { ascending: false })
-          .limit(40)
-      : Promise.resolve({ data: [] }),
   ]);
-
-  const personalized = userId
-    ? await decorateSignals(sb, personalizeSignals(((rawSignals ?? []) as SignalRowRaw[]), prefs).slice(0, 12))
-    : [];
 
   if (userId) {
     void logProductEvent(sb, {
@@ -120,37 +100,12 @@ export default async function BriefingsPage({ searchParams }: { searchParams: { 
       {mode === 'my' && userId && (
         <div className="space-y-6">
           <PersonalizedBriefingPanel />
-
-          <section>
-            <header className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-ink-600">
-                  Signals in your briefing context
-                </h2>
-                <p className="mt-0.5 text-xs text-ink-400">
-                  Reflects your topics and mute settings
-                </p>
-              </div>
-              <Link href="/feed" className="text-sm font-medium text-amber-700 hover:text-amber-800">
-                Open feed →
-              </Link>
-            </header>
-            {personalized.length === 0 ? (
-              <EmptyState
-                title="No personalized signals right now."
-                body="Try widening your topics or checking the global briefing."
-                action={{ label: 'See global briefing', href: '/briefings?mode=global' }}
-              />
-            ) : (
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {personalized.slice(0, 6).map((s) => (
-                  <li key={s.id}>
-                    <SignalCard s={s} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <Link
+            href="/feed"
+            className="inline-flex rounded-xl border border-ink-100 bg-paper px-4 py-2.5 text-sm font-semibold text-signal hover:border-signal/30"
+          >
+            Explore the live feed →
+          </Link>
         </div>
       )}
 

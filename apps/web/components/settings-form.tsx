@@ -109,8 +109,8 @@ export function SettingsForm({
   const [weatherLon, setWeatherLon] = useState<string>(
     initial?.weather_lon != null ? String(initial.weather_lon) : '',
   );
-  const [feedMode, setFeedMode] = useState<'personalized' | 'global' | 'hybrid'>(
-    initial?.feed_mode_preference ?? 'personalized',
+  const [feedMode, setFeedMode] = useState<'personalized' | 'global'>(
+    initial?.feed_mode_preference === 'global' ? 'global' : 'personalized',
   );
   const [briefingFrequency, setBriefingFrequency] = useState<'daily' | 'weekly' | 'both' | 'off'>(
     initial?.briefing_frequency_preference ?? 'daily',
@@ -457,11 +457,10 @@ export function SettingsForm({
             >
               <Segmented
                 active={feedMode}
-                onSelect={(v) => setFeedMode(v as 'personalized' | 'global' | 'hybrid')}
+                onSelect={(v) => setFeedMode(v as 'personalized' | 'global')}
                 options={[
                   { label: 'Personalized', value: 'personalized' },
                   { label: 'Global', value: 'global' },
-                  { label: 'Hybrid', value: 'hybrid' },
                 ]}
               />
             </SettingsCard>

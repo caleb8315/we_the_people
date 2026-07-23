@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { confidenceBandDisplay } from '@osint/core';
 import type {
   ConfidenceBand,
   ConfidenceReport,
@@ -339,7 +340,7 @@ export function VerifyClient({ signedIn }: { signedIn: boolean }) {
         </div>
       </div>
 
-      <ExampleVerificationResult />
+      {!result && !loading && <ExampleVerificationResult />}
       {loading && <VerifyProgress />}
       {!signedIn && result && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
@@ -799,17 +800,10 @@ function toneDotClass(tone: 'info' | 'good' | 'warn'): string {
 }
 
 function friendlyBandLabel(band: string): string {
-  switch (band) {
-    case 'high':
-      return 'Looks trustworthy';
-    case 'contested':
-      return 'Sources clash';
-    case 'medium':
-      return 'Still forming';
-    case 'low':
-    default:
-      return 'Thin so far';
+  if (band === 'high' || band === 'medium' || band === 'low' || band === 'contested') {
+    return confidenceBandDisplay(band);
   }
+  return 'Still forming';
 }
 
 function summarizeMixNatural(mix: {

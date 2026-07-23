@@ -7,7 +7,6 @@ import { ChipRow } from '@/components/ui/chip-row';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FeedFreshness } from '@/components/feed-freshness';
 import { FeedAutoCorroboration } from '@/components/feed-auto-corroboration';
-import { FeedOrientationBanner } from '@/components/feed-orientation-banner';
 import { PlayerStatus } from '@/components/player-status';
 import { logProductEvent } from '@/lib/product-events';
 import { applyMutes, decorateSignals, type SignalRowRaw } from '@/lib/signals';
@@ -310,8 +309,6 @@ export default async function FeedPage({
           <PlayerStatus compact />
         </div>
       </section>
-
-      <FeedOrientationBanner />
 
       {/* Topic browser row. */}
       <section>

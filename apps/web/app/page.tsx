@@ -93,7 +93,7 @@ export default async function LandingPage() {
           <Step
             n="02"
             title="Get a clear call"
-            body="Looks trustworthy, still forming, thin so far, or sources clash — with both sides when they disagree."
+            body="Looks solid, still forming, thin so far, or sources clash — with both sides when they disagree."
           />
           <Step
             n="03"
@@ -115,7 +115,7 @@ export default async function LandingPage() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <VerdictDemo
-            band="Looks trustworthy"
+            band="Looks solid"
             tone="good"
             title="Central bank holds rates — wires match"
             body="Seven independent outlets agree on the decision and timing. Safe to treat the core fact as solid."
@@ -231,10 +231,10 @@ export default async function LandingPage() {
                 Free forever
               </p>
               <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight text-ink">
-                Create your account. Keep your progress.
+                Create your account. Start your progress.
               </h2>
               <p className="mt-2 max-w-xl text-sm text-ink-500">
-                Personalized feed, missions, and AI-grounded verifications. Secure by default — not locked behind invite walls.
+                Personalized feed, missions, and AI-grounded verifications. Progress stays on this device for now.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import {
   buildConfidenceReport,
   buildTrustExplanation,
+  confidenceBandDisplay,
   physicalEvidencePhrase,
   statusDescription,
   statusLabel,
@@ -245,7 +246,7 @@ export default async function SignalPage({ params }: PageProps) {
         tone={contradictionsCount > 0 ? 'danger' : isComplexSignal ? 'warn' : 'neutral'}
         badge={
           contradictionsCount > 0
-            ? <Badge variant="disputed">Sources disagree</Badge>
+            ? <Badge variant="disputed">Sources clash</Badge>
             : isComplexSignal
               ? <Badge variant="muted" withIcon={false}>Detection skipped</Badge>
               : undefined
@@ -842,37 +843,21 @@ function TrustHero({
   explanation: TrustExplanation;
   bottomLine: string;
 }) {
-  const confidenceTone =
-    explanation.source_confidence.level === 'high'
-      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-      : explanation.source_confidence.level === 'medium'
-        ? 'border-amber-200 bg-amber-50 text-amber-700'
-        : explanation.source_confidence.level === 'contested'
-          ? 'border-danger-200 bg-danger-50 text-danger-700'
-          : 'border-ink-200 bg-canvas-50 text-ink-700';
-
   return (
     <section className={`mt-4 rounded-2xl border p-4 sm:p-5 ${bandTone.wrap}`}>
-      {/* Verdict line. */}
       <div className="flex items-center gap-2">
         <span
           aria-hidden="true"
           className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${bandDotClass(band)}`}
         />
         <p className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${bandTone.label}`}>
-          {bottomLineLabelForBand(band)}
+          {confidenceBandDisplay(band)}
         </p>
       </div>
       <p className="mt-2.5 text-[15px] leading-relaxed text-ink sm:text-base">
         {explanation.reader_summary || explanation.summary || bottomLine}
       </p>
 
-      {/* Glanceable framing chips. Each chip carries an optional `hint`
-          that explains the label in plain English — important for chips
-          like "Same article republished" where a normal reader needs to
-          know what we mean. The hint surfaces as a hover tooltip + an
-          explicit aria-label for screen readers, and the chip shows a
-          tiny "?" affordance so it's obvious there is more info. */}
       {explanation.headline_chips.length > 0 && (
         <ul className="mt-3 flex flex-wrap gap-1.5">
           {explanation.headline_chips.map((c, i) => {
@@ -908,151 +893,27 @@ function TrustHero({
         </ul>
       )}
 
-      <div className="mt-4 space-y-3">
-        <section className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2.5">
-          <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
-            What you know for certain
-          </p>
-          <ul className="mt-1.5 space-y-1 text-[13px] text-ink-700">
-            {explanation.confirmed_points.slice(0, 3).map((item, i) => (
-              <li key={i} className="flex gap-1.5">
-                <span aria-hidden="true" className="mt-[6px] h-1 w-1 shrink-0 rounded-full bg-emerald-500" />
-                <span>{item.text}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-        {explanation.disputed_or_uncertain_points.length > 0 && (
-          <section className="rounded-xl border border-danger-200 bg-danger-50/60 px-3 py-2.5">
-            <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-danger-700">
-              What&apos;s murky or disputed
-            </p>
-            <ul className="mt-1.5 space-y-1 text-[13px] text-ink-700">
-              {explanation.disputed_or_uncertain_points.slice(0, 3).map((item, i) => (
-                <li key={i} className="flex gap-1.5">
-                  <span aria-hidden="true" className="mt-[6px] h-1 w-1 shrink-0 rounded-full bg-danger-500" />
-                  <span>{item.text}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-        {explanation.headline_chips.length > 0 && (
-          <section className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2.5">
-            <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-amber-700">
-              The spin / propaganda signal
-            </p>
-            <p className="mt-1 text-[13px] text-ink-700">
-              {explanation.headline_chips
-                .slice(0, 2)
-                .map((chip) => chip.hint ?? chip.label)
-                .join(' ')}
-            </p>
-          </section>
-        )}
-        <section className="rounded-xl border border-ink-100 bg-paper/70 px-3 py-2.5">
-          <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">
-            What to do
-          </p>
-          <p className="mt-1 text-[13px] text-ink-700">{bottomLine}</p>
-        </section>
-      </div>
-
-      {/* Reader-first brief: top-loaded for scan speed on mobile. */}
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-ink-100 bg-paper/70 px-3 py-2.5">
-          <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">Summary</p>
-          <p className="mt-1 text-[13px] leading-relaxed text-ink-700 sm:text-[13.5px]">
-            {explanation.reader_summary}
-          </p>
-        </div>
-        <div className="rounded-xl border border-ink-100 bg-paper/70 px-3 py-2.5">
-          <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">Why it matters</p>
-          <ul className="mt-1.5 space-y-1 text-[13px] text-ink-700">
-            {explanation.why_it_matters.map((line, i) => (
-              <li key={i} className="flex gap-1.5">
-                <span aria-hidden="true" className="mt-[6px] h-1 w-1 shrink-0 rounded-full bg-amber-500" />
-                <span>{line}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      <div className="mt-3 rounded-xl border border-ink-100 bg-paper/70 px-3 py-2.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">Source confidence</p>
-          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${confidenceTone}`}>
-            {explanation.source_confidence.label}
-          </span>
-        </div>
-        <p className="mt-1 text-[12.5px] text-ink-600">{explanation.source_confidence.detail}</p>
-      </div>
-
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <TrustBriefList
-          title="What we know"
-          items={explanation.confirmed_points}
-          empty="No confirmed points yet."
-          defaultTone="support"
-        />
-        <TrustBriefList
-          title="What we don't know yet"
-          items={explanation.disputed_or_uncertain_points}
-          empty="No major unresolved questions at this moment."
-          defaultTone="dispute"
-        />
-      </div>
-
-      <div className="mt-3 rounded-xl border border-ink-100 bg-paper/70 px-3 py-2.5">
-        <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">What to watch next</p>
-        <ul className="mt-1.5 space-y-1 text-[13px] text-ink-700">
-          {explanation.watch_next_points.map((item, i) => (
-            <li key={i} className="flex flex-wrap items-start gap-1.5">
-              <span
-                className={`mt-[2px] rounded-full border px-1.5 py-[1px] text-[9px] font-semibold uppercase tracking-wider ${evidenceStateBadgeClass(
-                  item.state,
-                )}`}
-              >
-                {evidenceStateLabel(item.state)}
-              </span>
-              <span className="min-w-0 flex-1">{item.text}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="mt-3 rounded-xl border border-ink-100 bg-canvas-50 px-3 py-2.5">
-        <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">Source note</p>
-        <p className="mt-1 text-[12.5px] leading-relaxed text-ink-600">{explanation.source_note}</p>
-      </div>
-
-      {/* Structured supported / disputed / unclear sections. Mirror the
-          briefing prompt's structure so the analyst voice is consistent
-          across surfaces. */}
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <TrustSection
-          title="What is widely supported"
+          title="What holds up"
           tone="support"
           items={explanation.whats_supported}
-          empty="Not enough independent reporting yet to call anything widely supported."
+          empty="Not enough reporting yet to call this solid."
         />
         <TrustSection
-          title="What is disputed or unclear"
+          title="What clashes"
           tone="dispute"
           items={explanation.whats_disputed}
-          empty="No source disagreements have been detected for this signal."
+          empty="No material clash detected so far."
         />
         <TrustSection
-          title="What to watch"
+          title="What could change"
           tone="watch"
           items={explanation.whats_unclear}
-          empty="Nothing specific to watch for at this time."
+          empty="Nothing specific to watch right now."
         />
       </div>
 
-      {/* Watch-for nudge — concrete, single-sentence, only rendered when
-          the explainer has something to say. */}
       {explanation.watch_for && (
         <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-[13.5px] text-ink-700 sm:text-sm">
           <span className="mr-1.5 font-semibold uppercase tracking-wider text-amber-700 text-[10px]">
@@ -1062,13 +923,10 @@ function TrustHero({
         </p>
       )}
 
-      {/* Action row — the AI shortcut + the deterministic learn-more
-          pills. Putting them together tells the user that the analyst
-          and the methodology page are continuations of THIS surface. */}
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Link
           href={`/dashboard/ai?signal=${encodeURIComponent(signalId)}&prompt=${encodeURIComponent(explanation.suggested_prompt)}`}
-          className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white shadow-[0_6px_16px_-4px_rgba(245,158,11,0.55)] transition hover:bg-amber-600"
+          className="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl bg-signal px-3 py-1.5 text-xs font-semibold text-white shadow-[0_6px_16px_-4px_rgba(15,155,142,0.45)] transition hover:bg-signal-600"
         >
           <span aria-hidden="true">✨</span>
           Ask the analyst about this story
@@ -1084,104 +942,8 @@ function TrustHero({
           </a>
         ))}
       </div>
-
-      <p className="mt-3 text-[10px] uppercase tracking-[0.18em] text-ink-400">
-        LLM-free trust summary · AI is opt-in via the analyst button
-      </p>
     </section>
   );
-}
-
-function TrustBriefList({
-  title,
-  items,
-  empty,
-  defaultTone,
-}: {
-  title: string;
-  items: Array<{
-    text: string;
-    state:
-      | 'confirmed'
-      | 'multi_source'
-      | 'single_source'
-      | 'disputed'
-      | 'missing_evidence';
-  }>;
-  empty: string;
-  defaultTone: 'support' | 'dispute';
-}) {
-  const wrapClass =
-    defaultTone === 'support'
-      ? 'border-emerald-200 bg-emerald-50/60'
-      : 'border-danger-200 bg-danger-50/60';
-  return (
-    <div className={`rounded-xl border px-3 py-2.5 ${wrapClass}`}>
-      <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-600">{title}</p>
-      {items.length === 0 ? (
-        <p className="mt-1.5 text-[12.5px] text-ink-500">{empty}</p>
-      ) : (
-        <ul className="mt-1.5 space-y-1 text-[13px] text-ink-700">
-          {items.map((item, i) => (
-            <li key={i} className="flex flex-wrap items-start gap-1.5">
-              <span
-                className={`mt-[2px] rounded-full border px-1.5 py-[1px] text-[9px] font-semibold uppercase tracking-wider ${evidenceStateBadgeClass(
-                  item.state,
-                )}`}
-              >
-                {evidenceStateLabel(item.state)}
-              </span>
-              <span className="min-w-0 flex-1">{item.text}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function evidenceStateLabel(
-  state:
-    | 'confirmed'
-    | 'multi_source'
-    | 'single_source'
-    | 'disputed'
-    | 'missing_evidence',
-): string {
-  switch (state) {
-    case 'confirmed':
-      return 'Confirmed';
-    case 'multi_source':
-      return 'Multi-source';
-    case 'single_source':
-      return 'Single source';
-    case 'disputed':
-      return 'Disputed';
-    case 'missing_evidence':
-      return 'Missing evidence';
-  }
-}
-
-function evidenceStateBadgeClass(
-  state:
-    | 'confirmed'
-    | 'multi_source'
-    | 'single_source'
-    | 'disputed'
-    | 'missing_evidence',
-): string {
-  switch (state) {
-    case 'confirmed':
-      return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-    case 'multi_source':
-      return 'border-brand-200 bg-brand-50 text-brand-700';
-    case 'single_source':
-      return 'border-amber-200 bg-amber-50 text-amber-700';
-    case 'disputed':
-      return 'border-danger-200 bg-danger-50 text-danger-700';
-    case 'missing_evidence':
-      return 'border-ink-200 bg-canvas-50 text-ink-600';
-  }
 }
 
 function TrustSection({
@@ -1247,19 +1009,6 @@ function chipToneClass(tone: 'support' | 'dispute' | 'caution' | 'sensor' | 'neu
     case 'neutral':
     default:
       return 'bg-ink-100 text-ink-700 hover:bg-ink-200';
-  }
-}
-
-function bottomLineLabelForBand(band: ConfidenceBand): string {
-  switch (band) {
-    case 'high':
-      return 'WIDELY SUPPORTED';
-    case 'medium':
-      return 'STILL DEVELOPING';
-    case 'low':
-      return 'LIMITED REPORTING';
-    case 'contested':
-      return 'SOURCES DISAGREE';
   }
 }
 

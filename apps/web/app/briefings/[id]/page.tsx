@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { logProductEvent } from '@/lib/product-events';
 import { Badge } from '@/components/ui/badge';
+import { AwardProgress } from '@/components/award-progress';
 
 export const revalidate = 120;
 
@@ -27,6 +28,7 @@ export default async function BriefingPage({ params }: { params: { id: string } 
 
   return (
     <article className="prose-osint space-y-5 sm:space-y-6">
+      <AwardProgress action="read_briefing" />
       <header className="space-y-3">
         <div className="flex items-center gap-2">
           <Badge variant="neutral" withIcon={false}>

@@ -808,7 +808,7 @@ function EvidenceCardRow({ card }: { card: EvidenceCard }) {
 function bandFriendly(band: ConfidenceBreakdown['band']): string {
   switch (band) {
     case 'high':
-      return 'Looks trustworthy';
+      return 'Looks solid';
     case 'medium':
       return 'Still forming';
     case 'contested':

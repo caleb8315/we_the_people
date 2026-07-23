@@ -60,7 +60,7 @@ export default function TrustPage() {
         </p>
         <ul>
           <li>
-            <strong>Looks trustworthy (70+).</strong> Strong agreement across credible,
+            <strong>Looks solid (70+).</strong> Strong agreement across credible,
             independent sources — often with supporting sensor evidence.
           </li>
           <li>
@@ -73,7 +73,7 @@ export default function TrustPage() {
           </li>
         </ul>
         <p className="text-xs text-ink-500">
-          &quot;Looks trustworthy&quot; means independent reporting strongly supports the event.
+          &quot;Looks solid&quot; means independent reporting strongly supports the event.
           Some details can still move as coverage develops.
         </p>
       </section>

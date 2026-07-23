@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ExpandableText } from '@/components/expandable-text';
 
-export const metadata = { title: 'Notifications · Crosscheck' };
+export const metadata = { title: 'Alerts · Crosscheck' };
 export const dynamic = 'force-dynamic';
 
 const MODES = ['all', 'unread'] as const;
