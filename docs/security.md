@@ -26,17 +26,21 @@ Explicitly out of scope for v1 (but tracked):
 - All user-facing tables have `enable row level security`.
 - Policies restrict `profiles`, `preferences`, `feedback` to the owning `auth.uid()`.
 - `signals`, `evidence`, `briefings` are public-read but filter out `quarantined` / `blocked` rows via a view (`signals_public`).
-- `usage_ledger`, `engine_runs`, `beta_allowlist` are service-role only (default-deny).
+- `usage_ledger` and `engine_runs` are service-role only (default-deny). Public
+  operations pages use a separate sanitized `engine_runs_public` view.
 
 ### Auth
 
-- Email/password auth for the current beta, backed by Supabase Auth.
-- Allowlist gate: only emails matching `BETA_ALLOWLIST` (env) or `beta_allowlist` (DB) can sign up or sign in. Unapproved users are directed to the access-request flow.
+- Email/password auth for the open beta, backed by Supabase Auth.
+- Sign-up is open. Supabase Auth's production rate limits and CAPTCHA should be
+  enabled in the Supabase dashboard before launch.
 - Session cookie refreshed in middleware on every request.
 
 ### API
 
 - Sensitive `/api/*` routes enforce per-IP sliding-window rate limits (see `lib/rate-limit.ts`) and session checks where user context is required.
+- Costly verification and image-forensics requests require an authenticated
+  session; configure Upstash Redis for production multi-instance rate limiting.
 - Write endpoints validate the full body with `zod`.
 - Protected endpoints require a valid Supabase session via the SSR client.
 - Service-role client is **never** imported from a client component.

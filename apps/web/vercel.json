@@ -5,6 +5,8 @@
   "buildCommand": "cd ../.. && npm run build --workspace apps/web",
   "regions": ["iad1"],
   "functions": {
-    "app/api/**/*": { "maxDuration": 30 }
+    "app/api/**/*": { "maxDuration": 30 },
+    "app/api/verify/route.ts": { "maxDuration": 45 },
+    "app/api/signal/[id]/develop/route.ts": { "maxDuration": 45 }
   }
 }

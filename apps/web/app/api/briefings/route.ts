@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAdminSupabase } from '@/lib/supabase-server';
+import { getServerSupabase } from '@/lib/supabase-server';
 import { getClientKey, limit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   const kind = searchParams.get('kind') === 'weekly' ? 'weekly' : 'daily';
   const max = Math.min(Number(searchParams.get('limit') ?? '10'), 30);
 
-  const sb = getAdminSupabase();
+  const sb = getServerSupabase();
   const { data, error } = await sb
     .from('briefings')
     .select('id, kind, period_start, period_end, headline, topics, signal_ids')

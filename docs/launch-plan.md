@@ -1,4 +1,4 @@
-# Launch Plan — Private Beta to 200 Users
+# Launch Plan — Open Beta to 200 Users
 
 A staged rollout with clear exit criteria at each cohort. Each cohort only opens if the previous one met its gates.
 
@@ -7,7 +7,7 @@ A staged rollout with clear exit criteria at each cohort. Each cohort only opens
 **Goal:** prove reliability with a tight group of sympathetic testers.
 
 - Audience: journalists, analysts, OSINT-community peers you know directly.
-- Entry: founder invites only (add emails to `public.beta_allowlist`).
+- Entry: open sign-up, with Supabase Auth CAPTCHA and email confirmation enabled.
 - Communication: a single Slack/Discord channel or group chat.
 
 Gates to open cohort 2:
@@ -21,7 +21,7 @@ Gates to open cohort 2:
 **Goal:** validate the product-market signal with a wider audience.
 
 - Audience: referrals from cohort 1 + niche geopolitics / crisis-mapping communities.
-- Entry: invite-only, form-based request reviewed manually.
+- Entry: open sign-up; monitor verification quota use and abuse signals daily.
 - Communication: weekly email changelog to all beta users.
 
 Gates to open cohort 3:
@@ -35,7 +35,7 @@ Gates to open cohort 3:
 **Goal:** produce traction evidence suitable for grant applications.
 
 - Audience: public beta waitlist + targeted NGO / researcher outreach.
-- Entry: short application form with optional "what will you use this for?" field.
+- Entry: open sign-up plus targeted NGO / researcher outreach.
 - Communication: dedicated changelog page linked in footer, optional mailing list.
 
 Gates to close the beta and prepare for funded scale:

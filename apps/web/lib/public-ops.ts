@@ -75,14 +75,14 @@ export async function getPublicOperationsSnapshot(): Promise<PublicOperationsSna
     { count: sourceCount },
   ] = await Promise.all([
     sb
-      .from('engine_runs')
+      .from('engine_runs_public')
       .select('job,status,started_at,records_out')
       .gte('started_at', since7d)
       .in('job', ['ingest', 'brief', 'alert', 'develop'])
       .order('started_at', { ascending: false })
       .limit(200),
     sb
-      .from('engine_runs')
+      .from('engine_runs_public')
       .select('job,status,started_at')
       .gte('started_at', since30d)
       .in('job', ['ingest', 'brief', 'alert', 'develop'])

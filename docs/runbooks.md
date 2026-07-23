@@ -16,12 +16,14 @@ Operational playbooks for the beta. Keep these up to date as the system evolves.
 - Gemini: https://aistudio.google.com/apikey → revoke old, create new → update `GEMINI_API_KEY`.
 - Groq: https://console.groq.com → revoke old, create new → update `GROQ_API_KEY`.
 
-## 3. Beta cohort onboarding
+## 3. Open-beta onboarding
 
-1. Add entries to `public.beta_allowlist` (one row per email, tagged with cohort).
-2. Send outreach from your founder email with a link to `/login`.
-3. Monitor the `auth.users` table for sign-ups; confirm invitees can create an
-   email/password account after approval.
+1. Confirm Supabase Auth email confirmation, CAPTCHA, and rate-limit settings
+   are enabled for the production project.
+2. Test a complete sign-up, onboarding, verification, account export, and
+   deletion flow using a disposable account.
+3. Monitor Vercel function usage and provider quotas during the first launch
+   window; verification and image-forensics requests require sign-in.
 
 ## 4. Ingestion is failing
 
@@ -283,3 +285,24 @@ from public.product_events
 where event_name = 'saved_view_applied'
   and created_at >= now() - interval '7 days';
 ```
+
+## 9. Database backup and restore
+
+Before every production migration, record the current deployed migration
+version and create a database backup from Supabase Dashboard → Database →
+Backups. Keep the backup timestamp with the deployment record.
+
+If a migration or operator action causes data loss:
+
+1. Pause GitHub Actions workers and Vercel deployments.
+2. Identify the last known-good backup and the affected tables.
+3. Restore into a separate Supabase project first; never overwrite production
+   before validating the recovered data and RLS policies.
+4. Reapply migrations in order from `supabase/migrations/`, then verify
+   `/api/health`, `/status`, sign-in, feed, and verification flows.
+5. Switch the production environment to the recovered project only after a
+   second operator checks the result.
+
+Current target: RPO ≤ 24 hours and RTO ≤ 4 hours. Move to a Supabase plan
+with point-in-time recovery before accepting data whose loss would exceed
+those targets.

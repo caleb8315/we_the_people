@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAdminSupabase } from '@/lib/supabase-server';
+import { getServerSupabase } from '@/lib/supabase-server';
 import { getClientKey, limit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
@@ -8,9 +8,8 @@ export const runtime = 'nodejs';
 /**
  * GET /api/signals?hours=24&topic=war&country=US&limit=50
  *
- * Public, read-only. Uses the `signals_public` view (anon can read) so no
- * service role is actually required — but we use the admin client here for
- * filters involving evidence counts.
+ * Public, read-only. Uses the `signals_public` view, which is deliberately
+ * exposed through RLS; no service-role credentials are needed here.
  */
 export async function GET(req: Request) {
   const rl = limit(getClientKey(req, 'signals'), 60, 60_000);
@@ -26,7 +25,7 @@ export async function GET(req: Request) {
   const status = searchParams.get('status'); // verified | developing
 
   const since = new Date(Date.now() - hours * 3600 * 1000).toISOString();
-  const sb = getAdminSupabase();
+  const sb = getServerSupabase();
 
   let q = sb
     .from('signals_public')

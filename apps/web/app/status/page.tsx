@@ -13,22 +13,22 @@ export default async function StatusPage() {
   const checks = [
     {
       name: 'Scheduled ingestion',
-      status: deriveStatus(runByJob(snapshot, 'ingest')),
-      detail: `Hourly ingestion keeps the feed current. Last successful ingest: ${formatTimestamp(runByJob(snapshot, 'ingest').lastSuccessAt)}.`,
+      status: deriveStatus(runByJob(snapshot, 'ingest'), 35),
+      detail: `Ingestion runs every 15 minutes. Last successful ingest: ${formatTimestamp(runByJob(snapshot, 'ingest').lastSuccessAt)}.`,
     },
     {
       name: 'Briefings',
-      status: deriveStatus(runByJob(snapshot, 'brief')),
+      status: deriveStatus(runByJob(snapshot, 'brief'), 26 * 60),
       detail: `Daily and weekly briefings depend on successful worker runs. Last successful briefing run: ${formatTimestamp(runByJob(snapshot, 'brief').lastSuccessAt)}.`,
     },
     {
       name: 'Alerts',
-      status: deriveStatus(runByJob(snapshot, 'alert')),
+      status: deriveStatus(runByJob(snapshot, 'alert'), 70),
       detail: `Alert delivery depends on recent alert worker runs. Last successful alert run: ${formatTimestamp(runByJob(snapshot, 'alert').lastSuccessAt)}.`,
     },
     {
       name: 'Story enrichment',
-      status: deriveStatus(runByJob(snapshot, 'develop')),
+      status: deriveStatus(runByJob(snapshot, 'develop'), 5 * 60),
       detail: `Background corroboration deepens developing signals over time. Last successful enrich run: ${formatTimestamp(runByJob(snapshot, 'develop').lastSuccessAt)}.`,
     },
   ];
@@ -104,9 +104,15 @@ function Metric({ label, value, hint }: { label: string; value: string; hint: st
   );
 }
 
-function deriveStatus(job: { lastSuccessAt: string | null; lastStatus: string | null }): 'healthy' | 'degraded' | 'unknown' {
+function deriveStatus(
+  job: { lastSuccessAt: string | null; lastStatus: string | null },
+  maxAgeMinutes: number,
+): 'healthy' | 'degraded' | 'unknown' {
   if (!job.lastSuccessAt && !job.lastStatus) return 'unknown';
   if (job.lastStatus === 'failed') return 'degraded';
+  if (!job.lastSuccessAt || Date.now() - Date.parse(job.lastSuccessAt) > maxAgeMinutes * 60_000) {
+    return 'degraded';
+  }
   return 'healthy';
 }
 

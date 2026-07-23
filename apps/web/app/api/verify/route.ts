@@ -169,6 +169,18 @@ export async function POST(req: Request) {
   const rl = limit(getClientKey(req, 'verify'), 20, 60_000);
   if (!rl.ok) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
 
+  // Verification fans out to multiple third-party services. Keep the public
+  // landing experience open, but require a signed-in account before spending
+  // shared API quota or serverless execution time.
+  const sb = getServerSupabase();
+  const { data: auth } = await sb.auth.getUser();
+  if (!auth.user) {
+    return NextResponse.json(
+      { error: 'authentication_required', message: 'Sign in to verify a claim.' },
+      { status: 401 },
+    );
+  }
+
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
@@ -185,9 +197,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'image_url_or_hash_required' }, { status: 400 });
   }
 
-  const sb = getServerSupabase();
-  const { data: auth } = await sb.auth.getUser();
-  const userId = auth.user?.id ?? null;
+  const userId = auth.user.id;
 
   let social: SocialProvenance | null = null;
   let link: LinkProvenance | null = null;

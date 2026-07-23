@@ -22,3 +22,5 @@ jobs:
         run: npm run lint
       - name: Test (workspaces)
         run: npm run test
+      - name: Production build (web)
+        run: npm run build --workspace apps/web

@@ -7,7 +7,10 @@ export const runtime = 'nodejs';
 
 /**
  * POST /api/account/delete — removes the current user's auth row.
- * Cascaded deletes in Postgres remove their profile, preferences, and feedback.
+ * Remove user-owned rows before deleting the Auth identity. Some historical
+ * verification tables intentionally use `on delete set null` so that
+ * aggregate product metrics survive; explicit cleanup prevents retaining
+ * personal submissions after a deletion request.
  */
 export async function POST(req: Request) {
   const rl = limit(getClientKey(req, 'acct-delete'), 3, 10 * 60_000);
@@ -18,7 +21,17 @@ export async function POST(req: Request) {
   if (!auth.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const admin = getAdminSupabase();
-  const { error } = await admin.auth.admin.deleteUser(auth.user.id);
+  const userId = auth.user.id;
+  const cleanup = await Promise.all([
+    admin.from('verification_cases').delete().eq('user_id', userId),
+    admin.from('verifications').delete().eq('user_id', userId),
+    admin.from('user_progress').delete().eq('user_id', userId),
+    admin.from('user_daily_usage').delete().eq('user_id', userId),
+  ]);
+  const cleanupError = cleanup.find((result) => result.error)?.error;
+  if (cleanupError) return NextResponse.json({ error: cleanupError.message }, { status: 500 });
+
+  const { error } = await admin.auth.admin.deleteUser(userId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   await sb.auth.signOut();

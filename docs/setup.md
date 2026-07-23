@@ -104,13 +104,13 @@ Workflows provided:
 - [`.github/workflows/alerts.yml`](../.github/workflows/alerts.yml) — every 30 minutes (high-severity push)
 - [`.github/workflows/briefing.yml`](../.github/workflows/briefing.yml) — daily + weekly
 - [`.github/workflows/maintenance.yml`](../.github/workflows/maintenance.yml) — nightly retention cleanup
-- [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — typecheck, lint, and tests on push/PR
+- [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — typecheck, lint, tests, and production build on push/PR
 
 Trigger each manually once via Actions → Run workflow to validate credentials.
 
-## 8. First-time beta onboarding
+## 8. First-time open-beta check
 
-1. Insert a row in `public.beta_allowlist` for each invitee.
-2. Send them the Vercel URL and instruct them to visit `/login`.
-3. Confirm each sign-up in `auth.users`.
-4. Confirm the public trust surface resolves: `/terms`, `/privacy`, `/sources`, `/reliability`, `/status`, and `/.well-known/security.txt`.
+1. Enable Supabase Auth email confirmation, CAPTCHA, and production rate limits.
+2. Create a disposable test account at `/login` and complete onboarding.
+3. Confirm sign-in, verification, account export, and deletion work end-to-end.
+4. Confirm the public trust surface resolves: `/terms`, `/privacy`, `/sources`, `/reliability`, `/status`, `/.well-known/security.txt`, and `/api/health`.

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getClientKey, limit } from '@/lib/rate-limit';
+import { getServerSupabase } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -27,6 +28,13 @@ const MAX_SIZE = 10 * 1024 * 1024;
 export async function POST(req: Request) {
   const rl = limit(getClientKey(req, 'img-forensics'), 20, 60_000);
   if (!rl.ok) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
+
+  // This route can consume paid/shared third-party detection quota.
+  const sb = getServerSupabase();
+  const { data: auth } = await sb.auth.getUser();
+  if (!auth.user) {
+    return NextResponse.json({ error: 'authentication_required' }, { status: 401 });
+  }
 
   let body: { image_base64: string } | null = null;
   try {

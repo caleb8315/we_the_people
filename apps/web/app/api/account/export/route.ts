@@ -29,6 +29,8 @@ export async function GET(req: Request) {
     { data: aiMessages },
     { data: verifications },
     { data: productEvents },
+    { data: progress },
+    { data: dailyUsage },
   ] = await Promise.all([
     sb.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
     sb.from('preferences').select('*').eq('user_id', userId).maybeSingle(),
@@ -44,6 +46,8 @@ export async function GET(req: Request) {
     sb.from('ai_messages').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
     sb.from('verifications').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
     sb.from('product_events').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+    sb.from('user_progress').select('*').eq('user_id', userId).maybeSingle(),
+    sb.from('user_daily_usage').select('*').eq('user_id', userId).order('day', { ascending: false }),
   ]);
 
   const payload = {
@@ -66,6 +70,8 @@ export async function GET(req: Request) {
     ai_messages: aiMessages ?? [],
     verifications: verifications ?? [],
     product_events: productEvents ?? [],
+    progress,
+    daily_usage: dailyUsage ?? [],
   };
 
   const filename = `crosscheck-account-export-${new Date().toISOString().slice(0, 10)}.json`;

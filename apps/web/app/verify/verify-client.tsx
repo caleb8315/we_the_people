@@ -336,7 +336,20 @@ export function VerifyClient({ signedIn }: { signedIn: boolean }) {
             </div>
           )}
 
-          {error && <p className="text-xs text-danger-600">{error}</p>}
+          {error && (
+            <p className="text-xs text-danger-600">
+              {error === 'authentication_required' ? (
+                <>
+                  Sign in to verify claims and protect shared research capacity.{' '}
+                  <a href="/login?next=/verify" className="font-semibold underline">
+                    Sign in →
+                  </a>
+                </>
+              ) : (
+                error
+              )}
+            </p>
+          )}
         </div>
       </div>
 

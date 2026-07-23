@@ -43,7 +43,8 @@ Optional (per-feature):
 - `USER_DAILY_BRIEFING_CALL_LIMIT` = 2
 - `MAX_DAILY_LLM_CALLS*` - LLM budget caps.
 - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_OPERATOR_CHAT_ID` - operator alert channel.
-- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` - optional Redis rate limiting.
+- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` - required for
+  multi-instance production rate limiting.
 - `WORKER_SHARED_SECRET` - required if you run the `develop` worker against `/api/signal/:id/develop`.
 - `SUPPORT_EMAIL`, `PRIVACY_EMAIL`, `SECURITY_EMAIL`, `LEGAL_EMAIL` - public trust/contact addresses.
 
@@ -87,11 +88,17 @@ including:
 - `019_image_observations.sql`
 - `020_phase4_social_sources.sql`
 - `021_phase5_kpi_views.sql`
-- `022_develop_signal_enrichment.sql`
+- `022_signal_enrichment.sql`
 - `023_update_signals_public_view.sql`
 - `024_tech_finance_sources.sql`
 - `025_google_news_and_coverage_expansion.sql`
 - `026_product_events_and_retention.sql`
+- `027_user_notifications.sql`
+- `028_verification_case_files.sql`
+- `029_update_ai_prompt_defaults_decisive_style.sql`
+- `030_operator_alerts.sql`
+- `031_user_progress.sql`
+- `032_public_ops_snapshot.sql`
 
 For the reliability / contradictions / evidence rollout — including the
 backfill procedure that populates the new columns on recently-ingested
@@ -112,7 +119,7 @@ In GitHub -> Settings -> Secrets and variables -> Actions, add:
 
 The workflows under `.github/workflows/` will then run on schedule:
 
-- `ingest.yml` hourly
+- `ingest.yml` every 15 minutes
 - `briefing.yml` daily + weekly
 - `alerts.yml` every 30 min
 - `email-briefings.yml` daily (writes in-app daily notifications)
