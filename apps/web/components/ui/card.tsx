@@ -15,11 +15,11 @@ export function Card({
 }) {
   const toneClass =
     tone === 'accent'
-      ? 'border-brand-200 bg-brand-50/60'
+      ? 'border-primary-200 bg-primary-50/60'
       : tone === 'danger'
         ? 'border-danger-200 bg-danger-50/60'
         : tone === 'warn'
-          ? 'border-amber-200 bg-amber-50/60'
+          ? 'border-flare-200 bg-flare-50/60'
           : 'border-ink-100 bg-paper';
 
   return (
@@ -27,7 +27,7 @@ export function Card({
       {(title || action) && (
         <header className="mb-3 flex items-center justify-between gap-3">
           {typeof title === 'string' ? (
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-400">
+            <h2 className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-400">
               {title}
             </h2>
           ) : (

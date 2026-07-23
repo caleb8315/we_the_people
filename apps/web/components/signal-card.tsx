@@ -97,7 +97,7 @@ export function SignalCard({ s }: { s: SignalRow }) {
     <Link
       href={`/signal/${s.id}`}
       className={`group block overflow-hidden rounded-card border border-ink-100 bg-paper shadow-card transition hover:shadow-card-hover focus-visible:border-amber-400 ${
-        s.severity >= 85 ? 'border-l-4 border-l-amber-400' : ''
+        s.severity >= 85 ? 'border-l-4 border-l-flare-400' : ''
       } ${s.featured ? 'ring-1 ring-amber-200' : ''}`}
     >
       <div className="flex flex-col sm:flex-row">
@@ -157,7 +157,7 @@ export function SignalCard({ s }: { s: SignalRow }) {
             <p className="mt-2 flex items-start gap-1.5 text-[12.5px] text-amber-800 sm:text-[13px]">
               <span
                 aria-hidden="true"
-                className="mt-[3px] inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+                className="mt-[3px] inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-flare-500"
               />
               <span className="clamp-2">
                 <span className="font-semibold uppercase tracking-wider text-amber-700 text-[10px]">

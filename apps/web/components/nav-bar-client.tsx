@@ -24,7 +24,7 @@ export function NavBarClient({
     { href: '/verify', label: 'Verify' },
     { href: '/briefings', label: 'Briefings' },
     ...(signedIn ? [{ href: '/notifications', label: 'Alerts' }] : []),
-    ...(signedIn ? [{ href: '/dashboard', label: 'HQ' }] : []),
+    ...(signedIn ? [{ href: '/dashboard', label: 'Dashboard' }] : []),
   ];
 
   const greeting = signedIn && displayName ? `Hey, ${displayName}` : null;
@@ -68,7 +68,7 @@ export function NavBarClient({
                 aria-current={isActive ? 'page' : undefined}
                 className={`rounded-xl px-3.5 py-1.5 text-sm transition ${
                   isActive
-                    ? 'bg-ink-900 text-white shadow-sm'
+                    ? 'bg-primary text-white shadow-sm'
                     : 'text-ink-500 hover:bg-ink-100 hover:text-ink'
                 }`}
               >
@@ -102,7 +102,7 @@ export function NavBarClient({
           ) : (
             <Link
               href="/login"
-              className="rounded-xl bg-ink-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-ink-700"
+              className="rounded-xl bg-primary px-4 py-1.5 text-sm font-medium text-white hover:bg-primary-700"
             >
               Sign in
             </Link>

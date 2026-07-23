@@ -72,7 +72,7 @@ export function LoginForm({ next }: { next: string }) {
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="input"
+              className="input-control"
               placeholder="Analyst Zero"
             />
           </Field>
@@ -84,7 +84,7 @@ export function LoginForm({ next }: { next: string }) {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="input"
+            className="input-control"
             placeholder="you@example.com"
           />
         </Field>
@@ -96,7 +96,7 @@ export function LoginForm({ next }: { next: string }) {
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="input"
+            className="input-control"
             placeholder="At least 8 characters"
           />
         </Field>
@@ -104,7 +104,7 @@ export function LoginForm({ next }: { next: string }) {
         <button
           type="submit"
           disabled={loading || !email || !password}
-          className="w-full rounded-full bg-amber-500 px-4 py-3 text-sm font-medium text-white shadow-[0_8px_20px_-6px_rgba(245,158,11,0.55)] transition hover:bg-amber-600 disabled:opacity-60"
+          className="w-full rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 disabled:opacity-60"
         >
           {loading ? 'Working…' : mode === 'signin' ? 'Sign in' : 'Create account'}
         </button>
@@ -120,26 +120,6 @@ export function LoginForm({ next }: { next: string }) {
         If your Supabase project requires email confirmation, finish that step before signing in.
       </p>
 
-      <style jsx>{`
-        .input {
-          width: 100%;
-          border-radius: 9999px;
-          border: 1px solid #e5e8ef;
-          background: #ffffff;
-          padding: 12px 16px;
-          color: #0f172a;
-          outline: none;
-          transition: border-color 120ms ease, box-shadow 120ms ease;
-          box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-        }
-        .input:focus {
-          border-color: #fbb024;
-          box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
-        }
-        .input::placeholder {
-          color: #9ca3af;
-        }
-      `}</style>
     </div>
   );
 }

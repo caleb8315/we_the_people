@@ -14,7 +14,7 @@ import { usePathname } from 'next/navigation';
  */
 
 const LINKS = [
-  { href: '/dashboard', label: 'HQ', icon: HomeIcon, authedOnly: true },
+  { href: '/dashboard', label: 'Dashboard', icon: HomeIcon, authedOnly: true },
   { href: '/', label: 'Home', icon: HomeIcon, anonOnly: true },
   { href: '/feed', label: 'Feed', icon: FeedIcon },
   { href: '/briefings', label: 'Briefings', icon: BriefingsIcon },
@@ -65,7 +65,7 @@ export function MobileBottomNav({ signedIn }: { signedIn: boolean }) {
                 onClick={() => void postNavEvent(link.href, pathname)}
                 aria-label={link.label}
                 aria-current={isActive ? 'page' : undefined}
-                className="flex min-h-[44px] items-center justify-center"
+                className="flex min-h-[44px] flex-col items-center justify-center gap-0.5"
               >
                 <span
                   className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl transition ${
@@ -75,6 +75,9 @@ export function MobileBottomNav({ signedIn }: { signedIn: boolean }) {
                   }`}
                 >
                   <Icon />
+                </span>
+                <span className={`text-[9px] font-medium ${isActive ? 'text-white' : 'text-white/55'}`}>
+                  {link.label}
                 </span>
               </Link>
             </li>

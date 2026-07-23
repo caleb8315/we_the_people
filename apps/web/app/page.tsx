@@ -56,7 +56,7 @@ export default async function LandingPage() {
             <div className="animate-rise-in-late mt-8 flex flex-wrap items-center gap-3">
               <Link
                 href="/verify"
-                className="rounded-2xl bg-flare px-6 py-3 text-sm font-semibold text-white shadow-[0_12px_28px_-10px_rgba(228,87,46,0.7)] transition hover:bg-flare-600"
+                className="rounded-2xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-[0_12px_28px_-10px_rgba(37,99,235,0.5)] transition hover:bg-primary-700"
               >
                 Verify a claim · +25 XP
               </Link>
@@ -106,7 +106,7 @@ export default async function LandingPage() {
       {/* Sample verdicts — not card-heavy hero; secondary section */}
       <section>
         <div className="mb-6 max-w-2xl">
-          <p className="font-display text-[11px] font-semibold uppercase tracking-[0.22em] text-flare">
+          <p className="kicker">
             In the wild
           </p>
           <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
@@ -130,7 +130,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Ranks teaser */}
-      <section className="overflow-hidden rounded-[32px] border border-ink-100 bg-ink-900 px-5 py-8 text-white sm:px-8 sm:py-10">
+      <section className="overflow-hidden rounded-card border border-ink-100 bg-ink-900 px-5 py-8 text-white sm:px-8 sm:py-10">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-xl">
             <p className="font-display text-[11px] font-semibold uppercase tracking-[0.22em] text-signal-300">
@@ -240,7 +240,7 @@ export default async function LandingPage() {
             <div className="flex flex-wrap gap-3">
               <Link
                 href="/login?next=/dashboard"
-                className="rounded-2xl bg-flare px-5 py-2.5 text-sm font-semibold text-white hover:bg-flare-600"
+                className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-700"
               >
                 Sign up
               </Link>
@@ -284,7 +284,7 @@ function VerdictDemo({
       ? 'border-signal/30 bg-signal/5 text-signal-700'
       : 'border-flare/30 bg-flare/5 text-flare-700';
   return (
-    <article className="rounded-[28px] border border-ink-100 bg-paper p-5 shadow-card">
+    <article className="rounded-card border border-ink-100 bg-paper p-5 shadow-card">
       <p className={`inline-flex rounded-xl px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${toneClass}`}>
         {band}
       </p>

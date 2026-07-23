@@ -76,7 +76,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-5 sm:space-y-7">
-      <header className="relative overflow-hidden rounded-[28px] border border-ink-100 bg-ink-900 px-5 py-6 text-white sm:px-7 sm:py-8">
+      <header className="relative overflow-hidden rounded-card border border-ink-100 bg-ink-900 px-5 py-6 text-white sm:px-7 sm:py-8">
         <div
           className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full bg-signal/30 blur-3xl animate-drift"
           aria-hidden
@@ -88,7 +88,7 @@ export default async function DashboardPage() {
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-signal-300">
-              Command HQ
+              Your dashboard
             </p>
             <h1 className="mt-2 font-display text-[30px] font-semibold leading-[1.1] tracking-tight sm:text-[38px]">
               Welcome back, {name}.
@@ -98,7 +98,7 @@ export default async function DashboardPage() {
             </p>
             <Link
               href="/verify"
-              className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-flare px-5 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_-8px_rgba(228,87,46,0.65)] transition hover:bg-flare-600"
+              className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_-8px_rgba(37,99,235,0.5)] transition hover:bg-primary-700"
             >
               Verify a claim · +25 XP
             </Link>
@@ -119,7 +119,7 @@ export default async function DashboardPage() {
       <div className="grid gap-4 lg:grid-cols-3">
         <Link
           href="/feed"
-          className="group rounded-[28px] border border-signal/25 bg-signal/5 p-5 shadow-card transition hover:shadow-card-hover lg:col-span-2"
+          className="group rounded-card border border-signal/25 bg-signal/5 p-5 shadow-card transition hover:shadow-card-hover lg:col-span-2"
         >
           <p className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-signal">
             Your next move
