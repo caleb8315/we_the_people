@@ -9,10 +9,12 @@ export function PersonalizedBriefingPanel() {
   const [expanded, setExpanded] = useState(false);
   const [signalsUsed, setSignalsUsed] = useState<number | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
+  const [degraded, setDegraded] = useState(false);
 
   async function generate() {
     setLoading(true);
     setError(null);
+    setDegraded(false);
     const res = await fetch('/api/briefings/generate', { method: 'POST' });
     const body = await res.json().catch(() => ({}));
     setLoading(false);
@@ -27,6 +29,7 @@ export function PersonalizedBriefingPanel() {
     setExpanded(false);
     setSignalsUsed(typeof body.signals_used === 'number' ? body.signals_used : null);
     setRemaining(typeof body.remaining_estimate === 'number' ? body.remaining_estimate : null);
+    setDegraded(body.degraded === true);
   }
 
   const sections = useMemo(() => parseBriefingSections(briefing ?? ''), [briefing]);
@@ -114,6 +117,12 @@ export function PersonalizedBriefingPanel() {
       </div>
 
       {error && <p className="border-t border-amber-200/50 px-5 py-3 text-sm text-danger-600 sm:px-6">{error}</p>}
+
+      {degraded && briefing && (
+        <p className="border-t border-amber-200/50 bg-amber-50/60 px-5 py-3 text-xs text-amber-800 sm:px-6">
+          AI providers were unavailable, so this briefing uses the latest source summaries directly.
+        </p>
+      )}
 
       {briefing && sections.length > 0 && (
         <div className="border-t border-amber-200/50 p-5 sm:p-6">
