@@ -8,8 +8,9 @@ import { supabase } from './supabase';
  *
  * Uses the shared `@osint/core/ai-provider` so that the worker briefing
  * pipeline, the on-demand `/api/briefings/generate` route, and the AI
- * chat route all behave identically (Gemini → Groq fallback, same
- * timeouts, same error trace). Budget enforcement is the worker's job:
+ * chat route share the same transport and error handling. Worker briefings
+ * prefer the XAY gateway's Groq model, then direct Groq, then Gemini.
+ * Budget enforcement is the worker's job:
  * if `tryConsume` denies the call we never hit the network.
  *
  * Fail-closed: a missing key, HTTP error, or empty response returns
@@ -20,7 +21,7 @@ import { supabase } from './supabase';
 
 export interface LlmResult {
   text: string | null;
-  provider: 'gemini' | 'groq' | 'skipped';
+  provider: 'gemini' | 'groq' | 'xay' | 'skipped';
   reason?: string;
 }
 
@@ -35,8 +36,9 @@ export async function callLlm(
   const messages: AiMessage[] = [{ role: 'user', content: prompt }];
   const result = await runAiCompletion({
     providers: [
-      { provider: 'gemini', apiKey: e.GEMINI_API_KEY },
+      { provider: 'xay', apiKey: e.XAY_API_KEY, model: 'llama-3.3-70b-versatile' },
       { provider: 'groq', apiKey: e.GROQ_API_KEY },
+      { provider: 'gemini', apiKey: e.GEMINI_API_KEY },
     ],
     messages,
     maxTokens: opts.maxTokens ?? 800,

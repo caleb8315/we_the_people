@@ -2,7 +2,7 @@
  * Shared AI provider abstraction (AI trust platform plan, capability 1).
  *
  * Goal: web routes (`/api/ai/chat`, `/api/briefings/generate`) and the
- * worker briefing job all converge on the same Gemini → Groq fallback
+ * worker briefing job all converge on the same provider abstraction
  * with the same timeouts, retry policy, structured response shape, and
  * fail-closed behaviour. Before this module each callsite reimplemented
  * the fetch + JSON shape and they drifted (different timeouts, different
@@ -17,7 +17,7 @@
  *     failures — fail-closed is the caller's responsibility).
  */
 
-export type AiProvider = 'gemini' | 'groq';
+export type AiProvider = 'gemini' | 'groq' | 'xay';
 export type AiProviderResult = AiProvider | 'skipped';
 
 export interface AiMessage {
@@ -47,6 +47,7 @@ export interface AiCompletionResult {
 
 const DEFAULT_GEMINI_MODEL = 'gemini-2.0-flash';
 const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
+const DEFAULT_XAY_MODEL = 'llama-3.3-70b-versatile';
 const DEFAULT_TIMEOUT_MS = 20_000;
 const DEFAULT_MAX_TOKENS = 800;
 const DEFAULT_TEMPERATURE = 0.3;
@@ -128,6 +129,8 @@ async function dispatchProvider(
       return callGemini(input);
     case 'groq':
       return callGroq(input);
+    case 'xay':
+      return callXay(input);
   }
 }
 
@@ -170,17 +173,40 @@ async function callGemini(input: DispatchInput): Promise<string> {
 }
 
 async function callGroq(input: DispatchInput): Promise<string> {
+  return callOpenAiCompatible(
+    'groq',
+    'https://api.groq.com/openai/v1/chat/completions',
+    input.model ?? DEFAULT_GROQ_MODEL,
+    input,
+  );
+}
+
+async function callXay(input: DispatchInput): Promise<string> {
+  return callOpenAiCompatible(
+    'xay',
+    'https://api.xay.ai/v1/chat/completions',
+    input.model ?? DEFAULT_XAY_MODEL,
+    input,
+  );
+}
+
+async function callOpenAiCompatible(
+  provider: 'groq' | 'xay',
+  endpoint: string,
+  model: string,
+  input: DispatchInput,
+): Promise<string> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), input.timeoutMs);
   try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${input.apiKey}`,
       },
       body: JSON.stringify({
-        model: input.model ?? DEFAULT_GROQ_MODEL,
+        model,
         messages: input.messages,
         temperature: input.temperature,
         max_tokens: input.maxTokens,
@@ -188,7 +214,7 @@ async function callGroq(input: DispatchInput): Promise<string> {
       signal: ctrl.signal,
     });
     if (!res.ok) {
-      throw new Error(`groq ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      throw new Error(`${provider} ${res.status}: ${(await res.text()).slice(0, 200)}`);
     }
     const j = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;

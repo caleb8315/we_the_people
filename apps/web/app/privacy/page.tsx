@@ -9,7 +9,7 @@ const processors = [
   ['Supabase', 'Authentication, Postgres storage, row-level security'],
   ['Cloudflare / hosting CDN', 'Site delivery, TLS, and basic edge protections'],
   ['In-app notifications', 'Delivery of daily briefings and priority alerts inside your account'],
-  ['Gemini / Groq (optional)', 'LLM summarization and analyst responses when AI features are used'],
+  ['Gemini / Groq / XAY (optional)', 'LLM summarization and analyst responses when AI features are used'],
   ['Firecrawl / Brave / Reddit / Bluesky (optional)', 'Live corroboration lookups for verify and develop flows'],
 ] as const;
 

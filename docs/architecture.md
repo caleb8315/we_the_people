@@ -61,5 +61,5 @@
 
 - **Single adapter fails.** The ingest job continues with the remaining ones and logs the error in `engine_runs.errors`.
 - **Supabase unreachable.** Worker exits 1; cron simply retries on the next schedule.
-- **LLM provider down.** Gemini → Groq fallback; then deterministic text.
+- **LLM provider down.** Briefings try XAY (Groq model) → direct Groq → Gemini; analyst chat tries Gemini → Groq. Deterministic fallback remains available.
 - **Vercel function cold start.** All API routes are read-light and use `s-maxage` where appropriate.
