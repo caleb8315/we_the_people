@@ -28,7 +28,7 @@ This mirrors the in-app `/privacy` page. Update both in sync.
 
 - We never sell personal data.
 - We never share identifiable data except with processors needed to run the service.
-- Current processors include **Supabase** (database/auth), **Cloudflare/Vercel** (hosting and edge delivery), and optional service integrations such as **Gemini**, **Groq**, **Firecrawl**, and **Brave** when those features are enabled.
+- Current processors include **Supabase** (database/auth), **Cloudflare/Vercel** (hosting and edge delivery), and optional service integrations such as **Gemini**, **Groq**, **XAY**, **Firecrawl**, and **Brave** when those features are enabled.
 
 ## Retention
 

@@ -10,6 +10,7 @@ const Env = z.object({
 
   GEMINI_API_KEY: emptyToUndef(z.string().optional()),
   GROQ_API_KEY: emptyToUndef(z.string().optional()),
+  XAY_API_KEY: emptyToUndef(z.string().optional()),
 
   RESEND_API_KEY: emptyToUndef(z.string().optional()),
   BREVO_API_KEY: emptyToUndef(z.string().optional()),
