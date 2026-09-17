@@ -145,14 +145,52 @@ function renderDeterministicBriefing(
     return 'No stories currently match your briefing preferences. Check your topic and country filters, then try again when new reporting arrives.';
   }
 
-  const paragraphs = signals.slice(0, 4).map((signal) => {
+  const paragraphs = signals.slice(0, 4).map((signal, index) => {
     const status = statusShortLabel(signal.verification_status as VerificationStatus);
-    const summary = signal.summary?.trim();
-    return `${signal.title}. ${summary || `Current evidence status: ${status}.`}`;
+    const title = compactText(signal.title, 220);
+    const summary = cleanFallbackSummary(signal.title, signal.summary);
+    return [
+      `${index + 1}. ${title}`,
+      summary,
+      `Evidence status: ${status}.`,
+    ]
+      .filter(Boolean)
+      .join('\n');
   });
 
   return [
     paragraphs.join('\n\n'),
     `What to watch: New reporting or source disagreements affecting these ${paragraphs.length} leading ${paragraphs.length === 1 ? 'story' : 'stories'}.`,
   ].join('\n\n');
+}
+
+function cleanFallbackSummary(title: string, summary: string | null): string | null {
+  if (!summary) return null;
+
+  let cleaned = summary
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#(?:39|x27);/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (cleaned.toLocaleLowerCase().startsWith(title.toLocaleLowerCase())) {
+    cleaned = cleaned.slice(title.length).replace(/^[\s.:;–—-]+/, '');
+  }
+
+  // Some feeds put the complete article body in `summary`. Do not dump it
+  // into the deterministic fallback; the linked title and evidence status
+  // remain useful without reproducing an unreviewed article.
+  if (!cleaned || cleaned.length > 600) return null;
+  return compactText(cleaned, 280);
+}
+
+function compactText(text: string, maxChars: number): string {
+  const compact = text.replace(/\s+/g, ' ').trim();
+  if (compact.length <= maxChars) return compact;
+  const clipped = compact.slice(0, maxChars + 1);
+  const lastSpace = clipped.lastIndexOf(' ');
+  return `${clipped.slice(0, lastSpace > maxChars * 0.7 ? lastSpace : maxChars).trimEnd()}…`;
 }
