@@ -82,7 +82,9 @@ export async function POST(req: Request) {
     ),
   ].join('\n');
 
-  const text = await callBriefingModel(BRIEFING_SYSTEM_PROMPT, prompt);
+  const completion = await callBriefingModel(BRIEFING_SYSTEM_PROMPT, prompt);
+  const degraded = !completion.text;
+  const text = completion.text ?? renderDeterministicBriefing(filtered);
   await logProductEvent(sb, {
     userId: auth.user.id,
     eventName: 'briefing_generated',
@@ -90,12 +92,20 @@ export async function POST(req: Request) {
       signals_used: filtered.length,
       focus_topic_count: focus.size,
       country_filter_count: countries.size,
+      provider: completion.provider,
+      degraded,
     },
   });
-  return NextResponse.json({ briefing: text, signals_used: filtered.length, remaining_estimate: cap.limit - cap.used });
+  return NextResponse.json({
+    briefing: text,
+    signals_used: filtered.length,
+    remaining_estimate: cap.limit - cap.used,
+    provider: completion.provider,
+    degraded,
+  });
 }
 
-async function callBriefingModel(systemPrompt: string, prompt: string): Promise<string> {
+async function callBriefingModel(systemPrompt: string, prompt: string) {
   const env = serverEnv();
   const result = await runAiCompletion({
     providers: [
@@ -110,6 +120,39 @@ async function callBriefingModel(systemPrompt: string, prompt: string): Promise<
     temperature: 0.35,
     maxTokens: 900,
   });
-  if (result.text) return result.text;
-  return 'Briefing generator is temporarily unavailable. Please retry later.';
+  if (!result.text) {
+    console.error('[briefing-generate] all providers failed', {
+      reason: result.reason,
+      attempts: result.attempts.map(({ provider, ok, status, error }) => ({
+        provider,
+        ok,
+        status,
+        error: error?.slice(0, 300),
+      })),
+    });
+  }
+  return result;
+}
+
+function renderDeterministicBriefing(
+  signals: Array<{
+    title: string;
+    summary: string | null;
+    verification_status: string;
+  }>,
+): string {
+  if (signals.length === 0) {
+    return 'No stories currently match your briefing preferences. Check your topic and country filters, then try again when new reporting arrives.';
+  }
+
+  const paragraphs = signals.slice(0, 4).map((signal) => {
+    const status = statusShortLabel(signal.verification_status as VerificationStatus);
+    const summary = signal.summary?.trim();
+    return `${signal.title}. ${summary || `Current evidence status: ${status}.`}`;
+  });
+
+  return [
+    paragraphs.join('\n\n'),
+    `What to watch: New reporting or source disagreements affecting these ${paragraphs.length} leading ${paragraphs.length === 1 ? 'story' : 'stories'}.`,
+  ].join('\n\n');
 }
