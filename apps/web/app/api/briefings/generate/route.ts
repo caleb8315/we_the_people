@@ -99,7 +99,7 @@ async function callBriefingModel(systemPrompt: string, prompt: string): Promise<
   const env = serverEnv();
   const result = await runAiCompletion({
     providers: [
-      { provider: 'xay', apiKey: env.XAY_API_KEY, model: 'llama-3.3-70b-versatile' },
+      { provider: 'xay', apiKey: env.XAY_API_KEY, model: 'gpt-4o-mini' },
       { provider: 'groq', apiKey: env.GROQ_API_KEY },
       { provider: 'gemini', apiKey: env.GEMINI_API_KEY },
     ],
