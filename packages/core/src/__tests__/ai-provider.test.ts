@@ -50,7 +50,7 @@ describe('runAiCompletion', () => {
           {
             provider: 'xay',
             apiKey: 'test-xay-key',
-            model: 'llama-3.3-70b-versatile',
+            model: 'gpt-4o-mini',
           },
         ],
         messages: [{ role: 'user', content: 'hello' }],
@@ -66,7 +66,7 @@ describe('runAiCompletion', () => {
         'Bearer test-xay-key',
       );
       const body = JSON.parse(String(request.init?.body));
-      assert.equal(body.model, 'llama-3.3-70b-versatile');
+      assert.equal(body.model, 'gpt-4o-mini');
     } finally {
       globalThis.fetch = originalFetch;
     }

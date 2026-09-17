@@ -47,7 +47,7 @@ export interface AiCompletionResult {
 
 const DEFAULT_GEMINI_MODEL = 'gemini-2.0-flash';
 const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
-const DEFAULT_XAY_MODEL = 'llama-3.3-70b-versatile';
+const DEFAULT_XAY_MODEL = 'gpt-4o-mini';
 const DEFAULT_TIMEOUT_MS = 20_000;
 const DEFAULT_MAX_TOKENS = 800;
 const DEFAULT_TEMPERATURE = 0.3;
