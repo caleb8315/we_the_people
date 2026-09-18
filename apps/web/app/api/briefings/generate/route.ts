@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { statusShortLabel } from '@osint/core';
 import type { VerificationStatus } from '@osint/core/types';
-import { runAiCompletion } from '@osint/core/ai-provider';
+import { describeAttempts, runAiCompletion } from '@osint/core/ai-provider';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { getClientKey, limit } from '@/lib/rate-limit';
 import { consumeUserDailyLimit } from '@/lib/daily-limits';
@@ -109,9 +109,9 @@ async function callBriefingModel(systemPrompt: string, prompt: string) {
   const env = serverEnv();
   const result = await runAiCompletion({
     providers: [
-      { provider: 'xay', apiKey: env.XAY_API_KEY, model: 'gpt-4o-mini' },
-      { provider: 'groq', apiKey: env.GROQ_API_KEY },
-      { provider: 'gemini', apiKey: env.GEMINI_API_KEY },
+      { provider: 'xay', apiKey: env.XAY_API_KEY, model: env.XAY_MODEL },
+      { provider: 'groq', apiKey: env.GROQ_API_KEY, model: env.GROQ_MODEL },
+      { provider: 'gemini', apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL },
     ],
     messages: [
       { role: 'system', content: systemPrompt },
@@ -123,12 +123,7 @@ async function callBriefingModel(systemPrompt: string, prompt: string) {
   if (!result.text) {
     console.error('[briefing-generate] all providers failed', {
       reason: result.reason,
-      attempts: result.attempts.map(({ provider, ok, status, error }) => ({
-        provider,
-        ok,
-        status,
-        error: error?.slice(0, 300),
-      })),
+      attempts: describeAttempts(result.attempts),
     });
   }
   return result;

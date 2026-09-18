@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { statusShortLabel } from '@osint/core';
 import type { VerificationStatus } from '@osint/core/types';
-import { runAiCompletion, type AiMessage } from '@osint/core/ai-provider';
+import { describeAttempts, runAiCompletion, type AiMessage } from '@osint/core/ai-provider';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { DEFAULT_AI_SYSTEM_PROMPT } from '@/lib/ai-defaults';
 import { getClientKey, limit } from '@/lib/rate-limit';
@@ -187,7 +187,7 @@ export async function POST(req: Request) {
   const context = [...(contextRows ?? [])].reverse();
   const assistantReply = await generateAssistantReply({
     systemPrompt: aiProfile?.system_prompt || DEFAULT_AI_SYSTEM_PROMPT,
-    model: aiProfile?.model ?? 'gemini-2.0-flash',
+    model: aiProfile?.model ?? undefined,
     temperature: Number(aiProfile?.temperature ?? 0.4),
     maxOutputTokens: aiProfile?.max_output_tokens ?? 600,
     context: [
@@ -203,8 +203,8 @@ export async function POST(req: Request) {
     session_id: sessionId,
     user_id: auth.user.id,
     role: 'assistant',
-    content: assistantReply,
-    provider: aiProfile?.model ?? 'fallback',
+    content: assistantReply.text,
+    provider: assistantReply.provider,
   });
   if (asstErr) return NextResponse.json({ error: asstErr.message }, { status: 500 });
 
@@ -212,7 +212,9 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     session_id: sessionId,
-    reply: assistantReply,
+    reply: assistantReply.text,
+    provider: assistantReply.provider,
+    degraded: assistantReply.degraded,
   });
 }
 
@@ -317,13 +319,17 @@ async function buildCaseGroundingContext(
   return lines.join('\n');
 }
 
+const AI_UNAVAILABLE_REPLY =
+  'AI provider unavailable right now. Your message was saved to your private session; retry in a few minutes.';
+
 async function generateAssistantReply(input: {
   systemPrompt: string;
-  model: string;
+  /** The user's stored preference; a retired ID is replaced by the transport. */
+  model?: string;
   temperature: number;
   maxOutputTokens: number;
   context: Array<{ role: string; content: string }>;
-}): Promise<string> {
+}): Promise<{ text: string; provider: string; degraded: boolean }> {
   const env = serverEnv();
 
   const baseMessages: AiMessage[] = [
@@ -338,16 +344,29 @@ async function generateAssistantReply(input: {
 
   const result = await runAiCompletion({
     providers: [
-      { provider: 'gemini', apiKey: env.GEMINI_API_KEY, model: input.model },
-      { provider: 'groq', apiKey: env.GROQ_API_KEY },
+      { provider: 'gemini', apiKey: env.GEMINI_API_KEY, model: input.model || env.GEMINI_MODEL },
+      { provider: 'groq', apiKey: env.GROQ_API_KEY, model: env.GROQ_MODEL },
+      { provider: 'xay', apiKey: env.XAY_API_KEY, model: env.XAY_MODEL },
     ],
     messages,
     temperature: input.temperature,
     maxTokens: input.maxOutputTokens,
   });
 
-  if (result.text) return result.text;
-  return 'AI provider unavailable right now. Your message was saved to your private session; retry in a few minutes.';
+  if (result.text) {
+    return {
+      text: result.text,
+      provider: result.model ? `${result.provider}:${result.model}` : result.provider,
+      degraded: false,
+    };
+  }
+
+  console.error('[ai-chat] all providers failed', {
+    reason: result.reason,
+    attempts: describeAttempts(result.attempts),
+  });
+
+  return { text: AI_UNAVAILABLE_REPLY, provider: 'unavailable', degraded: true };
 }
 
 function buildGroundingContext(input: {
