@@ -6,6 +6,7 @@ import { runBackfill } from './jobs/backfill';
 import { runDevelop } from './jobs/develop';
 import { runMaintenance } from './jobs/maintenance';
 import { runWatchdog } from './jobs/watchdog';
+import { runAiDoctor } from './jobs/ai-doctor';
 import { sendOperatorAlert } from './lib/operator-alert';
 
 /**
@@ -27,6 +28,7 @@ import { sendOperatorAlert } from './lib/operator-alert';
  *   tsx src/index.ts develop --thin=2         # prioritise low-source signals first
  *   tsx src/index.ts maintenance              # prune retention-managed rows
  *   tsx src/index.ts watchdog                 # alert if the pipeline stalls
+ *   tsx src/index.ts ai:doctor                # probe every configured LLM provider
  */
 const args = process.argv.slice(2);
 const [cmd, arg] = args;
@@ -101,9 +103,16 @@ async function main() {
       });
       return;
     }
+    case 'ai:doctor': {
+      const results = await runAiDoctor();
+      // Non-zero when nothing can answer, so CI or a cron can fail loudly
+      // instead of leaving every AI surface silently degraded.
+      if (!results.some((r) => r.ok)) process.exit(1);
+      return;
+    }
     default:
       console.error(
-        `unknown command: ${cmd}. use: ingest [--fast] | brief [weekly] | alert | notifications (or email alias) | backfill [hours] [--dry-run] [--limit=N] | develop [--dry-run] [--max=N] [--cooldown=MIN] [--window=HRS] [--thin=N] | maintenance [--dry-run] [--usage-days=N] [--signal-hours=N] | watchdog [--ingest-stale=MIN] [--signal-stale=MIN]`,
+        `unknown command: ${cmd}. use: ingest [--fast] | brief [weekly] | alert | notifications (or email alias) | backfill [hours] [--dry-run] [--limit=N] | develop [--dry-run] [--max=N] [--cooldown=MIN] [--window=HRS] [--thin=N] | maintenance [--dry-run] [--usage-days=N] [--signal-hours=N] | watchdog [--ingest-stale=MIN] [--signal-stale=MIN] | ai:doctor`,
       );
       process.exit(2);
   }
