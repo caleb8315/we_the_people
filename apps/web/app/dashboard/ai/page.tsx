@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { resolveModel } from '@osint/core/ai-provider';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { AiWorkspace } from '@/components/ai-workspace';
 import { StatTile } from '@/components/ui/stat-tile';
@@ -50,7 +51,11 @@ export default async function AiPage() {
           tone={remaining <= 2 ? 'warn' : 'accent'}
         />
         <StatTile label="Total sessions" value={sessions ?? 0} hint="Private to your account" />
-        <StatTile label="Model" value={aiProfile?.model ?? 'gemini-2.0-flash'} hint={`temp ${aiProfile?.temperature ?? 0.4}`} />
+        <StatTile
+          label="Model"
+          value={resolveModel('gemini', aiProfile?.model ?? undefined)}
+          hint={`temp ${aiProfile?.temperature ?? 0.4}`}
+        />
       </section>
 
       <AiWorkspace />

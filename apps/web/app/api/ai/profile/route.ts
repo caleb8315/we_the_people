@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { DEFAULT_GEMINI_MODEL } from '@osint/core/ai-provider';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { DEFAULT_AI_SYSTEM_PROMPT } from '@/lib/ai-defaults';
 import { getClientKey, limit } from '@/lib/rate-limit';
@@ -34,7 +35,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       profile: {
         user_id: auth.user.id,
-        model: 'gemini-2.0-flash',
+        model: DEFAULT_GEMINI_MODEL,
         system_prompt: DEFAULT_AI_SYSTEM_PROMPT,
         temperature: 0.4,
         max_output_tokens: 600,

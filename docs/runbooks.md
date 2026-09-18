@@ -40,6 +40,50 @@ Symptoms: briefings revert to deterministic bullet form; `engine_runs.meta.llm_s
 2. Raise `MAX_DAILY_LLM_CALLS_*` carefully if you have provider quota headroom.
 3. If consistently over budget, reduce source count or tighten severity thresholds in `jobs/brief.ts`.
 
+## 5a. "The AIs aren't working"
+
+Symptoms: analyst chat answers `AI provider unavailable right now`; personalized
+briefings show the amber source-summary banner (`degraded: true`); scheduled
+briefings read like a list of headlines.
+
+Every AI surface falls back to deterministic copy on failure, so a broken
+provider is quiet by design. Find out which leg is failing before changing
+anything:
+
+```bash
+npm run ai:doctor
+```
+
+It sends one real completion per configured provider and prints the outcome.
+Read the status code:
+
+- **No key set** — the provider is skipped at runtime. Set it in Vercel (web
+  surfaces) *and* GitHub Actions secrets (scheduled briefings); they are
+  separate configs, and a key set in only one place fixes only one surface.
+- **HTTP 401 / 403** — the key is wrong, revoked, or out of quota. See runbook 2.
+- **HTTP 404 / `model_decommissioned`** — the provider retired that model ID.
+  Check its deprecation page ([Gemini](https://ai.google.dev/gemini-api/docs/deprecations),
+  [Groq](https://console.groq.com/docs/deprecations)), then set `GEMINI_MODEL`,
+  `GROQ_MODEL`, or `XAY_MODEL` to a live ID and redeploy. Add the dead ID to
+  `RETIRED_MODEL_IDS` in `packages/core/src/ai-provider.ts` so stored user
+  profiles and stale overrides stop pointing at it.
+- **XAY specifically** — the gateway forwards inference to the provider you have
+  a key on file for, keyed on the model name. A model your gateway account
+  cannot serve fails there even though the ID is valid upstream.
+
+Two things make this failure mode easy to misread:
+
+1. Model retirement breaks code that has not changed. If chat worked last month
+   and nothing was deployed since, suspect a shutdown date before a regression.
+2. Chat and briefings use different provider orders (chat: Gemini → Groq → XAY;
+   briefings: XAY → Groq → Gemini). Fixing one provider can fix one surface and
+   leave the other broken, so re-check both.
+
+For production rather than local keys, search Vercel logs for
+`[ai-chat] all providers failed` or `[briefing-generate] all providers failed`;
+each logs a per-provider attempt trace with status codes. Worker runs record
+`provider`, `model`, and `reason` in `engine_runs.meta`.
+
 ## 6. Incident response (data exposure)
 
 1. Rotate all keys (runbooks 1 + 2).

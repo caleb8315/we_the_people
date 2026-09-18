@@ -32,7 +32,11 @@ Strongly recommended:
 
 - `GEMINI_API_KEY` - from https://aistudio.google.com/apikey.
 - `GROQ_API_KEY` - from https://console.groq.com.
-- `XAY_API_KEY` - server-only XAY gateway key; briefings use it with `gpt-4o-mini`.
+- `XAY_API_KEY` - server-only XAY gateway key. The gateway forwards inference
+  to whichever provider you have a key on file for, so the model you name must
+  be one your gateway account can serve.
+- `GEMINI_MODEL` / `GROQ_MODEL` / `XAY_MODEL` - optional. Only set these to move
+  off a retired model without a code change; blank uses the current defaults.
 - `ADMIN_EMAILS` - comma-separated list including your own email, for `/ops` access.
 - `NEXT_PUBLIC_APP_URL` - the Vercel URL (e.g. `https://we-the-people.vercel.app`).
 
