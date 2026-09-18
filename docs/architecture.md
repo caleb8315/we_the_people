@@ -61,5 +61,6 @@
 
 - **Single adapter fails.** The ingest job continues with the remaining ones and logs the error in `engine_runs.errors`.
 - **Supabase unreachable.** Worker exits 1; cron simply retries on the next schedule.
-- **LLM provider down.** Briefings try XAY (`gpt-4o-mini`) → direct Groq → Gemini; analyst chat tries Gemini → Groq. Deterministic fallback remains available.
+- **LLM provider down.** Briefings try XAY → direct Groq → Gemini; analyst chat tries Gemini → Groq → XAY. Deterministic fallback remains available.
+- **LLM model retired.** Providers shut down model IDs on a schedule (Gemini 2.0 on 2026-06-01, Groq's Llama IDs on 2026-08-16), and a request naming one 404s forever. `@osint/core/ai-provider` substitutes the current default for any ID in `RETIRED_MODEL_IDS`, so stale `ai_profiles.model` rows and stale `*_MODEL` overrides degrade instead of failing. Run `npm run ai:doctor` to see what each provider actually returns.
 - **Vercel function cold start.** All API routes are read-light and use `s-maxage` where appropriate.

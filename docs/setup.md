@@ -86,6 +86,7 @@ Add repo secrets:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `GEMINI_API_KEY`, `GROQ_API_KEY`, and/or `XAY_API_KEY`
+- Optional: `GEMINI_MODEL`, `GROQ_MODEL`, `XAY_MODEL` to override model IDs
 - `WORKER_SHARED_SECRET` (required for the `develop` workflow)
 - Optional: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_OPERATOR_CHAT_ID`
 
