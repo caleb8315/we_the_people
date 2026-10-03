@@ -83,7 +83,7 @@ export function VerifyClient({ signedIn }: { signedIn: boolean }) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setError(body.error ?? `http_${res.status}`);
+        setError(verifyErrorMessage(body.error, res.status));
         return;
       }
       const data = (await res.json()) as VerifyResponse;
@@ -297,6 +297,16 @@ function SubmitButton({ loading, onClick }: { loading: boolean; onClick: () => v
       </svg>
     </button>
   );
+}
+
+function verifyErrorMessage(code: unknown, status: number): string {
+  if (status === 429 || code === 'rate_limited') {
+    return 'Too many checks in a short period. Please wait a moment and try again.';
+  }
+  if (status === 400) {
+    return 'Check the URL or claim and try again.';
+  }
+  return 'Something went wrong while starting the check. Please try again.';
 }
 
 function VerifyResult({ data, signedIn }: { data: VerifyResponse; signedIn: boolean }) {
