@@ -15,6 +15,11 @@ const ServerEnv = PublicEnv.extend({
   GEMINI_API_KEY: emptyToUndef(z.string().optional()),
   GROQ_API_KEY: emptyToUndef(z.string().optional()),
   XAY_API_KEY: emptyToUndef(z.string().optional()),
+  // Model overrides. Left unset we use the @osint/core defaults; setting them
+  // lets a provider deprecation be answered with a redeploy, not a code change.
+  GEMINI_MODEL: emptyToUndef(z.string().optional()),
+  GROQ_MODEL: emptyToUndef(z.string().optional()),
+  XAY_MODEL: emptyToUndef(z.string().optional()),
   UPSTASH_REDIS_REST_URL: emptyToUndef(z.string().url().optional()),
   UPSTASH_REDIS_REST_TOKEN: emptyToUndef(z.string().optional()),
   WORKER_SHARED_SECRET: emptyToUndef(z.string().min(16).optional()),

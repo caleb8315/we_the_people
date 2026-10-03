@@ -15,6 +15,7 @@
     "develop": "tsx src/index.ts develop",
     "maintenance": "tsx src/index.ts maintenance",
     "watchdog": "tsx src/index.ts watchdog",
+    "ai:doctor": "tsx src/index.ts ai:doctor",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

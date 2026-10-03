@@ -114,9 +114,9 @@ export default function TrustPage() {
       <section id="ai-transparency">
         <h2>Where AI is and is not used</h2>
         <p className="text-ink-600">
-          Crosscheck uses AI as an assistant around the verification core. The deterministic reliability scorer, the source-disagreement
-          detector, the corroboration scorer, the confidence band, and every label you see
-          on a card or signal page are computed without an LLM call.
+          Crosscheck finds evidence without AI. The source search, the reliability scorer,
+          the source-disagreement detector, the corroboration scorer, the confidence band, and
+          every label you see on a feed card or signal page are computed without an LLM call.
         </p>
         <p className="mt-2 text-ink-600">
           AI is used in narrow, evidence-bound places, all of which fall back to deterministic
@@ -124,6 +124,12 @@ export default function TrustPage() {
           their daily limit:
         </p>
         <ul>
+          <li>
+            <strong>Claim checks</strong> — on Verify, AI reads the sources we found and
+            answers your claim yes or no, naming the outlets it relied on. A &quot;yes&quot; must
+            cite a source from that list or it is thrown out. If no AI answer passes those
+            checks, you see the answer computed from source counts instead.
+          </li>
           <li>
             <strong>Briefings</strong> — the daily and personal briefings use AI to write a
             short, structured narrative on top of the same source counts and disagreement
@@ -146,7 +152,7 @@ export default function TrustPage() {
           AI in Crosscheck never:
         </p>
         <ul>
-          <li>writes or overrides a signal&apos;s reliability label, confidence band, or verification status;</li>
+          <li>writes or overrides a feed signal&apos;s reliability label, confidence band, or verification status;</li>
           <li>creates a parallel scoring system outside the deterministic core;</li>
           <li>invents evidence or conclusions not supported by the cited sources;</li>
           <li>accuses a person, group, or state of anything;</li>

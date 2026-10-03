@@ -20,7 +20,8 @@
     "backfill": "npm run backfill --workspace apps/worker",
     "develop": "npm run develop --workspace apps/worker",
     "maintenance": "npm run maintenance --workspace apps/worker",
-    "watchdog": "npm run watchdog --workspace apps/worker"
+    "watchdog": "npm run watchdog --workspace apps/worker",
+    "ai:doctor": "npm run ai:doctor --workspace apps/worker"
   },
   "engines": {
     "node": ">=20.0.0"

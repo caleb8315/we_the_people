@@ -1,5 +1,5 @@
 import { tryConsume, type Bucket } from '@osint/core/budget';
-import { runAiCompletion, type AiMessage } from '@osint/core/ai-provider';
+import { describeAttempts, runAiCompletion, type AiMessage } from '@osint/core/ai-provider';
 import { env } from './env';
 import { supabase } from './supabase';
 
@@ -9,7 +9,8 @@ import { supabase } from './supabase';
  * Uses the shared `@osint/core/ai-provider` so that the worker briefing
  * pipeline, the on-demand `/api/briefings/generate` route, and the AI
  * chat route share the same transport and error handling. Worker briefings
- * prefer XAY's gpt-4o-mini route, then direct Groq, then Gemini.
+ * prefer the XAY gateway, then direct Groq, then Gemini. Each leg's model
+ * comes from `<PROVIDER>_MODEL` when set, otherwise the `@osint/core` default.
  * Budget enforcement is the worker's job:
  * if `tryConsume` denies the call we never hit the network.
  *
@@ -22,6 +23,7 @@ import { supabase } from './supabase';
 export interface LlmResult {
   text: string | null;
   provider: 'gemini' | 'groq' | 'xay' | 'skipped';
+  model?: string;
   reason?: string;
 }
 
@@ -36,17 +38,27 @@ export async function callLlm(
   const messages: AiMessage[] = [{ role: 'user', content: prompt }];
   const result = await runAiCompletion({
     providers: [
-      { provider: 'xay', apiKey: e.XAY_API_KEY, model: 'gpt-4o-mini' },
-      { provider: 'groq', apiKey: e.GROQ_API_KEY },
-      { provider: 'gemini', apiKey: e.GEMINI_API_KEY },
+      { provider: 'xay', apiKey: e.XAY_API_KEY, model: e.XAY_MODEL },
+      { provider: 'groq', apiKey: e.GROQ_API_KEY, model: e.GROQ_MODEL },
+      { provider: 'gemini', apiKey: e.GEMINI_API_KEY, model: e.GEMINI_MODEL },
     ],
     messages,
     maxTokens: opts.maxTokens ?? 800,
     temperature: opts.temperature ?? 0.4,
   });
+
+  if (!result.text) {
+    console.error('[llm] all providers failed', {
+      bucket: opts.bucket,
+      reason: result.reason,
+      attempts: describeAttempts(result.attempts),
+    });
+  }
+
   return {
     text: result.text,
     provider: result.provider,
+    model: result.model,
     reason: result.reason,
   };
 }

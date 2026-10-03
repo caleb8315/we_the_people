@@ -153,6 +153,7 @@ export async function runBriefing(kind: 'daily' | 'weekly'): Promise<{ briefing_
     errors,
     meta: {
       provider: llm.provider,
+      model: llm.model,
       llm_skipped: llm.provider === 'skipped',
       reason: llm.reason,
       pre_enriched: preEnriched,
@@ -160,7 +161,7 @@ export async function runBriefing(kind: 'daily' | 'weekly'): Promise<{ briefing_
     },
   });
   console.log(
-    `[brief] ${kind} briefing ${ins.id} (llm=${llm.provider}, pre_enriched=${preEnriched})`,
+    `[brief] ${kind} briefing ${ins.id} (llm=${llm.provider}${llm.model ? `:${llm.model}` : ''}, pre_enriched=${preEnriched})`,
   );
   return { briefing_id: ins.id as string };
 }

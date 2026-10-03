@@ -1,15 +1,17 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  applyClaimJudgment,
   buildEvidenceCaseFile,
   claimEvidenceStanceLabel,
+  directAnswerFromJudgment,
   decomposeClaims,
   directAnswerForCaseFile,
   verdictLabel,
 } from '..';
 import { buildEvidenceCards } from '../evidence-cards';
 import { rankSources } from '../source-ranking';
-import type { EvidenceCaseFile, EvidenceItem } from '..';
+import type { ClaimJudgment, EvidenceCaseFile, EvidenceItem } from '..';
 
 function ev(partial: Partial<EvidenceItem>): EvidenceItem {
   return {
@@ -111,14 +113,19 @@ describe('directAnswerForCaseFile', () => {
     });
   }
 
-  it('leads with direct yes, no, and partly labels', () => {
+  it('leads with direct yes and no labels', () => {
     assert.deepEqual(answer('supported'), {
       kind: 'yes',
       label: 'Yes.',
       explanation: 'The available evidence supports that this happened.',
     });
     assert.equal(answer('contradicted').label, 'No.');
-    assert.equal(answer('partly_supported').label, 'Partly.');
+  });
+
+  it('never answers "Partly" from keyword overlap alone', () => {
+    const result = answer('partly_supported');
+    assert.notEqual(result.label, 'Partly.');
+    assert.equal(result.label, 'Not confirmed.');
   });
 
   it('does not turn missing evidence into a false negative', () => {
