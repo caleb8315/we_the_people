@@ -107,11 +107,12 @@ export default async function LandingPage() {
       <section>
         <div className="mb-6 max-w-2xl">
           <p className="font-display text-[11px] font-semibold uppercase tracking-[0.22em] text-flare">
-            In the wild
+            Illustrative examples
           </p>
           <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
             What Crosscheck actually says
           </h2>
+          <p className="mt-2 text-sm text-ink-500">Examples only — not live verification results.</p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <VerdictDemo

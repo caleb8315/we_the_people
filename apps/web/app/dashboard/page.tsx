@@ -247,11 +247,6 @@ export default async function DashboardPage() {
           <Card title="Quick tools">
             <ul className="-my-1 divide-y divide-ink-100">
               <QuickTool
-                href="/dashboard/sources"
-                title="Source control"
-                body="Global map · credibility tiers · what's active."
-              />
-              <QuickTool
                 href="/dashboard/ai"
                 title="AI analyst"
                 body={`Your analyst memory — ${sessionCount ?? 0} session${sessionCount === 1 ? '' : 's'}.`}

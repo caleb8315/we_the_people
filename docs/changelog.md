@@ -6,6 +6,7 @@ User-facing changes to the beta. Update as new cohorts get features.
 
 - **Focused verification flow.** Verification results are now visible without an account, saved cases can open directly in the evidence-grounded analyst, and duplicated caveat/source panels have been consolidated into one evidence-first result.
 - Removed the browser-only XP/missions experiment, the unconnected image-forensics prototype, and the placeholder pricing page.
+- Removed the unimplemented Hybrid feed option and unused JSON routes, restored saved Intel filters, hid feedback controls for signed-out readers, unified briefing prompts, and aligned setup/security docs with open signup.
 - Personalized briefings now fall back to current source summaries when every AI provider is unavailable, while recording sanitized provider diagnostics in server logs.
 - **XAY briefing gateway.** Scheduled and on-demand briefings now prefer XAY's OpenAI-compatible gateway with `gpt-4o-mini`, then fall back to direct Groq and Gemini. Analyst chat remains Gemini-first.
 - **Automatic operator self-monitoring.** The background worker now emails the operator when a job fails, partially fails with errors, or crashes — no more silent pipeline failures. Delivery is best-effort across Resend / Brevo / Telegram (whichever is configured), de-duplicated per throttle window via `030_operator_alerts.sql` so a broken cron can't flood the inbox. Every scheduled workflow also emails on infra-level failure (checkout, `npm ci`, timeouts) via a shared `notify-operator` composite action, and a new twice-hourly **Watchdog** workflow catches a stalled pipeline (no recent ingest success or stale signals). Default recipient is configurable with `OPERATOR_ALERT_EMAIL`.
@@ -19,7 +20,7 @@ User-facing changes to the beta. Update as new cohorts get features.
   - **Phase 4 — structured briefings.** Worker briefing prompt and on-demand `/api/briefings/generate` prompt now require five fixed sections — "What happened", "What is widely supported", "What is disputed or unclear", "What changed", "What to watch next" — with an explicit forbidden-phrasing list.
   - **Capability 12 — AI transparency.** `/trust` now has an "Where AI is and is not used" section spelling out which surfaces are deterministic, which use LLMs, and what AI is never allowed to do (write reliability labels, declare facts, accuse anyone, frame sensor absence as denial).
   - Tightened the default AI analyst system prompt for citation-first answers and an explicit "what is supported / disputed / changed / watch" structure.
-- Hardened beta access and auth flows: sanitized `next` redirects, enforced the beta allowlist on signup/signin, and added access-request forms on the landing and login pages.
+- Simplified auth to open email/password signup while preserving sanitized redirects and protected account routes.
 - Added self-serve account export (`/api/account/export`) plus Settings UI to download account JSON directly.
 - Shipped the production trust surface: `/terms`, `/contact`, `/dmca`, `/corrections`, `/status`, `/sources`, `/sources-licensing`, `/reliability`, `/changelog`, and `/.well-known/security.txt`.
 - Replaced the static status page with live public operational summaries and added a public reliability page backed by `engine_runs` and `source_health_current`.

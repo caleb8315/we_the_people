@@ -75,7 +75,6 @@ After success, `select count(*) from public.signals;` should be > 0.
    - `PRIVACY_EMAIL`
    - `SECURITY_EMAIL`
    - `LEGAL_EMAIL`
-   - `BETA_ALLOWLIST` (comma-separated emails or domain suffixes like `@example.com`)
    - `WORKER_SHARED_SECRET` (must match the worker env if `develop.yml` is enabled)
 4. Deploy.
 
@@ -108,9 +107,9 @@ Workflows provided:
 
 Trigger each manually once via Actions → Run workflow to validate credentials.
 
-## 8. First-time beta onboarding
+## 8. First-time onboarding check
 
-1. Insert a row in `public.beta_allowlist` for each invitee.
-2. Send them the Vercel URL and instruct them to visit `/login`.
-3. Confirm each sign-up in `auth.users`.
+1. Create an email/password account at `/login`.
+2. Complete onboarding and confirm the dashboard opens.
+3. Confirm the user appears in `auth.users`.
 4. Confirm the public trust surface resolves: `/terms`, `/privacy`, `/sources`, `/reliability`, `/status`, and `/.well-known/security.txt`.

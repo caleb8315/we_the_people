@@ -40,7 +40,7 @@ export default async function OpsPage() {
         'map_opened',
         'signal_opened_from_map',
         'mobile_nav_used',
-        'saved_view_applied',
+        'saved_view_created',
       ]),
   ]);
 
@@ -53,13 +53,7 @@ export default async function OpsPage() {
   const mapOpenCount = events.filter((e) => e.event_name === 'map_opened').length;
   const mapSignalOpenCount = events.filter((e) => e.event_name === 'signal_opened_from_map').length;
   const mobileNavCount = events.filter((e) => e.event_name === 'mobile_nav_used').length;
-  const savedViewCount = events.filter((e) => e.event_name === 'saved_view_applied').length;
-  const mapViewRate =
-    feedViews.length === 0
-      ? 0
-      : Math.round(
-          (100 * feedViews.filter((e) => String(e.event_props?.view ?? '') === 'map').length) / feedViews.length,
-        );
+  const savedViewCount = events.filter((e) => e.event_name === 'saved_view_created').length;
   const mobileFeedRate =
     feedViews.length === 0
       ? 0
@@ -86,20 +80,15 @@ export default async function OpsPage() {
         <StatTile label="Buckets used" value={usageByBucket.size} />
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <StatTile label="Map feed share (7d)" value={`${mapViewRate}%`} hint="feed_viewed events in map mode" />
-        <StatTile label="Map opened (7d)" value={mapOpenCount} hint="feed + intel map sessions" />
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatTile label="Map opened (7d)" value={mapOpenCount} hint="intel map sessions" />
         <StatTile label="Map signal opens (7d)" value={mapSignalOpenCount} hint="signal_opened_from_map" />
         <StatTile label="Mobile feed share (7d)" value={`${mobileFeedRate}%`} hint="feed_viewed from mobile UA" />
-        <StatTile label="Saved views (7d)" value={savedViewCount} hint="saved_view_applied events" />
+        <StatTile label="Saved views created (7d)" value={savedViewCount} />
       </section>
 
       <Card title="UX validation hints">
         <ul className="space-y-1 text-sm text-ink-600">
-          <li>
-            Map discoverability is healthy if map feed share reaches at least <strong className="text-ink">20%</strong> in
-            early cohorts.
-          </li>
           <li>
             Map utility improves when <strong className="text-ink">signal_opened_from_map / map_opened</strong> trends up.
           </li>

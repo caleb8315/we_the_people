@@ -14,7 +14,7 @@ import {
   type TrustExplanation,
   type VerificationStatus,
 } from '@osint/core';
-import { getAdminSupabase } from '@/lib/supabase-server';
+import { getAdminSupabase, getServerSupabase } from '@/lib/supabase-server';
 import { Badge } from '@/components/ui/badge';
 import { SeverityMeter } from '@/components/ui/severity-meter';
 import { Disclosure } from '@/components/ui/disclosure';
@@ -33,6 +33,7 @@ type PageProps = { params: { id: string } };
 
 export default async function SignalPage({ params }: PageProps) {
   const sb = getAdminSupabase();
+  const session = getServerSupabase();
 
   const [{ data: signal }, { data: enrichmentRow }, { data: evidence }, { data: contradictions }, { data: feedbackRows }] =
     await Promise.all([
@@ -55,7 +56,7 @@ export default async function SignalPage({ params }: PageProps) {
   // We don't enforce auth here — anonymous readers can still trigger the
   // live enrichment (it's per-IP rate limited). But only authenticated
   // users can bypass the per-signal cooldown with force=true.
-  const { data: auth } = await sb.auth.getUser();
+  const { data: auth } = await session.auth.getUser();
   const canForce = Boolean(auth?.user?.id);
 
   const contradictionsCount = (contradictions ?? []).length;
@@ -211,7 +212,7 @@ export default async function SignalPage({ params }: PageProps) {
         )}
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <SignalFeedbackButtons signalId={signal.id} />
+          <SignalFeedbackButtons signalId={signal.id} signedIn={canForce} />
           <SignalShareButton title={signal.title} verdict={humanVerdict} />
           <LearnMoreLinks title={signal.title} topic={signal.topic} />
         </div>

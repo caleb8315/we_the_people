@@ -79,7 +79,7 @@ describe('buildConfidenceReport', () => {
     });
     assert.equal(report.band, 'high');
     assert.equal(report.label_short, 'HIGH');
-    assert.equal(report.label_display, 'Looks solid');
+    assert.equal(report.label_display, 'Looks trustworthy');
     assert.ok(report.explanation_bullets.length >= 1);
     assert.ok(report.explanation_bullets.length <= 3);
     assert.ok(report.source_trace.length >= 1);
@@ -294,7 +294,7 @@ describe('buildConfidenceReport', () => {
 
 describe('confidenceBandDisplay', () => {
   it('maps bands to people-first display strings', () => {
-    assert.equal(confidenceBandDisplay('high'), 'Looks solid');
+    assert.equal(confidenceBandDisplay('high'), 'Looks trustworthy');
     assert.equal(confidenceBandDisplay('medium'), 'Still forming');
     assert.equal(confidenceBandDisplay('low'), 'Thin so far');
     assert.equal(confidenceBandDisplay('contested'), 'Sources clash');

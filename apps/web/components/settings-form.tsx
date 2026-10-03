@@ -4,6 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Segmented } from './ui/segmented';
 import { siteConfig } from '@/lib/site-config';
+import {
+  SOURCE_GROUP_LABELS,
+  SOURCE_GROUP_ORDER,
+  sourceGroupKey,
+  type SourceGroupKey,
+} from '@osint/core/source-catalog';
 
 const TOPICS = ['war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'tech', 'finance', 'other'] as const;
 type Topic = (typeof TOPICS)[number];
@@ -19,7 +25,7 @@ export interface PrefsInitial {
   weather_lat?: number | null;
   weather_lon?: number | null;
   weather_label?: string | null;
-  feed_mode_preference?: 'personalized' | 'global' | 'hybrid';
+  feed_mode_preference?: 'personalized' | 'global';
   briefing_frequency_preference?: 'daily' | 'weekly' | 'both' | 'off';
   alert_intensity_preference?: 'critical_only' | 'important_and_up' | 'all';
   max_alerts_per_day_preference?: number;
@@ -33,32 +39,6 @@ export interface SourceOpt {
   metadata?: { type?: string | null } | null;
 }
 
-const SOURCE_GROUP_ORDER = [
-  'news_wires',
-  'regional_news',
-  'science_sensors',
-  'satellite_space',
-  'weather',
-  'humanitarian_official',
-  'markets',
-  'cyber',
-  'events',
-  'apis',
-] as const;
-
-const SOURCE_GROUP_LABELS: Record<(typeof SOURCE_GROUP_ORDER)[number], string> = {
-  news_wires: 'News wires',
-  regional_news: 'Regional news coverage',
-  science_sensors: 'Science sensors',
-  satellite_space: 'Satellite and space-weather intelligence',
-  weather: 'Weather and alerts',
-  humanitarian_official: 'Humanitarian and official bulletins',
-  markets: 'Markets and macro',
-  cyber: 'Cyber intelligence',
-  events: 'Global events',
-  apis: 'Other APIs',
-};
-
 const SETTINGS_TABS = [
   { id: 'topics', label: 'Topics', icon: TopicsIcon },
   { id: 'sources', label: 'Sources', icon: SourcesIcon },
@@ -67,21 +47,6 @@ const SETTINGS_TABS = [
 ] as const;
 
 type SettingsTab = (typeof SETTINGS_TABS)[number]['id'];
-
-function sourceGroupKey(source: SourceOpt): (typeof SOURCE_GROUP_ORDER)[number] {
-  const kind = String(source.kind ?? '').toLowerCase();
-  const type = String(source.metadata?.type ?? '').toLowerCase();
-  if (type === 'earthquake' || type === 'natural_events' || type === 'volcano' || type === 'hurricane')
-    return 'science_sensors';
-  if (type === 'satellite' || type === 'space_weather') return 'satellite_space';
-  if (type === 'weather' || type === 'weather_alerts') return 'weather';
-  if (type === 'markets') return 'markets';
-  if (type === 'cyber' || type === 'cyber_intel') return 'cyber';
-  if (type === 'humanitarian' || type === 'official_bulletin') return 'humanitarian_official';
-  if (type === 'news_regional') return 'regional_news';
-  if (type === 'events') return 'events';
-  return kind === 'rss' ? 'news_wires' : 'apis';
-}
 
 export function SettingsForm({
   initial,
@@ -109,8 +74,8 @@ export function SettingsForm({
   const [weatherLon, setWeatherLon] = useState<string>(
     initial?.weather_lon != null ? String(initial.weather_lon) : '',
   );
-  const [feedMode, setFeedMode] = useState<'personalized' | 'global' | 'hybrid'>(
-    initial?.feed_mode_preference ?? 'personalized',
+  const [feedMode, setFeedMode] = useState<'personalized' | 'global'>(
+    initial?.feed_mode_preference === 'global' ? 'global' : 'personalized',
   );
   const [briefingFrequency, setBriefingFrequency] = useState<'daily' | 'weekly' | 'both' | 'off'>(
     initial?.briefing_frequency_preference ?? 'daily',
@@ -128,7 +93,7 @@ export function SettingsForm({
   const [newPassword, setNewPassword] = useState('');
   const [accountStatus, setAccountStatus] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const groupedSources = new Map<(typeof SOURCE_GROUP_ORDER)[number], SourceOpt[]>();
+  const groupedSources = new Map<SourceGroupKey, SourceOpt[]>();
   for (const source of sources) {
     const key = sourceGroupKey(source);
     if (!groupedSources.has(key)) groupedSources.set(key, []);
@@ -457,11 +422,10 @@ export function SettingsForm({
             >
               <Segmented
                 active={feedMode}
-                onSelect={(v) => setFeedMode(v as 'personalized' | 'global' | 'hybrid')}
+                onSelect={(v) => setFeedMode(v as 'personalized' | 'global')}
                 options={[
                   { label: 'Personalized', value: 'personalized' },
                   { label: 'Global', value: 'global' },
-                  { label: 'Hybrid', value: 'hybrid' },
                 ]}
               />
             </SettingsCard>

@@ -1,4 +1,4 @@
-import { HUMAN_VOICE_SYSTEM_PROMPT } from '@/lib/prompts/humanVoice';
+import { HUMAN_VOICE_SYSTEM_PROMPT } from '@osint/core/prompts';
 
 /**
  * Default system prompt for the per-user AI analyst.

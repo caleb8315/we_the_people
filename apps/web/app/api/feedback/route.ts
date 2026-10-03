@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
 const Body = z.object({
   signal_id: z.string().uuid().optional(),
   briefing_id: z.string().uuid().optional(),
-  kind: z.enum(['useful', 'noise', 'wrong', 'helpful_context']),
+  kind: z.enum(['useful', 'wrong', 'helpful_context']),
   note: z.string().max(400).optional(),
 });
 

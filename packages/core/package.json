@@ -33,7 +33,8 @@
     "./confidence-breakdown": "./src/confidence-breakdown.ts",
     "./result-explanation": "./src/result-explanation.ts",
     "./claim-decomposition": "./src/claim-decomposition.ts",
-    "./case-file": "./src/case-file.ts"
+    "./case-file": "./src/case-file.ts",
+    "./prompts": "./src/prompts.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

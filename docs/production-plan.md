@@ -10,10 +10,10 @@ This plan sits alongside, and does not replace, [launch-plan.md](launch-plan.md)
 
 What already exists in the repo (don't redo):
 
-- Next.js 14 web app (`apps/web`) with Supabase SSR auth, middleware CSP, rate limiting (`lib/rate-limit.ts`), RLS on user tables, invite-only email/password auth, account export, and branded route error boundaries.
+- Next.js 14 web app (`apps/web`) with Supabase SSR auth, middleware CSP, rate limiting (`lib/rate-limit.ts`), RLS on user tables, open email/password auth, account export, and branded route error boundaries.
 - Worker (`apps/worker`) with ingest, brief, alert, email-briefings, backfill, develop (story enrichment), and maintenance jobs, driven by GitHub Actions cron.
 - Core package (`packages/core`) with reliability scoring, contradictions, evidence, confidence bands, clustering, domains, media.
-- Supabase schema (`supabase/migrations/001` through `026`) with `signals`, `evidence`, `briefings`, `contradictions`, `engine_runs`, `usage_ledger`, `beta_allowlist`, `product_events`, `user_saved_views`, `user_ai_state`, and maintenance/telemetry alignment updates.
+- Supabase schema with `signals`, `evidence`, `briefings`, `contradictions`, `engine_runs`, `usage_ledger`, `product_events`, `user_saved_views`, `user_ai_state`, and maintenance/telemetry alignment updates.
 - Daily LLM budget guards (`MAX_DAILY_LLM_CALLS*`) and per-user daily limits (`USER_DAILY_*`).
 - Docs: `architecture.md`, `security.md`, `privacy.md`, `runbooks.md`, `metrics.md`, `launch-plan.md`, `migration-plan.md`, `changelog.md`, `deploy-to-vercel.md`.
 - `/ops` admin dashboard, `/trust`, `/about`, `/privacy`, `/terms`, `/contact`, `/dmca`, `/corrections`, `/status`, `/changelog`, `/sources`, `/sources-licensing`, `/reliability`, `/onboarding`, `/settings`, `/dashboard`, `/feed`, `/signal/[id]`, `/briefings`, `/verify`.
@@ -22,7 +22,7 @@ What's still missing is the remaining "last-mile production polish" — deeper o
 
 ### Status snapshot (completed on `main`)
 
-- [x] Invite-only auth gate with access-request flow, redirect hardening, and safer API access on sensitive routes.
+- [x] Open email/password auth, redirect hardening, and safer API access on sensitive routes.
 - [x] Self-serve account export plus privacy/security/legal page expansion.
 - [x] Public trust surface for `/sources`, `/reliability`, `/status`, `/changelog`, `/terms`, `/contact`, `/dmca`, `/corrections`, and `/.well-known/security.txt`.
 - [x] Shared helper cleanup for source catalog grouping, product event names, and daily usage limits.

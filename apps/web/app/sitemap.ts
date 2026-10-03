@@ -12,6 +12,8 @@ const routes = [
   '/feed',
   '/login',
   '/privacy',
+  '/reliability',
+  '/sources',
   '/status',
   '/terms',
   '/trust',

@@ -20,29 +20,11 @@ const PrefBody = z.object({
   weather_lat: z.number().min(-90).max(90).nullable().optional(),
   weather_lon: z.number().min(-180).max(180).nullable().optional(),
   weather_label: z.string().max(120).nullable().optional(),
-  feed_mode_preference: z.enum(['personalized', 'global', 'hybrid']).optional(),
+  feed_mode_preference: z.enum(['personalized', 'global']).optional(),
   briefing_frequency_preference: z.enum(['daily', 'weekly', 'both', 'off']).optional(),
   alert_intensity_preference: z.enum(['critical_only', 'important_and_up', 'all']).optional(),
   max_alerts_per_day_preference: z.number().int().min(1).max(5).optional(),
 });
-
-export async function GET(req: Request) {
-  const rl = limit(getClientKey(req, 'prefs-get'), 60, 60_000);
-  if (!rl.ok) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
-
-  const sb = getServerSupabase();
-  const { data: auth } = await sb.auth.getUser();
-  if (!auth.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-
-  const { data, error } = await sb
-    .from('preferences')
-    .select('*')
-    .eq('user_id', auth.user.id)
-    .maybeSingle();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ preferences: data ?? null });
-}
 
 export async function PUT(req: Request) {
   const rl = limit(getClientKey(req, 'prefs-put'), 20, 60_000);

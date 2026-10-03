@@ -107,7 +107,7 @@ export function PersonalizedBriefingPanel() {
               </span>
             )}
             {remaining == null && signalsUsed == null && (
-              <span>Beta limit: 2 calls/day</span>
+              <span>2 briefings per day</span>
             )}
           </div>
         </div>

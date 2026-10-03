@@ -110,7 +110,7 @@ export function AiWorkspace() {
       <section className="rounded-card border border-ink-100 bg-paper p-4">
         <h2 className="text-sm font-semibold">{activeTitle}</h2>
         <p className="mt-1 text-xs text-ink-500">
-          Beta limit: up to 10 AI chat messages/day per user. Limits reset daily.
+          Up to 10 messages per day. Resets at midnight UTC.
         </p>
         <div className="mt-3 max-h-[460px] space-y-2 overflow-auto pr-1">
           {messages.map((m) => (

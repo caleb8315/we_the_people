@@ -94,14 +94,13 @@ npm run backfill -- 48 --dry-run
 - Public trust surface: `/terms`, `/privacy`, `/contact`, `/dmca`,
   `/corrections`, `/status`, `/sources`, `/reliability`, `/trust`,
   `/changelog`, and `/.well-known/security.txt`
-- Self-serve account export from Settings and invite-only beta access request
-  flows on the landing and login pages
+- Open email/password accounts with self-serve export and deletion from Settings
 
 ## Production-readiness status
 
 Completed on `main`:
 
-- Invite-only beta auth flow with access requests and allowlist enforcement
+- Open email/password auth with protected account routes
 - Safer auth redirects and tighter API access for sensitive routes
 - Self-serve account export plus improved account management flows
 - Public sources catalog, public reliability page, and live status page
