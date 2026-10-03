@@ -8,7 +8,6 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { FeedFreshness } from '@/components/feed-freshness';
 import { FeedAutoCorroboration } from '@/components/feed-auto-corroboration';
 import { FeedOrientationBanner } from '@/components/feed-orientation-banner';
-import { PlayerStatus } from '@/components/player-status';
 import { logProductEvent } from '@/lib/product-events';
 import { applyMutes, decorateSignals, type SignalRowRaw } from '@/lib/signals';
 import { groupSignalsForFeed, rankGlobalFeedStories } from '@/lib/signal-feed';
@@ -243,7 +242,7 @@ export default async function FeedPage({
 
   return (
     <div className="space-y-6 sm:space-y-7">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <section>
         <div className="min-w-0 flex-1">
           <p className="font-display text-[11px] font-semibold uppercase tracking-[0.22em] text-signal">
             {userName ? `Hey, ${userName}` : 'Live coverage'}
@@ -254,7 +253,8 @@ export default async function FeedPage({
             <span className="text-ink-500">the world right now.</span>
           </h1>
           <p className="mt-2 max-w-xl text-sm text-ink-500">
-            Scout stories for XP. Open three to clear today&apos;s mission.
+            Follow the strongest signals, compare independent coverage, and open any story to
+            inspect the source trail.
           </p>
 
           <form action="/feed" className="mt-5 flex max-w-xl items-center gap-3">
@@ -305,9 +305,6 @@ export default async function FeedPage({
               </svg>
             </button>
           </form>
-        </div>
-        <div className="w-full max-w-sm lg:shrink-0">
-          <PlayerStatus compact />
         </div>
       </section>
 

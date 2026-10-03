@@ -13,9 +13,6 @@ import type {
   EvidenceCardSummary,
   EvidenceStance,
   ClaimVerdict,
-  RankedSource,
-  RankedSourceSummary,
-  ResultExplanation,
 } from '@osint/core';
 import { prettyOutletName } from '@/lib/reader-report';
 
@@ -26,8 +23,6 @@ import { prettyOutletName } from '@/lib/reader-report';
  * `report` / `reader_report` shapes:
  *
  *   - confidence breakdown (4 components + composite + penalties)
- *   - "Why this result?" / "What would resolve this?" / agree / disagree
- *   - ranked sources with per-source rationale
  *   - conflict cards (extended taxonomy + numeric severity)
  *   - bias signal layer (kept visually separate from confidence)
  *   - evidence cards with stance
@@ -38,8 +33,6 @@ import { prettyOutletName } from '@/lib/reader-report';
  */
 
 export interface VerifyAnalysisData {
-  ranked_sources: RankedSource[];
-  ranked_summary: RankedSourceSummary;
   conflicts: AnalyzedConflict[];
   conflict_summary: {
     total: number;
@@ -51,7 +44,6 @@ export interface VerifyAnalysisData {
   evidence_cards: EvidenceCard[];
   cards_summary: EvidenceCardSummary;
   confidence_breakdown: ConfidenceBreakdown;
-  explanation: ResultExplanation;
   case_file?: EvidenceCaseFile;
   specialized_sources?: Array<{
     id: string;
@@ -71,10 +63,8 @@ export function VerifyAnalysis({ data }: { data: VerifyAnalysisData }) {
         <SpecializedSourcesCard systems={data.specialized_sources} />
       )}
       <ConfidenceBreakdownCard breakdown={data.confidence_breakdown} />
-      <ResultExplanationCard explanation={data.explanation} />
       <ConflictsCard conflicts={data.conflicts} summary={data.conflict_summary} />
       <BiasCard bias={data.bias} />
-      <RankedSourcesCard sources={data.ranked_sources} />
       <EvidenceCardsList cards={data.evidence_cards} summary={data.cards_summary} />
     </section>
   );
@@ -94,8 +84,8 @@ function CaseFileCard({ caseFile }: { caseFile: EvidenceCaseFile }) {
             {caseFile.overall_summary}
           </h3>
           <p className="mt-2 max-w-prose text-[13.5px] leading-relaxed text-ink-600">
-            We split the submission into checkable claims, then mapped source evidence to each claim.
-            The verdict is evidence-bound and claim-by-claim, with unresolved gaps called out explicitly.
+            We split the submission into checkable claims and mapped the strongest source evidence
+            to each one.
           </p>
         </div>
         <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${verdictClass(caseFile.overall_verdict)}`}>
@@ -127,12 +117,13 @@ function CaseFileMiniBlock({
   items: string[];
   tone: 'good' | 'warn' | 'info';
 }) {
+  if (items.length === 0) return null;
   const dot = tone === 'good' ? 'bg-emerald-500' : tone === 'warn' ? 'bg-amber-500' : 'bg-brand-500';
   return (
     <div className="rounded-xl border border-ink-100 bg-paper/80 px-3 py-3">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">{title}</p>
       <ul className="mt-2 space-y-1.5 text-[12.5px] leading-relaxed text-ink-700">
-        {(items.length > 0 ? items : ['No strong signal in this section yet.']).slice(0, 4).map((item, i) => (
+        {items.slice(0, 4).map((item, i) => (
           <li key={i} className="flex gap-2">
             <span aria-hidden="true" className={`mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
             <span>{item}</span>
@@ -264,8 +255,8 @@ function SpecializedSourcesCard({
 }: {
   systems: NonNullable<VerifyAnalysisData['specialized_sources']>;
 }) {
-  const hits = systems.filter((s) => s.status === 'hit').length;
-  const unavailable = systems.filter((s) => s.status === 'unavailable').length;
+  const matches = systems.filter((system) => system.status === 'hit' && system.evidence_count > 0);
+  if (matches.length === 0) return null;
   return (
     <article className="rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
@@ -274,26 +265,20 @@ function SpecializedSourcesCard({
             Deep source coverage
           </p>
           <h3 className="mt-1 text-lg font-semibold text-ink sm:text-xl">
-            {hits} specialized source{hits === 1 ? '' : 's'} found matching records
+            {matches.length} specialized source{matches.length === 1 ? '' : 's'} found matching records
           </h3>
         </div>
-        {unavailable > 0 && (
-          <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800">
-            {unavailable} need free API setup
-          </span>
-        )}
       </header>
       <p className="mt-2 max-w-prose text-[13.5px] leading-relaxed text-ink-600">
         These are claim-specific searches across fact-check, scholarly, legal, finance, and cyber databases.
-        They add evidence only; the case-file engine still decides how each source maps to each claim.
       </p>
       <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {systems.map((s) => (
+        {matches.map((s) => (
           <li key={s.id} className="rounded-xl border border-ink-100 bg-canvas-50 px-3 py-2.5">
             <div className="flex items-baseline justify-between gap-2">
               <p className="text-sm font-semibold text-ink-700">{s.name}</p>
-              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${systemStatusClass(s.status)}`}>
-                {s.status}
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+                match
               </span>
             </div>
             <p className="mt-1 text-[11px] text-ink-500">
@@ -380,78 +365,6 @@ function BreakdownRow({
   );
 }
 
-/* ─── Result explanation ───────────────────────────────────────────────── */
-
-function ResultExplanationCard({ explanation }: { explanation: ResultExplanation }) {
-  return (
-    <article className="rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-400">
-        Plain-English explanation
-      </p>
-      <p className="mt-2 max-w-prose text-[13.5px] italic leading-relaxed text-ink-600">
-        {explanation.positioning}
-      </p>
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <ExplainBlock title="Why this result?" tone="info" bullets={explanation.why_this_result} />
-        <ExplainBlock
-          title="What would resolve this?"
-          tone="info"
-          bullets={explanation.what_would_resolve_this}
-        />
-        <ExplainBlock
-          title="What sources agree on"
-          tone="good"
-          bullets={explanation.what_sources_agree_on}
-        />
-        <ExplainBlock
-          title="What sources disagree on"
-          tone="warn"
-          bullets={explanation.what_sources_disagree_on}
-        />
-      </div>
-    </article>
-  );
-}
-
-function ExplainBlock({
-  title,
-  tone,
-  bullets,
-}: {
-  title: string;
-  tone: 'info' | 'good' | 'warn';
-  bullets: string[];
-}) {
-  if (bullets.length === 0) return null;
-  const dotClass = tone === 'good' ? 'bg-emerald-500' : tone === 'warn' ? 'bg-amber-500' : 'bg-ink-300';
-  return (
-    <div className="rounded-xl border border-ink-100 bg-canvas-50 px-3 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">
-        {title}
-      </p>
-      <ul className="mt-1.5 space-y-1.5 text-[13.5px] leading-relaxed text-ink-700">
-        {bullets.map((b, i) => (
-          <li key={i} className="flex gap-2">
-            <span aria-hidden="true" className={`mt-[8px] h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
-            <span>{renderEmphasis(b)}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/** Minimal `**bold**` renderer — keeps the explanation-builder simple. */
-function renderEmphasis(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  return parts.map((p, i) => {
-    if (p.startsWith('**') && p.endsWith('**')) {
-      return <strong key={i} className="font-semibold text-ink">{p.slice(2, -2)}</strong>;
-    }
-    return <span key={i}>{p}</span>;
-  });
-}
-
 /* ─── Conflicts (extended taxonomy + numeric severity) ─────────────────── */
 
 function ConflictsCard({
@@ -461,7 +374,8 @@ function ConflictsCard({
   conflicts: AnalyzedConflict[];
   summary: VerifyAnalysisData['conflict_summary'];
 }) {
-  if (conflicts.length === 0) {
+  const materialConflicts = conflicts.filter((conflict) => conflict.type !== 'insufficient_evidence');
+  if (materialConflicts.length === 0) {
     return (
       <article className="rounded-card border border-emerald-200 bg-emerald-50/40 p-5 shadow-card sm:p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-700">
@@ -469,10 +383,6 @@ function ConflictsCard({
         </p>
         <p className="mt-1 text-sm font-semibold text-emerald-800">
           No material conflicts detected across the available sources.
-        </p>
-        <p className="mt-1 text-xs text-emerald-700/80">
-          Direct contradiction, framing difference, timeline mismatch, missing context, and
-          insufficient-evidence checks all came back clear.
         </p>
       </article>
     );
@@ -485,7 +395,7 @@ function ConflictsCard({
             Conflict analysis
           </p>
           <h3 className="mt-1 text-lg font-semibold text-ink sm:text-xl">
-            {summary.total} {summary.total === 1 ? 'conflict' : 'conflicts'} surfaced
+            {materialConflicts.length} {materialConflicts.length === 1 ? 'conflict' : 'conflicts'} surfaced
           </h3>
         </div>
         {summary.worst_severity > 0 && (
@@ -496,7 +406,7 @@ function ConflictsCard({
         )}
       </header>
       <ul className="mt-4 space-y-2.5">
-        {conflicts.map((c, i) => (
+        {materialConflicts.map((c, i) => (
           <li
             key={i}
             className={`rounded-xl border px-3 py-2.5 ${conflictToneClass(c.severity_band)}`}
@@ -526,7 +436,7 @@ function ConflictsCard({
 /* ─── Bias signal (kept separate from confidence) ──────────────────────── */
 
 function BiasCard({ bias }: { bias: CorpusBiasReport }) {
-  if (bias.pieces === 0) return null;
+  if (bias.pieces === 0 || !bias.has_signal || bias.avg_intensity <= 0) return null;
   const showSignals = bias.has_signal || bias.avg_intensity > 0;
   return (
     <article className="rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
@@ -536,9 +446,7 @@ function BiasCard({ bias }: { bias: CorpusBiasReport }) {
             Bias signal
           </p>
           <h3 className="mt-1 text-lg font-semibold text-ink sm:text-xl">
-            {bias.band === 'neutral'
-              ? 'Language reads as broadly observational'
-              : bias.band === 'low'
+            {bias.band === 'low'
                 ? 'Mild bias markers detected'
                 : bias.band === 'moderate'
                   ? 'Moderate bias markers detected'
@@ -561,7 +469,6 @@ function BiasCard({ bias }: { bias: CorpusBiasReport }) {
           <BiasRow label="Emotional tone" score={bias.per_signal.emotional_tone} />
         </ul>
       )}
-      <p className="mt-3 text-[11px] italic text-ink-500">{bias.disclaimer}</p>
     </article>
   );
 }
@@ -580,106 +487,6 @@ function BiasRow({ label, score }: { label: string; score: number }) {
         />
       </div>
     </li>
-  );
-}
-
-/* ─── Ranked sources ───────────────────────────────────────────────────── */
-
-function RankedSourcesCard({ sources }: { sources: RankedSource[] }) {
-  const [expanded, setExpanded] = useState(false);
-  if (sources.length === 0) return null;
-  const visible = expanded ? sources : sources.slice(0, 5);
-  return (
-    <article className="rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
-      <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-400">
-            Ranked sources
-          </p>
-          <h3 className="mt-1 text-lg font-semibold text-ink sm:text-xl">
-            {sources.length} source{sources.length === 1 ? '' : 's'} compared
-          </h3>
-        </div>
-        <p className="text-[11px] text-ink-500">
-          Ranked by credibility · directness · recency · independence.
-        </p>
-      </header>
-      <ol className="mt-4 space-y-3">
-        {visible.map((s) => (
-          <RankedSourceRow key={s.url} source={s} />
-        ))}
-      </ol>
-      {sources.length > 5 && (
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="mt-3 text-[12.5px] font-semibold text-amber-700 hover:text-amber-900"
-        >
-          {expanded ? 'Show fewer sources' : `Show all ${sources.length} sources`}
-        </button>
-      )}
-    </article>
-  );
-}
-
-function RankedSourceRow({ source }: { source: RankedSource }) {
-  const reasons = source.reasons.slice(0, 3);
-  return (
-    <li className="rounded-xl border border-ink-100 bg-canvas-50 p-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div className="min-w-0">
-          <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-ink-500">
-            <span>#{source.rank}</span>
-            <span className="rounded-full bg-paper px-2 py-0.5 text-ink-600">
-              {roleChip(source.role)}
-            </span>
-            {source.is_credible && (
-              <span className="text-emerald-600">✓ Rated</span>
-            )}
-            {source.is_syndicated && (
-              <span className="text-amber-700">↻ Likely circular</span>
-            )}
-          </p>
-          <a
-            href={source.url}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-1 block truncate text-sm font-medium text-ink-700 hover:text-amber-700"
-          >
-            {prettyOutletName(source.domain)}
-          </a>
-          {source.title && (
-            <p className="mt-0.5 truncate text-[12.5px] text-ink-500">{source.title}</p>
-          )}
-        </div>
-        <p className="text-sm font-semibold tabular-nums text-ink-700">{source.score}/100</p>
-      </div>
-      <div className="mt-2 grid gap-1.5 sm:grid-cols-4">
-        <ScorePill label="Cred." score={source.components.credibility} />
-        <ScorePill label="Direct." score={source.components.directness} />
-        <ScorePill label="Recent" score={source.components.recency} />
-        <ScorePill label="Indep." score={source.components.independence} />
-      </div>
-      {reasons.length > 0 && (
-        <ul className="mt-2 space-y-1 text-[12.5px] leading-relaxed text-ink-600">
-          {reasons.map((r, i) => (
-            <li key={i} className="flex gap-2">
-              <span aria-hidden="true" className={`mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full ${reasonDot(r.effect)}`} />
-              <span>{r.text}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </li>
-  );
-}
-
-function ScorePill({ label, score }: { label: string; score: number }) {
-  return (
-    <div className="flex items-center gap-2 rounded-md border border-ink-100 bg-paper px-2 py-1">
-      <span className="text-[11px] uppercase tracking-wider text-ink-500">{label}</span>
-      <span className="text-[12px] font-semibold tabular-nums text-ink-700">{score}</span>
-    </div>
   );
 }
 
@@ -837,51 +644,6 @@ function conflictToneClass(band: 'low' | 'medium' | 'high'): string {
       return 'border-amber-200 bg-amber-50/70';
     case 'low':
       return 'border-ink-100 bg-canvas-50';
-  }
-}
-
-function reasonDot(effect: 'positive' | 'negative' | 'neutral'): string {
-  switch (effect) {
-    case 'positive':
-      return 'bg-emerald-500';
-    case 'negative':
-      return 'bg-amber-500';
-    case 'neutral':
-      return 'bg-ink-300';
-  }
-}
-
-function systemStatusClass(status: 'hit' | 'miss' | 'skipped' | 'unavailable' | 'error'): string {
-  switch (status) {
-    case 'hit':
-      return 'bg-emerald-100 text-emerald-800';
-    case 'miss':
-      return 'bg-ink-100 text-ink-600';
-    case 'skipped':
-      return 'bg-sky-100 text-sky-800';
-    case 'unavailable':
-      return 'bg-amber-100 text-amber-800';
-    case 'error':
-      return 'bg-danger-100 text-danger-700';
-  }
-}
-
-function roleChip(role: RankedSource['role']): string {
-  switch (role) {
-    case 'primary':
-      return 'Primary';
-    case 'official':
-      return 'Official';
-    case 'reporting':
-      return 'Reporting';
-    case 'reference':
-      return 'Reference';
-    case 'social':
-      return 'Social';
-    case 'aggregator':
-      return 'Aggregator';
-    case 'unknown':
-      return 'Unrated';
   }
 }
 

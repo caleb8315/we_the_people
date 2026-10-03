@@ -6,8 +6,6 @@ import { SignalCard } from '@/components/signal-card';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { decorateSignals, personalizeSignals, type SignalRowRaw } from '@/lib/signals';
-import { PlayerStatus } from '@/components/player-status';
-import { DailyMissions } from '@/components/daily-missions';
 
 export const metadata = { title: 'HQ · Crosscheck' };
 export const dynamic = 'force-dynamic';
@@ -96,19 +94,20 @@ export default async function DashboardPage() {
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-signal-300">
-              Command HQ
+              Your Crosscheck
             </p>
             <h1 className="mt-2 font-display text-[30px] font-semibold leading-[1.1] tracking-tight sm:text-[38px]">
               Welcome back, {name}.
             </h1>
             <p className="mt-2 max-w-xl text-sm text-white/70">
-              Clear calls for the people. Missions today, stories that matter, and what looks solid vs what clashes.
+              Your highest-priority stories, latest briefing, and the evidence that changed since
+              your last visit.
             </p>
             <Link
               href="/verify"
               className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-flare px-5 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_-8px_rgba(228,87,46,0.65)] transition hover:bg-flare-600"
             >
-              Verify a claim · +25 XP
+              Verify a claim
             </Link>
           </div>
           <dl className="grid grid-cols-3 gap-3 text-center">
@@ -118,11 +117,6 @@ export default async function DashboardPage() {
           </dl>
         </div>
       </header>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <PlayerStatus />
-        <DailyMissions />
-      </div>
 
       <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
         <Link

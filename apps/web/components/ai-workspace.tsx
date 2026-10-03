@@ -15,6 +15,7 @@ export function AiWorkspace() {
   const [status, setStatus] = useState<string | null>(null);
   const [primed, setPrimed] = useState(false);
   const searchParams = useSearchParams();
+  const caseId = searchParams.get('case');
 
   async function load(sessionId?: string | null) {
     const qp = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
@@ -61,7 +62,11 @@ export function AiWorkspace() {
     const res = await fetch('/api/ai/chat', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ session_id: activeSessionId ?? undefined, message: userText }),
+      body: JSON.stringify({
+        session_id: activeSessionId ?? undefined,
+        message: userText,
+        case_id: caseId ?? undefined,
+      }),
     });
     setLoading(false);
     if (!res.ok) {
@@ -126,9 +131,10 @@ export function AiWorkspace() {
         {primed && messages.length === 0 && (
           <p className="mt-3 rounded-md border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
             <span className="mr-1.5 font-semibold uppercase tracking-wider text-amber-700 text-[10px]">
-              Pre-filled from signal
+              {caseId ? 'Grounded in verification case' : 'Pre-filled from signal'}
             </span>
-            Edit the question if you like, then press Send. The analyst is grounded in your live feed context.
+            Edit the question if you like, then press Send. The analyst will use the relevant
+            source evidence as context.
           </p>
         )}
         <div className="mt-3 flex gap-2">

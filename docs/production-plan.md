@@ -206,7 +206,7 @@ The lightest touch that keeps the civic core free.
 
 - **GitHub Sponsors button** in repo + footer. Zero integration.
 - **Stripe Payment Link** for one-time donations. Zero code. Paste URL into `/about` and footer.
-- [x] `**/pricing` page** — "free forever" primary message + optional "Supporter" ($5/mo) framed as "supports the project" not "removes ads" (we never run ads). Live at `/pricing`; sponsor/donate buttons appear when `NEXT_PUBLIC_SPONSOR_URL` / `NEXT_PUBLIC_DONATE_URL` are set. No billing backend yet.
+- Monetization UI is deferred until there is a real billing or donation path; the placeholder pricing page was removed.
 
 Only *after* 50+ WAU and at least a handful of donors:
 

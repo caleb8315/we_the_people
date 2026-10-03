@@ -112,7 +112,6 @@ Completed on `main`:
   scheduled workflow emails on infra failure, and a watchdog catches a stalled
   pipeline (de-duplicated via `030_operator_alerts.sql`)
 - Hardened Content-Security-Policy + Dependabot for security/dependency updates
-- Public `/pricing` page ("free forever" + optional Supporter tier + donation links)
 - CI coverage for typecheck, lint, tests, and production build
 - Route-level error boundaries for branded recovery UX
 
@@ -121,7 +120,6 @@ Still intentionally pending:
 - Sentry / external uptime monitoring (email/watchdog alerting is in place; an
   external monitor is still needed to catch the "GitHub disabled our crons" case)
 - Cloudflare Pages migration
-- Full Stripe subscription/billing backend (the `/pricing` page links out only)
 - Full marketing asset pack (favicon/OG/touch icons)
 
 ## What Crosscheck does not do
