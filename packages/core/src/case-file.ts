@@ -80,12 +80,43 @@ export interface EvidenceCaseFile {
   what_we_can_say: string[];
   what_remains_uncertain: string[];
   what_would_make_this_stronger: string[];
+  /** Present when a model read the evidence and answered the claim. */
+  judgment?: ClaimJudgment | null;
+}
+
+export type JudgeAnswer = 'yes' | 'no' | 'unclear';
+
+/**
+ * Why the judge answered the way it did. `not_reported` is the "this would be
+ * covered if it had happened, and it isn't" case; `not_real` is a claim that
+ * misdescribes how the world works (e.g. a policy that "turns AI into
+ * superintelligence").
+ */
+export type JudgeBasis =
+  | 'reported'
+  | 'contradicted'
+  | 'not_reported'
+  | 'not_real'
+  | 'conflicting'
+  | 'no_coverage';
+
+export type JudgedStance = 'supports' | 'contradicts' | 'topic_only';
+
+export interface ClaimJudgment {
+  answer: JudgeAnswer;
+  basis: JudgeBasis;
+  /** One sentence that answers the question, e.g. "No — he signed X, not Y." */
+  headline: string;
+  /** Two or three sentences naming the sources behind the answer. */
+  explanation: string;
+  evidence: Array<{ url: string; domain: string; stance: JudgedStance }>;
+  provider: string;
+  model: string | null;
 }
 
 export type DirectAnswerKind =
   | 'yes'
   | 'no'
-  | 'partly'
   | 'mixed'
   | 'unclear'
   | 'misleading'
@@ -95,9 +126,45 @@ export interface DirectAnswer {
   kind: DirectAnswerKind;
   label: string;
   explanation: string;
+  /** Supporting detail shown under the explanation, when available. */
+  detail?: string;
+}
+
+export function directAnswerFromJudgment(judgment: ClaimJudgment): DirectAnswer {
+  const explanation = stripLeadingAnswer(judgment.headline);
+  const detail = judgment.explanation || undefined;
+  switch (judgment.answer) {
+    case 'yes':
+      return { kind: 'yes', label: 'Yes.', explanation, detail };
+    case 'no':
+      return { kind: 'no', label: 'No.', explanation, detail };
+    case 'unclear':
+      return judgment.basis === 'conflicting'
+        ? { kind: 'mixed', label: 'Sources disagree.', explanation, detail }
+        : { kind: 'unclear', label: 'Not clear yet.', explanation, detail };
+  }
+}
+
+export function verdictFromJudgment(judgment: ClaimJudgment): ClaimVerdict {
+  switch (judgment.answer) {
+    case 'yes':
+      return 'supported';
+    case 'no':
+      return judgment.basis === 'contradicted' ? 'contradicted' : 'unsupported';
+    case 'unclear':
+      return judgment.basis === 'conflicting' ? 'unresolved' : 'not_enough_evidence';
+  }
+}
+
+function stripLeadingAnswer(headline: string): string {
+  const rest = headline.replace(/^(yes|no)\b[\s,.:;!—–-]*/i, '').trim();
+  if (!rest) return headline.trim();
+  return rest.charAt(0).toUpperCase() + rest.slice(1);
 }
 
 export function directAnswerForCaseFile(caseFile: EvidenceCaseFile): DirectAnswer {
+  if (caseFile.judgment) return directAnswerFromJudgment(caseFile.judgment);
+
   const hasSupportedClaim = caseFile.claims.some(
     (claim) => claim.verdict === 'supported' || claim.verdict === 'partly_supported',
   );
@@ -124,12 +191,14 @@ export function directAnswerForCaseFile(caseFile: EvidenceCaseFile): DirectAnswe
         label: 'No.',
         explanation: 'The available evidence does not support this claim.',
       };
+    // Without a judge, "partly supported" only means credible sources share
+    // words with the claim. That is topical overlap, not confirmation.
     case 'partly_supported':
       return {
-        kind: 'partly',
-        label: 'Partly.',
+        kind: 'unclear',
+        label: 'Not confirmed.',
         explanation:
-          'The core claim has support, but at least one important detail does not fully check out.',
+          'Credible outlets cover this topic, but none we found clearly report that this claim is true.',
       };
     case 'misleading_framing':
       return {
@@ -230,6 +299,114 @@ export function buildEvidenceCaseFile(input: BuildEvidenceCaseFileInput): Eviden
   };
 }
 
+/**
+ * Fold a judge's reading of the evidence back into the case file.
+ *
+ * Keyword overlap marks a story that merely names the same people as
+ * "partially supporting" a claim. Where the judge read a source, its stance
+ * replaces the overlap guess, claim verdicts are recomputed from the
+ * corrected stances, and the overall verdict follows the judge's answer, so
+ * the evidence list cannot contradict the headline answer.
+ */
+export function applyClaimJudgment(
+  caseFile: EvidenceCaseFile,
+  judgment: ClaimJudgment,
+): EvidenceCaseFile {
+  const stanceByUrl = new Map(judgment.evidence.map((e) => [e.url.toLowerCase(), e.stance]));
+  const judgedVerdict = verdictFromJudgment(judgment);
+
+  const claims = caseFile.claims.map((claimFile) => {
+    const evidence = claimFile.evidence
+      .map((e) => {
+        const judged = stanceByUrl.get(e.url.toLowerCase());
+        return judged ? { ...e, ...judgedEvidenceStance(judged) } : e;
+      })
+      .sort((a, b) => {
+        const stanceDelta = stanceWeight(a.stance) - stanceWeight(b.stance);
+        if (stanceDelta !== 0) return stanceDelta;
+        return (a.source_rank ?? 999) - (b.source_rank ?? 999);
+      });
+    const counts = countStances(evidence);
+    const score = scoreClaim({ claim: claimFile.claim, evidence, ...counts });
+    // A single-claim input is the whole question the judge answered.
+    const verdict =
+      caseFile.claims.length === 1
+        ? judgedVerdict
+        : decideClaimVerdict({ claim: claimFile.claim, evidence, score, ...counts });
+    return {
+      ...claimFile,
+      verdict,
+      confidence_score: score,
+      confidence_band: bandFromClaimScore(verdict, score),
+      support_count: counts.supportCount,
+      contradiction_count: counts.contradictionCount,
+      context_count: counts.contextCount,
+      evidence,
+      uncertainty: buildClaimUncertainty({ claim: claimFile.claim, verdict, evidence, ...counts }),
+      summary: summarizeClaim(
+        claimFile.claim,
+        verdict,
+        counts.supportCount,
+        counts.contradictionCount,
+        counts.contextCount,
+      ),
+    };
+  });
+
+  return {
+    ...caseFile,
+    overall_verdict: judgedVerdict,
+    overall_summary: judgment.headline,
+    claims,
+    what_we_can_say: dedupeText([judgment.explanation, ...buildWhatWeCanSay(claims)]).slice(0, 4),
+    what_remains_uncertain: buildOverallUncertainty(claims),
+    what_would_make_this_stronger: buildOverallResolve(claims),
+    judgment,
+  };
+}
+
+function judgedEvidenceStance(
+  stance: JudgedStance,
+): Pick<CaseFileEvidence, 'stance' | 'stance_confidence' | 'explanation'> {
+  switch (stance) {
+    case 'supports':
+      return {
+        stance: 'directly_supports',
+        stance_confidence: 85,
+        explanation: 'This source reports that the claim is true.',
+      };
+    case 'contradicts':
+      return {
+        stance: 'contradicts',
+        stance_confidence: 85,
+        explanation: 'This source reports something that contradicts the claim.',
+      };
+    case 'topic_only':
+      return {
+        stance: 'context_only',
+        stance_confidence: 80,
+        explanation: 'Covers the same people or topic, but does not report this claim.',
+      };
+  }
+}
+
+function countStances(evidence: CaseFileEvidence[]): {
+  supportCount: number;
+  contradictionCount: number;
+  contextCount: number;
+} {
+  return {
+    supportCount: evidence.filter(
+      (e) => e.stance === 'directly_supports' || e.stance === 'partially_supports',
+    ).length,
+    contradictionCount: evidence.filter((e) => e.stance === 'contradicts' || e.stance === 'weakens')
+      .length,
+    contextCount: evidence.filter(
+      (e) => e.stance === 'context_only' || e.stance === 'mentions_without_evidence',
+    ).length,
+  };
+}
+
 function buildClaimCaseFile(input: {
   claim: AtomicClaim;
   evidence: EvidenceItem[];
@@ -255,15 +432,7 @@ function buildClaimCaseFile(input: {
     })
     .slice(0, 12);
 
-  const supportCount = evidence.filter((e) =>
-    e.stance === 'directly_supports' || e.stance === 'partially_supports',
-  ).length;
-  const contradictionCount = evidence.filter((e) =>
-    e.stance === 'contradicts' || e.stance === 'weakens',
-  ).length;
-  const contextCount = evidence.filter((e) =>
-    e.stance === 'context_only' || e.stance === 'mentions_without_evidence',
-  ).length;
+  const { supportCount, contradictionCount, contextCount } = countStances(evidence);
 
   const confidence = scoreClaim({
     claim: input.claim,
