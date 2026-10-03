@@ -20,8 +20,11 @@ import {
   summarizeEvidenceCards,
   buildConfidenceBreakdown,
   buildEvidenceCaseFile,
+  applyClaimJudgment,
   decomposeClaims,
 } from '@osint/core';
+import { judgeClaim, selectJudgeEvidence } from '@osint/core/claim-judge';
+import { serverEnv } from '@/lib/env';
 import type {
   ConfidenceReport,
   EvidenceItem,
@@ -59,7 +62,10 @@ import {
  *     (decideVerification, computeReliabilityScores, buildConfidenceReport)
  *     and NEVER re-implements reliability math locally.
  *   - Social submissions are capped at the `medium` band.
- *   - No LLM call.
+ *   - Evidence gathering and the reliability band stay deterministic. One LLM
+ *     call (`judgeClaim`) reads the gathered sources and answers the claim
+ *     yes or no; its reply is validated against those sources, and the
+ *     deterministic answer is used whenever no valid judgment comes back.
  */
 
 export const dynamic = 'force-dynamic';
@@ -69,8 +75,9 @@ export const runtime = 'nodejs';
 // "GDELT errored" chip, so we give the route a generous duration cap. 45s
 // works on Vercel Hobby (max 60s) and leaves ~10s of headroom for our own
 // processing + response. The client shows progressive "still searching…"
-// messages so this long wait feels intentional, not broken.
-export const maxDuration = 45;
+// messages so this long wait feels intentional, not broken. The claim judge
+// adds up to ~22s on top, hence the Hobby-plan maximum of 60s.
+export const maxDuration = 60;
 
 const Body = z.object({
   kind: z.enum(['url', 'text']),
@@ -135,6 +142,7 @@ type VerifyResponse = {
 };
 
 export async function POST(req: Request) {
+  const startedAt = Date.now();
   const rl = limit(getClientKey(req, 'verify'), 20, 60_000);
   if (!rl.ok) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
 
@@ -330,7 +338,7 @@ export async function POST(req: Request) {
     is_text_only: body.kind === 'text',
     cap_at_medium: capMedium,
   });
-  const caseFile = buildEvidenceCaseFile({
+  let caseFile = buildEvidenceCaseFile({
     title: searchedTitle ?? title,
     text: body.kind === 'text' ? body.text ?? null : pageDescription,
     url: canonical_url ?? body.url ?? null,
@@ -340,6 +348,40 @@ export async function POST(req: Request) {
     contradictions: corroboration.contradictions,
     overall_band: report.band,
   });
+
+  const claimForJudge =
+    body.kind === 'text'
+      ? body.text ?? ''
+      : searchedTitle
+        ? [searchedTitle, pageDescription].filter(Boolean).join(' — ')
+        : '';
+  if (claimForJudge) {
+    const anchorUrl = (canonical_url ?? body.url ?? '').toLowerCase();
+    const env = serverEnv();
+    const judged = await judgeClaim({
+      claim: claimForJudge,
+      // The submitted page cannot corroborate itself.
+      evidence: selectJudgeEvidence(
+        mergedEvidence.filter((e) => e.url.toLowerCase() !== anchorUrl),
+        ranked,
+      ),
+      providers: [
+        { provider: 'gemini', apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL },
+        { provider: 'groq', apiKey: env.GROQ_API_KEY, model: env.GROQ_MODEL },
+        { provider: 'xay', apiKey: env.XAY_API_KEY, model: env.XAY_MODEL },
+      ],
+      // Leave room under maxDuration for persistence and the response.
+      budgetMs: Math.min(22_000, 52_000 - (Date.now() - startedAt)),
+    });
+    if (judged.judgment) {
+      caseFile = applyClaimJudgment(caseFile, judged.judgment);
+    } else {
+      console.error('[verify] claim judge unavailable; using deterministic answer', {
+        reason: judged.reason,
+        attempts: judged.attempts,
+      });
+    }
+  }
 
   // Persist when the user is authenticated. Anonymous readers still get a
   // full confidence report back — we just don't retain a history row.
@@ -399,6 +441,8 @@ export async function POST(req: Request) {
           credible_sources: credibleCount,
           systems_hit: corroboration.systems.filter((s) => s.status === 'hit').length,
           systems_queried: corroboration.systems.length,
+          judged_answer: caseFile.judgment?.answer ?? null,
+          judge_provider: caseFile.judgment?.provider ?? null,
         },
       });
     } catch {
