@@ -1,6 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import {
+  directAnswerForCaseFile,
+  type DirectAnswer,
+  type DirectAnswerKind,
+} from '@osint/core';
 import type {
   ConfidenceBand,
   ConfidenceReport,
@@ -182,16 +187,16 @@ function ExampleVerificationResult() {
       <h2 className="mt-1 text-lg font-semibold leading-snug text-ink sm:text-xl">
         Cruise ship hantavirus death reports
       </h2>
-      <p className="mt-2 text-sm leading-relaxed text-ink-600">
-        This story is real, but details moved fast and early headlines overstated key facts.
-        Multiple outlets confirm a passenger died after a cruise, and health officials did open an
-        investigation. What changed is the cause label: some reports called it a confirmed
-        hantavirus case before lab confirmation was public.
-      </p>
-      <p className="mt-2 text-sm leading-relaxed text-ink-600">
-        Best takeaway: share that there is a confirmed death and investigation, but avoid posting
-        definitive cause language until official pathology results are released.
-      </p>
+      <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500">
+          Direct answer
+        </p>
+        <p className="mt-2 font-display text-2xl font-semibold text-amber-800">Partly.</p>
+        <p className="mt-1 text-sm leading-relaxed text-ink-700">
+          The death and investigation happened, but the reported cause was not confirmed when
+          early headlines claimed it was.
+        </p>
+      </div>
     </section>
   );
 }
@@ -311,10 +316,12 @@ function verifyErrorMessage(code: unknown, status: number): string {
 
 function VerifyResult({ data, signedIn }: { data: VerifyResponse; signedIn: boolean }) {
   const { reader_report: reader, corroboration, analysis } = data;
-  const bandTone = bandToneClasses(reader.band);
+  const answer = analysis?.case_file
+    ? directAnswerForCaseFile(analysis.case_file)
+    : fallbackDirectAnswer(reader.band);
+  const answerTone = directAnswerTone(answer.kind);
   return (
     <section className="space-y-5 rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
-      {/* 1. Header — what was submitted, presented conversationally. */}
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-400">
           {reader.kind_label}
@@ -322,29 +329,29 @@ function VerifyResult({ data, signedIn }: { data: VerifyResponse; signedIn: bool
         <h2 className="mt-1 text-xl font-semibold leading-snug text-ink sm:text-[24px]">
           {reader.headline}
         </h2>
-        <p className="mt-2 text-[15px] leading-relaxed text-ink-600">{reader.one_liner}</p>
       </div>
 
-      {/* 2. THE VERDICT — the main answer: is this trustworthy? */}
-      <div className={`rounded-2xl border p-5 sm:p-6 ${bandTone.wrap}`}>
+      <div className={`rounded-2xl border p-5 sm:p-6 ${answerTone.wrap}`}>
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden="true"
-            className={`inline-block h-3 w-3 shrink-0 rounded-full ${bandDotClass(reader.band)}`}
+            className={`inline-block h-3 w-3 shrink-0 rounded-full ${answerTone.dot}`}
           />
-          <p className={`text-sm font-semibold ${bandTone.label}`}>
-            {friendlyBandLabel(reader.band)}
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500">
+            Direct answer
           </p>
         </div>
-        <p className="mt-3 text-[15px] leading-relaxed text-ink sm:text-base">
-          {reader.bottom_line}
+        <p className={`mt-3 font-display text-3xl font-semibold tracking-tight sm:text-4xl ${answerTone.label}`}>
+          {answer.label}
+        </p>
+        <p className="mt-2 max-w-2xl text-base leading-relaxed text-ink-700 sm:text-lg">
+          {answer.explanation}
         </p>
         <p className="mt-2 text-xs text-ink-500">
           Based on {summarizeMixNatural(reader.source_mix)}
         </p>
       </div>
 
-      {/* 2b. Tracked-event match — with event context, not just a data link. */}
       {corroboration.matched_signal && (
         <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
           <div className="flex items-start gap-3">
@@ -424,19 +431,66 @@ function VerifyResult({ data, signedIn }: { data: VerifyResponse; signedIn: bool
   );
 }
 
-/** Colours for the hero verdict box — keyed to the confidence band so the
- * visual tone matches the message before the reader even parses the words. */
-function bandToneClasses(band: string): { wrap: string; label: string } {
+function directAnswerTone(
+  kind: DirectAnswerKind,
+): { wrap: string; label: string; dot: string } {
+  switch (kind) {
+    case 'yes':
+      return {
+        wrap: 'border-emerald-200 bg-emerald-50/80',
+        label: 'text-emerald-800',
+        dot: 'bg-emerald-500',
+      };
+    case 'no':
+    case 'misleading':
+      return {
+        wrap: 'border-danger-200 bg-danger-50/80',
+        label: 'text-danger-800',
+        dot: 'bg-danger-500',
+      };
+    case 'partly':
+    case 'mixed':
+      return {
+        wrap: 'border-amber-200 bg-amber-50/80',
+        label: 'text-amber-800',
+        dot: 'bg-amber-500',
+      };
+    case 'unclear':
+    case 'not_checkable':
+      return {
+        wrap: 'border-ink-200 bg-canvas-50',
+        label: 'text-ink-800',
+        dot: 'bg-ink-400',
+      };
+  }
+}
+
+function fallbackDirectAnswer(band: ConfidenceBand): DirectAnswer {
   switch (band) {
     case 'high':
-      return { wrap: 'border-emerald-200 bg-emerald-50/80', label: 'text-emerald-700' };
+      return {
+        kind: 'yes',
+        label: 'Yes.',
+        explanation: 'Multiple independent sources support the core claim.',
+      };
     case 'contested':
-      return { wrap: 'border-danger-200 bg-danger-50/80', label: 'text-danger-700' };
+      return {
+        kind: 'mixed',
+        label: 'Sources disagree.',
+        explanation: 'The event may have happened, but sources conflict on important details.',
+      };
     case 'medium':
-      return { wrap: 'border-amber-200 bg-amber-50/80', label: 'text-amber-700' };
+      return {
+        kind: 'partly',
+        label: 'Partly.',
+        explanation: 'The core claim has some support, but important details are still unsettled.',
+      };
     case 'low':
-    default:
-      return { wrap: 'border-ink-200 bg-canvas-50', label: 'text-ink-600' };
+      return {
+        kind: 'unclear',
+        label: 'Not clear yet.',
+        explanation: 'There is not enough direct evidence to answer yes or no.',
+      };
   }
 }
 
@@ -483,20 +537,6 @@ function toneDotClass(tone: 'info' | 'good' | 'warn'): string {
     case 'info':
     default:
       return 'bg-ink-300';
-  }
-}
-
-function friendlyBandLabel(band: string): string {
-  switch (band) {
-    case 'high':
-      return 'Looks trustworthy';
-    case 'contested':
-      return 'Sources clash';
-    case 'medium':
-      return 'Still forming';
-    case 'low':
-    default:
-      return 'Thin so far';
   }
 }
 
@@ -578,19 +618,6 @@ function dotClass(status: string): string {
     case 'miss':
       return 'bg-ink-300';
     default:
-      return 'bg-ink-300';
-  }
-}
-
-function bandDotClass(band: ConfidenceBand): string {
-  switch (band) {
-    case 'high':
-      return 'bg-brand-500';
-    case 'medium':
-      return 'bg-amber-500';
-    case 'contested':
-      return 'bg-danger-500';
-    case 'low':
       return 'bg-ink-300';
   }
 }

@@ -57,16 +57,24 @@ export interface VerifyAnalysisData {
 
 export function VerifyAnalysis({ data }: { data: VerifyAnalysisData }) {
   return (
-    <section className="space-y-5">
-      {data.case_file && <CaseFileCard caseFile={data.case_file} />}
-      {data.specialized_sources && data.specialized_sources.length > 0 && (
-        <SpecializedSourcesCard systems={data.specialized_sources} />
-      )}
-      <ConfidenceBreakdownCard breakdown={data.confidence_breakdown} />
-      <ConflictsCard conflicts={data.conflicts} summary={data.conflict_summary} />
-      <BiasCard bias={data.bias} />
-      <EvidenceCardsList cards={data.evidence_cards} summary={data.cards_summary} />
-    </section>
+    <details className="group rounded-2xl border border-ink-100 bg-canvas-50">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-ink-700">
+        <span>See detailed evidence and scoring</span>
+        <span className="text-ink-400 transition-transform group-open:rotate-180" aria-hidden="true">
+          &#8964;
+        </span>
+      </summary>
+      <section className="space-y-5 border-t border-ink-100 p-4">
+        {data.case_file && <CaseFileCard caseFile={data.case_file} />}
+        {data.specialized_sources && data.specialized_sources.length > 0 && (
+          <SpecializedSourcesCard systems={data.specialized_sources} />
+        )}
+        <ConfidenceBreakdownCard breakdown={data.confidence_breakdown} />
+        <ConflictsCard conflicts={data.conflicts} summary={data.conflict_summary} />
+        <BiasCard bias={data.bias} />
+        <EvidenceCardsList cards={data.evidence_cards} summary={data.cards_summary} />
+      </section>
+    </details>
   );
 }
 

@@ -93,7 +93,7 @@ export default async function LandingPage() {
           <Step
             n="02"
             title="Get a clear call"
-            body="Looks trustworthy, still forming, thin so far, or sources clash — with both sides when they disagree."
+            body="Yes, no, partly, or sources disagree — followed by a short explanation in plain English."
           />
           <Step
             n="03"
