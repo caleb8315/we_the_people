@@ -25,8 +25,8 @@ export default async function VerifyPage() {
             Is this trustworthy?
           </h1>
           <p className="mt-3 max-w-2xl text-sm text-ink-500 sm:text-base">
-            Paste a URL, headline, or rumor. Get a clear call — looks solid, still forming, thin so
-            far, or sources clash — with both sides when they disagree.
+            Paste a URL, headline, or rumor. Get a direct answer — yes, no, partly, or sources
+            disagree — followed by the evidence behind it.
           </p>
         </div>
       </header>

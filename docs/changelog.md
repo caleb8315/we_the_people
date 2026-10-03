@@ -4,6 +4,7 @@ User-facing changes to the beta. Update as new cohorts get features.
 
 ## Unreleased
 
+- **Direct verification answers.** Claim checks now lead with “Yes,” “No,” “Partly,” “Sources disagree,” or “Not clear yet” in plain English; scores and methodology are collapsed below the evidence summary.
 - **Focused verification flow.** Verification results are now visible without an account, saved cases can open directly in the evidence-grounded analyst, and duplicated caveat/source panels have been consolidated into one evidence-first result.
 - Removed the browser-only XP/missions experiment, the unconnected image-forensics prototype, and the placeholder pricing page.
 - Removed the unimplemented Hybrid feed option and unused JSON routes, restored saved Intel filters, hid feedback controls for signed-out readers, unified briefing prompts, and aligned setup/security docs with open signup.
