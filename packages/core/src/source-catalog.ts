@@ -14,6 +14,10 @@ export const SOURCE_GROUP_ORDER = [
 ] as const;
 
 export type SourceGroupKey = (typeof SOURCE_GROUP_ORDER)[number];
+type SourceGroupingInput = {
+  kind: string | null;
+  metadata?: Record<string, unknown> | null;
+};
 export type SourceCatalogRow = Pick<
   SourceRow,
   'id' | 'name' | 'kind' | 'country_code' | 'credibility' | 'metadata' | 'enabled'
@@ -32,7 +36,7 @@ export const SOURCE_GROUP_LABELS: Record<SourceGroupKey, string> = {
   apis: 'Other APIs',
 };
 
-export function sourceGroupKey(source: Pick<SourceRow, 'kind' | 'metadata'>): SourceGroupKey {
+export function sourceGroupKey(source: SourceGroupingInput): SourceGroupKey {
   const kind = String(source.kind ?? '').toLowerCase();
   const type = String(source.metadata?.type ?? '').toLowerCase();
   if (type === 'earthquake' || type === 'natural_events' || type === 'volcano' || type === 'hurricane') {
