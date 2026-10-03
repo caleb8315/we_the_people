@@ -7,7 +7,7 @@ import { getClientKey, limit } from '@/lib/rate-limit';
 import { consumeUserDailyLimit } from '@/lib/daily-limits';
 import { serverEnv } from '@/lib/env';
 import { logProductEvent } from '@/lib/product-events';
-import { BRIEFING_SYSTEM_PROMPT } from '@/lib/prompts/humanVoice';
+import { BRIEFING_SYSTEM_PROMPT } from '@osint/core/prompts';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -28,9 +28,8 @@ export async function POST(req: Request) {
   if (!cap.ok) {
     return NextResponse.json(
       {
-        error: 'beta_daily_limit',
-        message:
-          'You reached your daily personalized briefing limit (2/day) during beta. This helps us keep responses high quality while we tune costs.',
+        error: 'daily_limit',
+        message: `Daily briefing limit reached (${cap.used}/${cap.limit}). Resets at midnight UTC.`,
         used: cap.used,
         limit: cap.limit,
       },

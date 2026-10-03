@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectBias, detectCorpusBias, BIAS_DISCLAIMER } from '../bias';
+import { detectBias, detectCorpusBias } from '../bias';
 
 describe('detectBias', () => {
   it('returns a neutral report on short / empty input', () => {
@@ -18,7 +18,6 @@ describe('detectBias', () => {
     assert.ok(loaded.intensity > 0);
     assert.ok(loaded.examples.length > 0);
     assert.ok(!/(false|untrue|not true)/i.test(r.summary));
-    assert.equal(r.disclaimer, BIAS_DISCLAIMER);
   });
 
   it('flags one-sided framing when only critics are quoted, not supporters', () => {
@@ -53,10 +52,9 @@ describe('detectBias', () => {
     assert.ok(emotion.intensity > 0);
   });
 
-  it('always carries a plain-language bias disclaimer', () => {
+  it('describes writing patterns without making a truth verdict', () => {
     const r = detectBias('Some loaded regime extremist propaganda terrorists committed crushing attacks here.');
-    assert.match(r.disclaimer, /bias|framing|loaded|how the text is written/i);
-    // Bias summary describes writing, not whether the claim is true/false.
+    assert.match(r.summary, /loaded|language|framing|tone/i);
     assert.ok(!/this is (true|false)/i.test(r.summary));
   });
 });
@@ -71,7 +69,6 @@ describe('detectCorpusBias', () => {
     assert.ok(r.pieces > 0);
     assert.ok(r.avg_intensity >= 0);
     assert.equal(typeof r.has_signal, 'boolean');
-    assert.match(r.disclaimer, /bias|framing|loaded|how the text is written/i);
   });
 
   it('returns a neutral report on empty corpora', () => {

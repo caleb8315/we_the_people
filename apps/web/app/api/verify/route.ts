@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
-  assessImageProvenance,
   assessLinkProvenance,
   assessSocialProvenance,
   buildConfidenceReport,
-  canonicalizeUrl,
   decideVerification,
-  describeImageObservation,
   extractDomain,
   heuristicConfidence,
   isCredibleDomain,
@@ -22,29 +19,23 @@ import {
   buildEvidenceCards,
   summarizeEvidenceCards,
   buildConfidenceBreakdown,
-  buildResultExplanation,
   buildEvidenceCaseFile,
   decomposeClaims,
 } from '@osint/core';
 import type {
   ConfidenceReport,
   EvidenceItem,
-  ImageObservationSnapshot,
   SocialProvenance,
   LinkProvenance,
-  ImageProvenance,
-  RankedSource,
-  RankedSourceSummary,
   AnalyzedConflict,
   ConflictSummary,
   CorpusBiasReport,
   EvidenceCard,
   EvidenceCardSummary,
   ConfidenceBreakdown,
-  ResultExplanation,
   EvidenceCaseFile,
 } from '@osint/core';
-import { getAdminSupabase, getServerSupabase } from '@/lib/supabase-server';
+import { getServerSupabase } from '@/lib/supabase-server';
 import { getClientKey, limit } from '@/lib/rate-limit';
 import { logProductEvent } from '@/lib/product-events';
 import {
@@ -59,11 +50,8 @@ import {
   type SpecializedCaseSearchResult,
 } from '@/lib/specialized-sources';
 
-/** Cap on how many hosts we remember per image hash. Keeps rows small. */
-const MAX_SEEN_HOSTS = 10;
-
 /**
- * POST /api/verify — run a URL / text / image submission through the same
+ * POST /api/verify — run a URL or text submission through the same
  * deterministic confidence engine that ranks the feed.
  *
  * Non-negotiable rules from the build plan:
@@ -85,15 +73,9 @@ export const runtime = 'nodejs';
 export const maxDuration = 45;
 
 const Body = z.object({
-  kind: z.enum(['url', 'text', 'image']),
+  kind: z.enum(['url', 'text']),
   url: z.string().url().optional(),
   text: z.string().max(4000).optional(),
-  image_url: z.string().url().optional(),
-  image_filename: z.string().max(256).optional(),
-  image_sha256: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/i)
-    .optional(),
 });
 
 type VerifyResponse = {
@@ -105,31 +87,20 @@ type VerifyResponse = {
    */
   reader_report: ReaderReport;
   /**
-   * April 2026 upgrade — evidence comparison platform layer.
-   * Adds: ranked sources with rationale, an extended conflict taxonomy
-   * with numeric severity, a bias signal layer, evidence cards with
-   * stance, a 4-component confidence breakdown, and the four result
-   * explanation sections (why this result, what would resolve this,
-   * what sources agree on, what sources disagree on).
-   *
-   * The original `report` and `reader_report` shapes are unchanged so
-   * existing callers keep working — `analysis` is purely additive.
+   * Evidence-comparison details used by the result page.
    */
   analysis: {
-    ranked_sources: RankedSource[];
-    ranked_summary: RankedSourceSummary;
     conflicts: AnalyzedConflict[];
     conflict_summary: ConflictSummary;
     bias: CorpusBiasReport;
     evidence_cards: EvidenceCard[];
     cards_summary: EvidenceCardSummary;
     confidence_breakdown: ConfidenceBreakdown;
-    explanation: ResultExplanation;
     case_file: EvidenceCaseFile;
     specialized_sources: SpecializedCaseSearchResult['systems'];
   };
   input: {
-    kind: 'url' | 'text' | 'image';
+    kind: 'url' | 'text';
     canonical_url: string | null;
     host: string | null;
     is_social: boolean;
@@ -139,8 +110,6 @@ type VerifyResponse = {
   };
   social: SocialProvenance | null;
   link: LinkProvenance | null;
-  image: ImageProvenance | null;
-  verification_id: string | null;
   case_id: string | null;
   /**
    * Phase 7 — live multi-system corroboration. Every submission fans out
@@ -181,17 +150,12 @@ export async function POST(req: Request) {
   if (body.kind === 'text' && !body.text) {
     return NextResponse.json({ error: 'text_required' }, { status: 400 });
   }
-  if (body.kind === 'image' && !body.image_url && !body.image_sha256) {
-    return NextResponse.json({ error: 'image_url_or_hash_required' }, { status: 400 });
-  }
-
   const sb = getServerSupabase();
   const { data: auth } = await sb.auth.getUser();
   const userId = auth.user?.id ?? null;
 
   let social: SocialProvenance | null = null;
   let link: LinkProvenance | null = null;
-  let image: ImageProvenance | null = null;
   let canonical_url: string | null = null;
   let host: string | null = null;
   let evidence: EvidenceItem[] = [];
@@ -239,47 +203,8 @@ export async function POST(req: Request) {
   } else if (body.kind === 'text' && body.text) {
     title = body.text.slice(0, 120);
     evidence = [];
-    provenanceWarnings.push(
-      'Pasted text has no source attribution — confidence is derived from claim shape only.',
-    );
+    provenanceWarnings.push('Text submission: source matching uses the claim wording.');
     capMedium = true;
-  } else if (body.kind === 'image') {
-    const canon = body.image_url ? canonicalizeUrl(body.image_url) : null;
-    canonical_url = canon?.url ?? null;
-    host = canon?.host ?? null;
-    image = assessImageProvenance({
-      url: body.image_url ?? null,
-      filename: body.image_filename ?? null,
-      sha256: body.image_sha256 ?? null,
-    });
-    provenanceWarnings.push(...image.tags);
-    // Phase 3 — deterministic first-seen / reused-image hash tracking. When
-    // a client provides a SHA-256, we upsert into image_observations and
-    // emit observation tags *based on the pre-upsert snapshot* so a fresh
-    // submission reads as "first time seen" rather than "seen 1 time before".
-    if (body.image_sha256) {
-      const prior = await recordImageObservation({
-        sha256: body.image_sha256.toLowerCase(),
-        host,
-      });
-      provenanceWarnings.push(...describeImageObservation(prior, host));
-    }
-    title = body.image_filename ? `Image · ${body.image_filename}` : 'Image submission';
-    capMedium = true;
-    if (canonical_url) {
-      const dom = extractDomain(canonical_url);
-      evidence = [
-        {
-          source_id: null,
-          url: canonical_url,
-          domain: dom,
-          title,
-          published_at: null,
-          is_credible: isCredibleDomain(dom),
-          excerpt: null,
-        },
-      ];
-    }
   }
 
   // Phase 7 — live multi-system corroboration. Instead of running the
@@ -405,19 +330,6 @@ export async function POST(req: Request) {
     is_text_only: body.kind === 'text',
     cap_at_medium: capMedium,
   });
-  const resultExplanation = buildResultExplanation({
-    band: report.band,
-    breakdown,
-    ranked_summary: rankedSummary,
-    conflicts: analyzedConflicts,
-    conflict_summary: conflictSummary,
-    cards_summary: cardsSummary,
-    has_anchor: Boolean(canonical_url),
-    is_text_only: body.kind === 'text',
-    is_social: Boolean(social),
-    subject:
-      (searchedTitle ?? title ?? body.text?.slice(0, 120) ?? '').trim() || null,
-  });
   const caseFile = buildEvidenceCaseFile({
     title: searchedTitle ?? title,
     text: body.kind === 'text' ? body.text ?? null : pageDescription,
@@ -439,10 +351,10 @@ export async function POST(req: Request) {
       .insert({
         user_id: userId,
         kind: body.kind,
-        input_url: body.kind === 'url' ? body.url ?? null : body.kind === 'image' ? body.image_url ?? null : null,
+        input_url: body.kind === 'url' ? body.url ?? null : null,
         input_text: body.kind === 'text' ? body.text ?? null : null,
-        image_filename: body.image_filename ?? null,
-        image_sha256: body.image_sha256 ?? null,
+        image_filename: null,
+        image_sha256: null,
         platform: social?.platform ?? null,
         host,
         is_social: Boolean(social),
@@ -461,7 +373,7 @@ export async function POST(req: Request) {
         verificationId: verification_id,
         caseFile,
         inputKind: body.kind,
-        inputUrl: body.kind === 'url' ? body.url ?? null : body.kind === 'image' ? body.image_url ?? null : null,
+        inputUrl: body.kind === 'url' ? body.url ?? null : null,
         inputText: body.kind === 'text' ? body.text ?? null : null,
       });
     }
@@ -496,6 +408,12 @@ export async function POST(req: Request) {
 
   // Phase 8 — Reader Report. Translate the engine's output into the
   // plain-English structure every user-facing surface renders.
+  const visibleCorroborationSystems = corroboration.systems
+    .filter((system) => system.status === 'hit' || system.status === 'miss')
+    .map((system) => ({ ...system, note: '' }));
+  const visibleSpecializedSystems = specialized.systems
+    .filter((system) => system.status === 'hit' && system.evidence_count > 0)
+    .map((system) => ({ ...system, note: '' }));
   const readerReport: ReaderReport = buildReaderReport({
     confidence: report,
     input: {
@@ -506,11 +424,9 @@ export async function POST(req: Request) {
       preview_text: body.kind === 'text' ? body.text?.slice(0, 300) ?? null : null,
       is_social: Boolean(social),
       social_platform_label: social?.platform_label ?? null,
-      image_filename: body.image_filename ?? null,
-      has_image_hash: Boolean(body.image_sha256),
     },
     corroboration: {
-      systems: corroboration.systems,
+      systems: visibleCorroborationSystems,
       matched_signal: matchedSignal
         ? {
             id: matchedSignal.id,
@@ -520,24 +436,20 @@ export async function POST(req: Request) {
           }
         : null,
     },
-    provenance_limits: provenanceWarnings,
   });
 
   const response: VerifyResponse = {
     report,
     reader_report: readerReport,
     analysis: {
-      ranked_sources: ranked,
-      ranked_summary: rankedSummary,
       conflicts: analyzedConflicts,
       conflict_summary: conflictSummary,
       bias: corpusBias,
       evidence_cards: evidenceCards,
       cards_summary: cardsSummary,
       confidence_breakdown: breakdown,
-      explanation: resultExplanation,
       case_file: caseFile,
-      specialized_sources: specialized.systems,
+      specialized_sources: visibleSpecializedSystems,
     },
     input: {
       kind: body.kind,
@@ -550,8 +462,6 @@ export async function POST(req: Request) {
     },
     social,
     link,
-    image,
-    verification_id,
     case_id,
     corroboration: {
       matched_signal: matchedSignal,
@@ -559,7 +469,7 @@ export async function POST(req: Request) {
       total_sources: sourceCount,
       credible_sources: credibleCount,
       searched_title: searchedTitle,
-      systems: corroboration.systems,
+      systems: visibleCorroborationSystems,
     },
   };
   return NextResponse.json(response);
@@ -588,7 +498,7 @@ async function persistCaseFile(
     userId: string;
     verificationId: string;
     caseFile: EvidenceCaseFile;
-    inputKind: 'url' | 'text' | 'image';
+    inputKind: 'url' | 'text';
     inputUrl: string | null;
     inputText: string | null;
   },
@@ -669,68 +579,4 @@ async function persistCaseFile(
   }
 
   return caseId;
-}
-
-/**
- * Fetch any prior observation for this hash, then upsert a new / incremented
- * row. Returns the PRE-upsert snapshot so the caller can describe the image
- * as "first time seen" on a genuinely first submission.
- *
- * Runs under the service-role client — the table is intentionally cross-user
- * (sha256 is anonymous, shared dedup data), so no user-scoped writes apply.
- */
-async function recordImageObservation(opts: {
-  sha256: string;
-  host: string | null;
-}): Promise<ImageObservationSnapshot | null> {
-  let admin: ReturnType<typeof getAdminSupabase>;
-  try {
-    admin = getAdminSupabase();
-  } catch {
-    // Service role not configured in this env — skip silently. The UI still
-    // gets a full confidence report; we just cannot dedupe this time.
-    return null;
-  }
-
-  const { data: priorRow } = await admin
-    .from('image_observations')
-    .select('first_seen_at,last_seen_at,observation_count,seen_hosts,first_host')
-    .eq('sha256', opts.sha256)
-    .maybeSingle();
-
-  const prior: ImageObservationSnapshot | null = priorRow
-    ? {
-        first_seen_at: priorRow.first_seen_at,
-        last_seen_at: priorRow.last_seen_at,
-        observation_count: priorRow.observation_count,
-        seen_hosts: priorRow.seen_hosts ?? [],
-        first_host: priorRow.first_host ?? null,
-      }
-    : null;
-
-  const now = new Date().toISOString();
-  if (prior) {
-    const seen = new Set(prior.seen_hosts);
-    if (opts.host) seen.add(opts.host);
-    const seenList = [...seen].slice(0, MAX_SEEN_HOSTS);
-    await admin
-      .from('image_observations')
-      .update({
-        last_seen_at: now,
-        observation_count: prior.observation_count + 1,
-        seen_hosts: seenList,
-      })
-      .eq('sha256', opts.sha256);
-  } else {
-    await admin.from('image_observations').insert({
-      sha256: opts.sha256,
-      first_seen_at: now,
-      last_seen_at: now,
-      observation_count: 1,
-      seen_hosts: opts.host ? [opts.host] : [],
-      first_host: opts.host,
-      first_context: 'verify',
-    });
-  }
-  return prior;
 }

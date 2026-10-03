@@ -8,7 +8,6 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { FeedFreshness } from '@/components/feed-freshness';
 import { FeedAutoCorroboration } from '@/components/feed-auto-corroboration';
 import { FeedOrientationBanner } from '@/components/feed-orientation-banner';
-import { PlayerStatus } from '@/components/player-status';
 import { logProductEvent } from '@/lib/product-events';
 import { applyMutes, decorateSignals, type SignalRowRaw } from '@/lib/signals';
 import { groupSignalsForFeed, rankGlobalFeedStories } from '@/lib/signal-feed';
@@ -18,18 +17,14 @@ export const dynamic = 'force-dynamic';
 
 const TOPICS = ['all', 'war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'tech', 'finance'] as const;
 const MODES = ['personalized', 'global'] as const;
-// const VIEWS = ['list', 'map'] as const;
-const VIEWS = ['list'] as const;
 const CORROBORATION_FILTERS = ['all', 'multi_plus'] as const;
 type FeedMode = (typeof MODES)[number];
-type FeedView = (typeof VIEWS)[number];
 type CorroborationFilter = (typeof CORROBORATION_FILTERS)[number];
 
 interface SavedViewRow {
   id: string;
   name: string;
   context: string;
-  view_mode: string;
   filters: Record<string, unknown> | null;
   updated_at: string;
 }
@@ -41,7 +36,6 @@ export default async function FeedPage({
     topic?: string;
     hours?: string;
     mode?: string;
-    view?: string;
     min_severity?: string;
     corroboration?: string;
   };
@@ -49,7 +43,6 @@ export default async function FeedPage({
   const topic = (searchParams.topic ?? 'all').toLowerCase();
   const hours = clamp(Number(searchParams.hours ?? '48'), 1, 24 * 14);
   const requestedMode = parseMode(searchParams.mode);
-  const requestedView = parseView(searchParams.view);
   const minSeverity = clamp(Number(searchParams.min_severity ?? '0'), 0, 100);
   const corroboration = parseCorroboration(searchParams.corroboration);
 
@@ -70,14 +63,14 @@ export default async function FeedPage({
     userId
       ? sb
           .from('preferences')
-          .select('topics, muted_sources, muted_topics, countries_of_focus, feed_mode_preference, feed_view_preference')
+          .select('topics, muted_sources, muted_topics, countries_of_focus, feed_mode_preference')
           .eq('user_id', userId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
     userId
       ? sb
           .from('user_saved_views')
-          .select('id, name, context, view_mode, filters, updated_at')
+          .select('id, name, context, filters, updated_at')
           .eq('user_id', userId)
           .eq('context', 'feed')
           .order('updated_at', { ascending: false })
@@ -87,8 +80,7 @@ export default async function FeedPage({
 
   const defaultMode: FeedMode = prefs?.feed_mode_preference === 'global' ? 'global' : 'personalized';
   const mode: FeedMode = userId ? requestedMode ?? defaultMode : 'global';
-  const prefView = String(prefs?.feed_view_preference ?? 'list') as FeedView;
-  const view: FeedView = requestedView ?? (userId ? prefView : 'list');
+  const view = 'list' as const;
   const since = new Date(Date.now() - hours * 3600 * 1000).toISOString();
 
   const mutedTopicsList: string[] = (prefs?.muted_topics ?? []) as string[];
@@ -214,17 +206,6 @@ export default async function FeedPage({
         eventProps: { from: defaultMode, to: requestedMode },
       });
     }
-    if (requestedView && requestedView !== prefView) {
-      void logProductEvent(sb, {
-        userId,
-        eventName: 'feed_view_toggled',
-        eventProps: { from: prefView, to: requestedView, context: 'feed' },
-      });
-      void sb
-        .from('preferences')
-        .update({ feed_view_preference: requestedView })
-        .eq('user_id', userId);
-    }
     void logProductEvent(sb, {
       userId,
       eventName: 'feed_scrolled_depth',
@@ -235,15 +216,15 @@ export default async function FeedPage({
     });
   }
 
-  const qp = (m: string, t: string, v: FeedView = view, sev: number = minSeverity) =>
-    `/feed?mode=${m}&topic=${t}&hours=${hours}&view=${v}&min_severity=${sev}&corroboration=${corroboration}`;
+  const qp = (m: string, t: string, sev: number = minSeverity) =>
+    `/feed?mode=${m}&topic=${t}&hours=${hours}&min_severity=${sev}&corroboration=${corroboration}`;
   const qpWithCorroboration = (corr: CorroborationFilter) =>
-    `/feed?mode=${mode}&topic=${topic}&hours=${hours}&view=${view}&min_severity=${minSeverity}&corroboration=${corr}`;
+    `/feed?mode=${mode}&topic=${topic}&hours=${hours}&min_severity=${minSeverity}&corroboration=${corr}`;
   const severityStops = [0, 60, 75, 85] as const;
 
   return (
     <div className="space-y-6 sm:space-y-7">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <section>
         <div className="min-w-0 flex-1">
           <p className="font-display text-[11px] font-semibold uppercase tracking-[0.22em] text-signal">
             {userName ? `Hey, ${userName}` : 'Live coverage'}
@@ -254,7 +235,8 @@ export default async function FeedPage({
             <span className="text-ink-500">the world right now.</span>
           </h1>
           <p className="mt-2 max-w-xl text-sm text-ink-500">
-            Scout stories for XP. Open three to clear today&apos;s mission.
+            Follow the strongest signals, compare independent coverage, and open any story to
+            inspect the source trail.
           </p>
 
           <form action="/feed" className="mt-5 flex max-w-xl items-center gap-3">
@@ -305,9 +287,6 @@ export default async function FeedPage({
               </svg>
             </button>
           </form>
-        </div>
-        <div className="w-full max-w-sm lg:shrink-0">
-          <PlayerStatus compact />
         </div>
       </section>
 
@@ -369,16 +348,6 @@ export default async function FeedPage({
                 ]}
               />
             )}
-            <Segmented
-              ariaLabel="Feed view"
-              className="w-full sm:w-auto"
-              active={view}
-              options={[
-                { label: 'List', value: 'list', href: qp(mode, topic, 'list') },
-                // Map view disabled until geo-coordinates are populated.
-                // { label: `Map (${geoPoints.length})`, value: 'map', href: qp(mode, topic, 'map') },
-              ]}
-            />
             <Link
               href="/briefings"
               className="inline-flex min-h-[36px] items-center justify-center rounded-full border border-ink-100 bg-paper px-3.5 py-1.5 text-sm text-ink-600 hover:border-ink-200 hover:text-ink sm:min-h-0"
@@ -393,7 +362,7 @@ export default async function FeedPage({
             {severityStops.map((sev) => (
               <a
                 key={sev}
-                href={qp(mode, topic, view, sev)}
+                href={qp(mode, topic, sev)}
                 className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                   sev === minSeverity
                     ? 'border-ink-900 bg-ink-900 text-white'
@@ -433,7 +402,7 @@ export default async function FeedPage({
               const savedHours = Number(f.hours ?? hours);
               const savedMinSev = Number(f.min_severity ?? 0);
               const savedCorroboration = typeof f.corroboration === 'string' ? f.corroboration : corroboration;
-              const href = `/feed?mode=${savedMode}&topic=${savedTopic}&hours=${savedHours}&view=${sv.view_mode}&min_severity=${savedMinSev}&corroboration=${savedCorroboration}`;
+              const href = `/feed?mode=${savedMode}&topic=${savedTopic}&hours=${savedHours}&min_severity=${savedMinSev}&corroboration=${savedCorroboration}`;
               return (
                 <Link
                   key={sv.id}
@@ -538,11 +507,6 @@ function parseMode(mode: string | undefined): FeedMode | null {
   return MODES.includes(mode as FeedMode) ? (mode as FeedMode) : null;
 }
 
-function parseView(view: string | undefined): FeedView | null {
-  if (!view) return null;
-  return VIEWS.includes(view as FeedView) ? (view as FeedView) : null;
-}
-
 function parseCorroboration(value: string | undefined): CorroborationFilter {
   if (!value) return 'multi_plus';
   return CORROBORATION_FILTERS.includes(value as CorroborationFilter)
@@ -554,7 +518,7 @@ function SaveViewButton({
   view,
   payload,
 }: {
-  view: FeedView;
+  view: 'list';
   payload: Record<string, unknown>;
 }) {
   return (

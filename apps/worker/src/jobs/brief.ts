@@ -1,4 +1,5 @@
 import { statusLabel, statusShortLabel } from '@osint/core';
+import { BRIEFING_SYSTEM_PROMPT } from '@osint/core/prompts';
 import type { VerificationStatus } from '@osint/core/types';
 import { env } from '../lib/env';
 import { finishEngineRun, startEngineRun, supabase } from '../lib/supabase';
@@ -38,26 +39,6 @@ import {
 
 const MAX_PREENRICH = 5;
 const PREENRICH_STALE_HOURS = 2;
-const BRIEFING_SYSTEM_PROMPT = `
-You are writing a morning intelligence briefing for someone who wants to
-understand what's actually happening in the world — cutting through the noise,
-propaganda, and spin.
-
-Write like a trusted journalist friend summarizing their morning read over coffee.
-Not a news ticker. Not a data report. A real explanation.
-
-STRUCTURE:
-- Open with the one thing that matters most today (1-2 sentences, direct)
-- Cover each major story: what happened, what's confirmed, what's being disputed
-  or spun, and why it matters to a regular person
-- End with what to watch — not as a bullet list of topics, but as a
-  "keep your eye on this because..." sentence
-
-TONE: Warm, smart, direct. Like a friend who happens to be an expert.
-Never robotic. Never start a section with a statistic.
-When evidence is strong, state the core event directly.
-When details are still moving, separate confirmed facts from open questions.
-`.trim();
 
 export async function runBriefing(kind: 'daily' | 'weekly'): Promise<{ briefing_id: string | null }> {
   const runId = await startEngineRun('brief');

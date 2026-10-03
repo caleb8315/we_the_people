@@ -15,13 +15,14 @@ export const metadata = { title: 'Priority Workspace · Crosscheck' };
 export const dynamic = 'force-dynamic';
 const VIEWS = ['list', 'map'] as const;
 type IntelView = (typeof VIEWS)[number];
+const INTEL_TOPICS = ['war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'tech', 'finance', 'other'] as const;
 const FRESH_WINDOW_HOURS = 36;
 const FALLBACK_WINDOW_HOURS = 96;
 
 export default async function IntelWorkspacePage({
   searchParams,
 }: {
-  searchParams: { view?: string };
+  searchParams: { view?: string; topics?: string; min_severity?: string };
 }) {
   const sb = getServerSupabase();
   const { data: auth } = await sb.auth.getUser();
@@ -70,12 +71,18 @@ export default async function IntelWorkspacePage({
       .limit(5),
   ]);
 
-  const focusTopics = new Set((prefs?.topics ?? ['war', 'economy', 'climate']) as string[]);
+  const requestedTopics = parseTopics(searchParams.topics);
+  const focusTopics = new Set(
+    requestedTopics ?? ((prefs?.topics ?? ['war', 'economy', 'climate']) as string[]),
+  );
+  const minSeverity = parseMinSeverity(searchParams.min_severity, Number(prefs?.min_alert_severity ?? 70));
   const freshRows = ((rawFreshSignals ?? []) as SignalRowRaw[]).filter((s: any) => !s.expires_at || s.expires_at > nowIso);
   const fallbackRows = ((rawFallbackSignals ?? []) as SignalRowRaw[]).filter(
     (s: any) => !s.expires_at || s.expires_at > nowIso,
   );
-  const rows = freshRows.length >= 8 ? freshRows : fallbackRows;
+  const rows = (freshRows.length >= 8 ? freshRows : fallbackRows).filter(
+    (signal) => Number(signal.severity ?? 0) >= minSeverity,
+  );
 
   const prioritizedRaw = rows
     .filter((s) => focusTopics.has(s.topic ?? 'other'))
@@ -89,6 +96,7 @@ export default async function IntelWorkspacePage({
     decorateSignals(sb, overflowRaw.slice(0, 30), { newSince: profile.last_dashboard_visit_at ?? null }),
   ]);
   const view: IntelView = requestedView ?? parseView(String(prefs?.feed_view_preference ?? 'list')) ?? 'list';
+  const filterQuery = `topics=${encodeURIComponent([...focusTopics].join(','))}&min_severity=${minSeverity}`;
   const geoPoints: SignalGeoPoint[] = prioritized.flatMap((s) => signalGeoPoints(s));
 
   const disputedCount = prioritized.reduce((n, s) => n + (s.is_disputed ? 1 : 0), 0);
@@ -118,7 +126,7 @@ export default async function IntelWorkspacePage({
             <h1 className="text-2xl font-semibold tracking-tight">Priority workspace</h1>
             <p className="mt-1 text-sm text-ink-500">
               Prioritized by your focus topics and how well each signal is corroborated. Alert intensity:{' '}
-              {prefs?.alert_intensity_preference ?? 'critical_only'}. Threshold: {prefs?.min_alert_severity ?? 70}.
+              {prefs?.alert_intensity_preference ?? 'critical_only'}. Threshold: {minSeverity}.
             </p>
             <p className="mt-1 text-xs text-ink-400">
               Showing {freshRows.length >= 8 ? `fresh window (${FRESH_WINDOW_HOURS}h)` : `fallback window (${FALLBACK_WINDOW_HOURS}h)`}.
@@ -129,8 +137,8 @@ export default async function IntelWorkspacePage({
             className="w-full sm:w-auto"
             active={view}
             options={[
-              { label: 'List', value: 'list', href: '/dashboard/intel?view=list' },
-              { label: `Map (${geoPoints.length})`, value: 'map', href: '/dashboard/intel?view=map' },
+              { label: 'List', value: 'list', href: `/dashboard/intel?view=list&${filterQuery}` },
+              { label: `Map (${geoPoints.length})`, value: 'map', href: `/dashboard/intel?view=map&${filterQuery}` },
             ]}
           />
         </div>
@@ -142,7 +150,12 @@ export default async function IntelWorkspacePage({
             (savedViews ?? []).map((sv: any) => {
               const f = (sv.filters ?? {}) as Record<string, unknown>;
               const savedView = typeof f.view_mode === 'string' ? f.view_mode : sv.view_mode;
-              const href = `/dashboard/intel?view=${savedView}`;
+              const savedTopics = Array.isArray(f.topics)
+                ? f.topics.filter((topic): topic is string => typeof topic === 'string')
+                : [...focusTopics];
+              const savedMinSeverity =
+                typeof f.min_alert_severity === 'number' ? f.min_alert_severity : minSeverity;
+              const href = `/dashboard/intel?view=${encodeURIComponent(savedView)}&topics=${encodeURIComponent(savedTopics.join(','))}&min_severity=${savedMinSeverity}`;
               return (
                 <Link
                   key={sv.id}
@@ -156,7 +169,7 @@ export default async function IntelWorkspacePage({
           )}
           <SaveIntelViewButton
             view={view}
-            payload={{ topics: [...focusTopics], min_alert_severity: prefs?.min_alert_severity ?? 70 }}
+            payload={{ topics: [...focusTopics], min_alert_severity: minSeverity }}
           />
         </div>
       </header>
@@ -229,6 +242,22 @@ function ageHours(s: Pick<SignalRowRaw, 'occurred_at' | 'first_seen_at'>): numbe
 function parseView(view: string | undefined): IntelView | null {
   if (!view) return null;
   return VIEWS.includes(view as IntelView) ? (view as IntelView) : null;
+}
+
+function parseTopics(value: string | undefined): string[] | null {
+  if (!value) return null;
+  const allowed = new Set<string>(INTEL_TOPICS);
+  const topics = value
+    .split(',')
+    .map((topic) => topic.trim().toLowerCase())
+    .filter((topic) => allowed.has(topic));
+  return topics.length > 0 ? [...new Set(topics)] : null;
+}
+
+function parseMinSeverity(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return Math.max(60, Math.min(100, fallback));
+  return Math.max(60, Math.min(100, Math.round(parsed)));
 }
 
 function SaveIntelViewButton({

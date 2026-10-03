@@ -50,11 +50,10 @@ export default function TermsPage() {
       </section>
 
       <section>
-        <h2>4. Accounts and beta access</h2>
+        <h2>4. Accounts</h2>
         <p>
-          Access may be limited to approved users during beta. You are responsible for maintaining
-          the confidentiality of your login credentials and for activity that occurs under your
-          account.
+          You are responsible for maintaining the confidentiality of your login credentials and
+          for activity that occurs under your account.
         </p>
       </section>
 

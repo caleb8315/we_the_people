@@ -107,7 +107,7 @@ const BAND_LABEL_SHORT: Record<ConfidenceBand, string> = {
 };
 
 const BAND_LABEL_DISPLAY: Record<ConfidenceBand, string> = {
-  high: 'Looks solid',
+  high: 'Looks trustworthy',
   medium: 'Still forming',
   low: 'Thin so far',
   contested: 'Sources clash',

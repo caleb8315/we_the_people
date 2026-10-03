@@ -1,20 +1,22 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import {
+  directAnswerForCaseFile,
+  type DirectAnswer,
+  type DirectAnswerKind,
+} from '@osint/core';
 import type {
   ConfidenceBand,
   ConfidenceReport,
-  ImageProvenance,
   LinkProvenance,
   SocialProvenance,
 } from '@osint/core';
 import type { ReaderReport } from '@/lib/reader-report';
-import type { ForensicReport, ForensicFinding } from '@/lib/image-forensics';
 import { Segmented } from '@/components/ui/segmented';
 import { VerifyAnalysis, type VerifyAnalysisData } from '@/components/verify-analysis';
-import { applyXpAction } from '@/lib/gamification';
 
-type Kind = 'url' | 'text' | 'image';
+type Kind = 'url' | 'text';
 
 interface MatchedSignalLite {
   id: string;
@@ -46,8 +48,7 @@ interface VerifyResponse {
   };
   social: SocialProvenance | null;
   link: LinkProvenance | null;
-  image: ImageProvenance | null;
-  verification_id: string | null;
+  case_id: string | null;
   corroboration: {
     matched_signal: MatchedSignalLite | null;
     matched_by: 'url' | 'keyword' | null;
@@ -69,82 +70,9 @@ export function VerifyClient({ signedIn }: { signedIn: boolean }) {
   const [kind, setKind] = useState<Kind>('url');
   const [url, setUrl] = useState('');
   const [text, setText] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [imageFilename, setImageFilename] = useState('');
-  const [imageSha256, setImageSha256] = useState('');
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageHashing, setImageHashing] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-  const [forensicReport, setForensicReport] = useState<ForensicReport | null>(null);
-  const [forensicAnalyzing, setForensicAnalyzing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VerifyResponse | null>(null);
-
-  async function processImageFile(file: File) {
-    if (!file.type.startsWith('image/')) {
-      setError('Please select an image file (PNG, JPG, GIF, WebP).');
-      return;
-    }
-    if (file.size > 20 * 1024 * 1024) {
-      setError('Image is too large (max 20 MB).');
-      return;
-    }
-    setError(null);
-    setForensicReport(null);
-    setResult(null);
-    setImageFilename(file.name);
-    setImageFile(file);
-    const previewUrl = URL.createObjectURL(file);
-    setImagePreview(previewUrl);
-
-    setImageHashing(true);
-    try {
-      const buffer = await file.arrayBuffer();
-      const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const hex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-      setImageSha256(hex);
-    } catch {
-      // SHA-256 failed, continue without it
-    } finally {
-      setImageHashing(false);
-    }
-
-    setForensicAnalyzing(true);
-    try {
-      const { analyzeImage } = await import('@/lib/image-forensics');
-      const report = await analyzeImage(file);
-      setForensicReport(report);
-    } catch {
-      setError('Image analysis failed. Try a different image.');
-    } finally {
-      setForensicAnalyzing(false);
-    }
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) void processImageFile(file);
-  }
-
-  function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) void processImageFile(file);
-  }
-
-  function clearImage() {
-    setImageUrl('');
-    setImageFilename('');
-    setImageSha256('');
-    setImageFile(null);
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
-    setImagePreview(null);
-    setForensicReport(null);
-  }
 
   async function submit() {
     setError(null);
@@ -153,11 +81,6 @@ export function VerifyClient({ signedIn }: { signedIn: boolean }) {
       const payload: Record<string, unknown> = { kind };
       if (kind === 'url') payload.url = url;
       if (kind === 'text') payload.text = text;
-      if (kind === 'image') {
-        if (imageUrl) payload.image_url = imageUrl;
-        if (imageFilename) payload.image_filename = imageFilename;
-        if (imageSha256) payload.image_sha256 = imageSha256;
-      }
       const res = await fetch('/api/verify', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -165,12 +88,11 @@ export function VerifyClient({ signedIn }: { signedIn: boolean }) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setError(body.error ?? `http_${res.status}`);
+        setError(verifyErrorMessage(body.error, res.status));
         return;
       }
       const data = (await res.json()) as VerifyResponse;
       setResult(data);
-      applyXpAction('verify_claim');
       try {
         await fetch('/api/events', {
           method: 'POST',
@@ -205,7 +127,6 @@ export function VerifyClient({ signedIn }: { signedIn: boolean }) {
             options={[
               { label: 'URL', value: 'url' },
               { label: 'Quoted text', value: 'text' },
-              { label: 'Image', value: 'image' },
             ]}
           />
         </div>
@@ -214,7 +135,7 @@ export function VerifyClient({ signedIn }: { signedIn: boolean }) {
           {kind === 'url' && (
             <label className="block">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">
-                Article, social post, or image URL
+                Article or social post
               </span>
               <div className="mt-1.5 flex flex-col items-stretch gap-2.5 sm:flex-row sm:items-center sm:gap-3">
                 <input
@@ -246,117 +167,13 @@ export function VerifyClient({ signedIn }: { signedIn: boolean }) {
               </div>
             </label>
           )}
-          {kind === 'image' && (
-            <div className="space-y-4">
-              {!imagePreview ? (
-                <>
-                  <div
-                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={handleDrop}
-                    className={`relative flex flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed p-8 text-center transition ${
-                      dragOver
-                        ? 'border-amber-400 bg-amber-50/60'
-                        : 'border-ink-200 bg-canvas-50 hover:border-ink-300'
-                    }`}
-                  >
-                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-10 w-10 text-ink-300" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="18" height="18" rx="3" />
-                      <circle cx="8.5" cy="8.5" r="1.5" />
-                      <path d="m21 15-5-5L5 21" />
-                    </svg>
-                    <div>
-                      <p className="text-sm font-medium text-ink-600">
-                        Drop an image here, or{' '}
-                        <label className="cursor-pointer font-semibold text-amber-600 hover:text-amber-700">
-                          browse
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleFileInput}
-                            className="sr-only"
-                          />
-                        </label>
-                      </p>
-                      <p className="mt-1 text-xs text-ink-400">PNG, JPG, GIF, or WebP up to 20 MB</p>
-                      <p className="mt-2 text-xs text-ink-400">
-                        We&rsquo;ll check for AI generation, photo manipulation, and metadata authenticity — all locally on your device.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="relative flex items-center gap-3">
-                    <div className="h-px flex-1 bg-ink-100" />
-                    <span className="text-xs text-ink-400">or paste an image URL to cross-check reporting</span>
-                    <div className="h-px flex-1 bg-ink-100" />
-                  </div>
-
-                  <div className="flex flex-col items-stretch gap-2.5 sm:flex-row sm:items-center sm:gap-3">
-                    <input
-                      type="url"
-                      value={imageUrl}
-                      onChange={(e) => setImageUrl(e.target.value)}
-                      placeholder="https://example.com/photo.jpg"
-                      className="min-w-0 flex-1 rounded-full border border-ink-100 bg-paper px-4 py-3 text-sm text-ink placeholder:text-ink-400 shadow-card focus:border-amber-400 focus:outline-none"
-                    />
-                    <SubmitButton loading={loading} onClick={submit} />
-                  </div>
-                </>
-              ) : (
-                <div className="space-y-4">
-                  <div className="relative overflow-hidden rounded-2xl border border-ink-100 bg-canvas-50">
-                    <img src={imagePreview} alt="Preview" className="mx-auto max-h-72 object-contain p-2" />
-                    <div className="absolute right-2 top-2 flex gap-1.5">
-                      <button
-                        type="button"
-                        onClick={clearImage}
-                        className="rounded-full bg-ink-900/70 p-1.5 text-white hover:bg-ink-900"
-                        aria-label="Remove image"
-                      >
-                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M18 6 6 18" /><path d="m6 6 12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-
-                  {(forensicAnalyzing || imageHashing) && (
-                    <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
-                      <span className="inline-block h-4 w-4 shrink-0 rounded-full border-2 border-amber-200 border-t-amber-500 motion-safe:animate-spin" />
-                      <p className="text-sm text-amber-700">
-                        {imageHashing ? 'Computing fingerprint...' : 'Analyzing image for AI markers, manipulation, and metadata...'}
-                      </p>
-                    </div>
-                  )}
-
-                  {forensicReport && <ImageForensicResult report={forensicReport} filename={imageFilename} />}
-                </div>
-              )}
-            </div>
-          )}
-
           {error && <p className="text-xs text-danger-600">{error}</p>}
         </div>
       </div>
 
-      <ExampleVerificationResult />
+      {!loading && !result && <ExampleVerificationResult />}
       {loading && <VerifyProgress />}
-      {!signedIn && result && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-medium text-amber-800">Sign in to see the full analysis</p>
-          <p className="mt-1 text-sm text-amber-700">
-            We checked your claim against our sources. Sign in to see which outlets corroborate
-            it, where they conflict, and whether the framing is being twisted.
-          </p>
-          <a
-            href="/login?next=/verify"
-            className="mt-3 inline-block text-sm font-medium text-amber-900 underline"
-          >
-            Sign in to see results &#8594;
-          </a>
-        </div>
-      )}
-      {signedIn && result && <VerifyResult data={result} />}
+      {result && <VerifyResult data={result} signedIn={signedIn} />}
     </section>
   );
 }
@@ -370,16 +187,16 @@ function ExampleVerificationResult() {
       <h2 className="mt-1 text-lg font-semibold leading-snug text-ink sm:text-xl">
         Cruise ship hantavirus death reports
       </h2>
-      <p className="mt-2 text-sm leading-relaxed text-ink-600">
-        This story is real, but details moved fast and early headlines overstated key facts.
-        Multiple outlets confirm a passenger died after a cruise, and health officials did open an
-        investigation. What changed is the cause label: some reports called it a confirmed
-        hantavirus case before lab confirmation was public.
-      </p>
-      <p className="mt-2 text-sm leading-relaxed text-ink-600">
-        Best takeaway: share that there is a confirmed death and investigation, but avoid posting
-        definitive cause language until official pathology results are released.
-      </p>
+      <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500">
+          Direct answer
+        </p>
+        <p className="mt-2 font-display text-2xl font-semibold text-amber-800">Partly.</p>
+        <p className="mt-1 text-sm leading-relaxed text-ink-700">
+          The death and investigation happened, but the reported cause was not confirmed when
+          early headlines claimed it was.
+        </p>
+      </div>
     </section>
   );
 }
@@ -402,14 +219,14 @@ function VerifyProgress() {
   const headline = [
     'Checking independent sources\u2026',
     'Still searching the web, social feeds, and sensor networks\u2026',
-    'Querying the GDELT global news archive\u2026',
-    'Almost there \u2014 GDELT\u2019s free archive can be slow during peak hours.',
+    'Comparing the strongest matches\u2026',
+    'Building your evidence summary\u2026',
   ][phase]!;
   const subline = [
-    'Running the fan-out across every configured system in parallel.',
-    'Most systems have responded. Waiting on the slower global archives.',
-    'This is where deep corroboration comes from \u2014 it can take up to 30 seconds. You can leave this tab open and come back.',
-    'If this finishes with \u201CGDELT: didn\u2019t respond\u201D, just retry \u2014 it\u2019s typically faster on the second try.',
+    'Looking for reporting and records that address the same claim.',
+    'Checking whether sources agree on the core details.',
+    'Ranking direct evidence above repetition and commentary.',
+    'Turning the source trail into one clear answer.',
   ][phase]!;
 
   return (
@@ -487,12 +304,24 @@ function SubmitButton({ loading, onClick }: { loading: boolean; onClick: () => v
   );
 }
 
-function VerifyResult({ data }: { data: VerifyResponse }) {
+function verifyErrorMessage(code: unknown, status: number): string {
+  if (status === 429 || code === 'rate_limited') {
+    return 'Too many checks in a short period. Please wait a moment and try again.';
+  }
+  if (status === 400) {
+    return 'Check the URL or claim and try again.';
+  }
+  return 'Something went wrong while starting the check. Please try again.';
+}
+
+function VerifyResult({ data, signedIn }: { data: VerifyResponse; signedIn: boolean }) {
   const { reader_report: reader, corroboration, analysis } = data;
-  const bandTone = bandToneClasses(reader.band);
+  const answer = analysis?.case_file
+    ? directAnswerForCaseFile(analysis.case_file)
+    : fallbackDirectAnswer(reader.band);
+  const answerTone = directAnswerTone(answer.kind);
   return (
     <section className="space-y-5 rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
-      {/* 1. Header — what was submitted, presented conversationally. */}
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-400">
           {reader.kind_label}
@@ -500,29 +329,29 @@ function VerifyResult({ data }: { data: VerifyResponse }) {
         <h2 className="mt-1 text-xl font-semibold leading-snug text-ink sm:text-[24px]">
           {reader.headline}
         </h2>
-        <p className="mt-2 text-[15px] leading-relaxed text-ink-600">{reader.one_liner}</p>
       </div>
 
-      {/* 2. THE VERDICT — the main answer: is this trustworthy? */}
-      <div className={`rounded-2xl border p-5 sm:p-6 ${bandTone.wrap}`}>
+      <div className={`rounded-2xl border p-5 sm:p-6 ${answerTone.wrap}`}>
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden="true"
-            className={`inline-block h-3 w-3 shrink-0 rounded-full ${bandDotClass(reader.band)}`}
+            className={`inline-block h-3 w-3 shrink-0 rounded-full ${answerTone.dot}`}
           />
-          <p className={`text-sm font-semibold ${bandTone.label}`}>
-            {friendlyBandLabel(reader.band)}
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500">
+            Direct answer
           </p>
         </div>
-        <p className="mt-3 text-[15px] leading-relaxed text-ink sm:text-base">
-          {reader.bottom_line}
+        <p className={`mt-3 font-display text-3xl font-semibold tracking-tight sm:text-4xl ${answerTone.label}`}>
+          {answer.label}
+        </p>
+        <p className="mt-2 max-w-2xl text-base leading-relaxed text-ink-700 sm:text-lg">
+          {answer.explanation}
         </p>
         <p className="mt-2 text-xs text-ink-500">
           Based on {summarizeMixNatural(reader.source_mix)}
         </p>
       </div>
 
-      {/* 2b. Tracked-event match — with event context, not just a data link. */}
       {corroboration.matched_signal && (
         <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
           <div className="flex items-start gap-3">
@@ -561,194 +390,107 @@ function VerifyResult({ data }: { data: VerifyResponse }) {
         </div>
       )}
 
-      {/* 3. Supporting detail — always open, because this IS the content. */}
-      {(reader.what_we_found.length > 0 || reader.what_is_unclear.length > 0) && (
-        <div className="space-y-4">
-          {reader.what_we_found.length > 0 && (
-            <ReaderBlock title="What the evidence says" bullets={reader.what_we_found} />
-          )}
-          {reader.what_is_unclear.length > 0 && (
-            <ReaderBlock title="Limitations to keep in mind" bullets={reader.what_is_unclear} />
-          )}
-        </div>
+      {reader.what_we_found.length > 0 && (
+        <ReaderBlock title="What the evidence says" bullets={reader.what_we_found} />
       )}
 
-      {/* 3b. April 2026 evidence-comparison panel — ranked sources,
-            extended conflict taxonomy, bias signal (kept separate from
-            confidence), evidence cards with stance, and the four result
-            explanation sections. The legacy reader-report blocks above
-            stay so existing language regression tests keep passing. */}
       {analysis && <VerifyAnalysis data={analysis} />}
 
-      {/* 4. Sources — show who reported what, not just system names. */}
-      {reader.source_trace_friendly.length > 0 && (
-        <details open className="group">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl border border-ink-100 bg-canvas-50 px-4 py-2.5 text-[12px] font-semibold uppercase tracking-[0.16em] text-ink-500 hover:bg-canvas-100">
-            <span>Sources behind this assessment</span>
-            <span className="text-ink-400 transition-transform group-open:rotate-180" aria-hidden="true">&#8964;</span>
-          </summary>
-          <div className="mt-3 rounded-xl border border-ink-100 bg-canvas-50 p-4">
-            <ul className="space-y-2.5">
-              {reader.source_trace_friendly.map((t, i) => (
-                <li key={i} className="flex items-start gap-2.5 text-sm">
-                  <span
-                    className={`mt-0.5 inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[10px] font-semibold uppercase tracking-wider ${roleChipClass(t.role_label)}`}
-                  >
-                    {t.role_label}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <a
-                      href={t.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-medium text-ink-700 hover:text-amber-600"
-                    >
-                      {t.outlet_label}
-                    </a>
-                    {t.title && (
-                      <p className="mt-0.5 truncate text-xs text-ink-500">{t.title}</p>
-                    )}
-                    <p className="text-xs text-ink-400">
-                      {t.domain}
-                      {t.is_credible && <span className="ml-1.5 text-emerald-600">&#10003; Rated source</span>}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </details>
+      {signedIn && data.case_id && (
+        <a
+          href={`/dashboard/ai?case=${encodeURIComponent(data.case_id)}&prompt=${encodeURIComponent(`Walk me through the strongest and weakest evidence for "${reader.headline}".`)}`}
+          className="inline-flex rounded-xl bg-ink-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-700"
+        >
+          Ask the analyst about this result
+        </a>
       )}
-
-      {/* 5. Transparency: which systems we searched — collapsed, for the curious. */}
-      <details className="group">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl border border-ink-100 bg-canvas-50 px-4 py-2.5 text-[12px] font-semibold uppercase tracking-[0.16em] text-ink-500 hover:bg-canvas-100">
-          <span>Where we looked</span>
-          <span className="text-ink-400 transition-transform group-open:rotate-180" aria-hidden="true">&#8964;</span>
-        </summary>
-        <div className="mt-3">
-          <CoverageStrip systems={corroboration.systems} />
-        </div>
-      </details>
-
-      {data.verification_id && (
-        <p className="text-[11px] text-ink-400">
-          Saved to your history &middot;{' '}
-          <span className="font-mono text-ink-500">{data.verification_id.slice(0, 8)}</span>
-        </p>
-      )}
-    </section>
-  );
-}
-
-function ImageForensicResult({ report, filename }: { report: ForensicReport; filename: string }) {
-  const tone = report.verdict === 'ai'
-    ? { wrap: 'border-danger-200 bg-danger-50/80', label: 'text-danger-700', dot: 'bg-danger-500' }
-    : report.verdict === 'real'
-      ? { wrap: 'border-emerald-200 bg-emerald-50/80', label: 'text-emerald-700', dot: 'bg-emerald-500' }
-      : { wrap: 'border-amber-200 bg-amber-50/80', label: 'text-amber-700', dot: 'bg-amber-500' };
-
-  return (
-    <section className="space-y-4 rounded-card border border-ink-100 bg-paper p-5 shadow-card sm:p-6">
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-400">
-          Image inspection
-        </p>
-        <h2 className="mt-1 text-xl font-semibold leading-snug text-ink sm:text-[24px]">
-          {filename}
-        </h2>
-        {report.metadata.camera && (
-          <p className="mt-1 text-xs text-ink-400">{report.metadata.camera}{report.metadata.date ? ` · ${report.metadata.date}` : ''}</p>
-        )}
-      </div>
-
-      <div className={`rounded-2xl border p-5 sm:p-6 ${tone.wrap}`}>
-        <div className="flex items-center gap-2.5">
-          <span aria-hidden="true" className={`inline-block h-3 w-3 shrink-0 rounded-full ${tone.dot}`} />
-          <p className={`text-sm font-semibold ${tone.label}`}>
-            {report.verdict_label}
-            {report.confidence > 0 && <span className="ml-2 font-normal text-ink-500">({report.confidence}% confidence)</span>}
+      {!signedIn && (
+        <div className="rounded-xl border border-ink-100 bg-canvas-50 p-4">
+          <p className="text-sm font-medium text-ink-700">Want to keep this check?</p>
+          <p className="mt-1 text-sm text-ink-500">
+            Sign in to save future verification cases and ask evidence-grounded follow-up questions.
           </p>
-        </div>
-        <p className="mt-3 text-[15px] leading-relaxed text-ink sm:text-base">
-          {report.explanation}
-        </p>
-      </div>
-
-      {report.findings.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-400">
-            Evidence
-          </p>
-          <ul className="space-y-1.5">
-            {report.findings.map((f, i) => (
-              <li key={i} className="flex gap-2.5 text-[14px] leading-relaxed text-ink-700">
-                <span
-                  aria-hidden="true"
-                  className={`mt-[8px] h-2 w-2 shrink-0 rounded-full ${
-                    f.type === 'good' ? 'bg-emerald-500' : f.type === 'bad' ? 'bg-danger-500' : 'bg-ink-300'
-                  }`}
-                />
-                <span>{f.text}</span>
-              </li>
-            ))}
-          </ul>
+          <a href="/login?next=/verify" className="mt-2 inline-block text-sm font-semibold text-signal hover:underline">
+            Sign in
+          </a>
         </div>
       )}
 
-      {report.generator_scores && Object.values(report.generator_scores).some(s => s > 0.05) && (
+      {corroboration.systems.some((system) => system.status === 'hit' || system.status === 'miss') && (
         <details className="group">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl border border-ink-100 bg-canvas-50 px-4 py-2.5 text-[12px] font-semibold uppercase tracking-[0.16em] text-ink-500 hover:bg-canvas-100">
-            <span>Generator breakdown</span>
+            <span>Where we looked</span>
             <span className="text-ink-400 transition-transform group-open:rotate-180" aria-hidden="true">&#8964;</span>
           </summary>
-          <div className="mt-2 space-y-1.5 px-1">
-            {Object.entries(report.generator_scores)
-              .filter(([, s]) => s > 0.01)
-              .sort(([, a], [, b]) => b - a)
-              .slice(0, 8)
-              .map(([gen, score]) => (
-                <div key={gen} className="flex items-center gap-3 text-sm">
-                  <span className="w-32 truncate text-xs text-ink-600 capitalize">{gen.replace(/_/g, ' ')}</span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-ink-100">
-                    <div
-                      className="h-full rounded-full bg-danger-400 transition-all"
-                      style={{ width: `${Math.round(score * 100)}%` }}
-                    />
-                  </div>
-                  <span className="w-10 text-right text-xs tabular-nums text-ink-500">{Math.round(score * 100)}%</span>
-                </div>
-              ))}
+          <div className="mt-3">
+            <CoverageStrip systems={corroboration.systems} />
           </div>
         </details>
       )}
-
-      <p className="text-[11px] text-ink-400">
-        {report.source === 'sightengine'
-          ? 'Powered by SightEngine — professional AI detection used by newsrooms, platforms, and fact-checkers worldwide.'
-          : report.source === 'huggingface'
-            ? 'Powered by open-source AI detection models via HuggingFace.'
-            : report.source === 'metadata'
-              ? 'Detected via embedded file metadata.'
-              : 'Analysis based on available metadata.'}
-      </p>
     </section>
   );
 }
 
-/** Colours for the hero verdict box — keyed to the confidence band so the
- * visual tone matches the message before the reader even parses the words. */
-function bandToneClasses(band: string): { wrap: string; label: string } {
+function directAnswerTone(
+  kind: DirectAnswerKind,
+): { wrap: string; label: string; dot: string } {
+  switch (kind) {
+    case 'yes':
+      return {
+        wrap: 'border-emerald-200 bg-emerald-50/80',
+        label: 'text-emerald-800',
+        dot: 'bg-emerald-500',
+      };
+    case 'no':
+    case 'misleading':
+      return {
+        wrap: 'border-danger-200 bg-danger-50/80',
+        label: 'text-danger-800',
+        dot: 'bg-danger-500',
+      };
+    case 'partly':
+    case 'mixed':
+      return {
+        wrap: 'border-amber-200 bg-amber-50/80',
+        label: 'text-amber-800',
+        dot: 'bg-amber-500',
+      };
+    case 'unclear':
+    case 'not_checkable':
+      return {
+        wrap: 'border-ink-200 bg-canvas-50',
+        label: 'text-ink-800',
+        dot: 'bg-ink-400',
+      };
+  }
+}
+
+function fallbackDirectAnswer(band: ConfidenceBand): DirectAnswer {
   switch (band) {
     case 'high':
-      return { wrap: 'border-emerald-200 bg-emerald-50/80', label: 'text-emerald-700' };
+      return {
+        kind: 'yes',
+        label: 'Yes.',
+        explanation: 'Multiple independent sources support the core claim.',
+      };
     case 'contested':
-      return { wrap: 'border-danger-200 bg-danger-50/80', label: 'text-danger-700' };
+      return {
+        kind: 'mixed',
+        label: 'Sources disagree.',
+        explanation: 'The event may have happened, but sources conflict on important details.',
+      };
     case 'medium':
-      return { wrap: 'border-amber-200 bg-amber-50/80', label: 'text-amber-700' };
+      return {
+        kind: 'partly',
+        label: 'Partly.',
+        explanation: 'The core claim has some support, but important details are still unsettled.',
+      };
     case 'low':
-    default:
-      return { wrap: 'border-ink-200 bg-canvas-50', label: 'text-ink-600' };
+      return {
+        kind: 'unclear',
+        label: 'Not clear yet.',
+        explanation: 'There is not enough direct evidence to answer yes or no.',
+      };
   }
 }
 
@@ -798,20 +540,6 @@ function toneDotClass(tone: 'info' | 'good' | 'warn'): string {
   }
 }
 
-function friendlyBandLabel(band: string): string {
-  switch (band) {
-    case 'high':
-      return 'Looks trustworthy';
-    case 'contested':
-      return 'Sources clash';
-    case 'medium':
-      return 'Still forming';
-    case 'low':
-    default:
-      return 'Thin so far';
-  }
-}
-
 function summarizeMixNatural(mix: {
   total: number;
   rated_outlets: number;
@@ -837,55 +565,24 @@ function summarizeMixNatural(mix: {
   return `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;
 }
 
-function roleChipClass(label: string): string {
-  switch (label) {
-    case 'Main report':
-      return 'bg-amber-100 text-amber-800';
-    case 'Backs this up':
-      return 'bg-emerald-100 text-emerald-800';
-    case 'Disagrees':
-      return 'bg-danger-100 text-danger-700';
-    case 'Sensor network':
-      return 'bg-sky-100 text-sky-800';
-    default:
-      return 'bg-ink-100 text-ink-600';
-  }
-}
-
-/**
- * Per-system coverage strip — shows every independent verification system
- * we queried and what each returned. This is the honest answer to "did you
- * actually check the web / social media / sensors?" — the user sees hits,
- * misses, skipped, unavailable, or errored for each system.
- */
 function CoverageStrip({
   systems,
 }: {
   systems: VerifyResponse['corroboration']['systems'];
 }) {
-  if (!systems || systems.length === 0) return null;
-  // Callouts surface the real reason a system didn't return evidence.
-  // We treat `unavailable` and `error` as actionable — either a misconfig
-  // (env var missing) or a transient upstream failure. `skipped` is
-  // by-design (sensor networks skip non-physical claims, etc.) so we
-  // don't auto-expose it; users can still hover the badge for the note.
-  const issues = systems.filter(
-    (s) => (s.status === 'unavailable' || s.status === 'error') && s.note,
-  );
-  const skippedSystems = systems.filter((s) => s.status === 'skipped' && s.note);
+  const completed = systems.filter((system) => system.status === 'hit' || system.status === 'miss');
   return (
     <div className="rounded-xl border border-ink-100 bg-canvas-50 p-3">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-400">
         Systems we searched
       </p>
       <ul className="mt-2 flex flex-wrap gap-1.5">
-        {systems.map((s) => (
+        {completed.map((s) => (
           <li
             key={s.id}
             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] ${chipClass(
               s.status,
             )}`}
-            title={s.note}
           >
             <span
               aria-hidden="true"
@@ -895,45 +592,10 @@ function CoverageStrip({
             {s.status === 'hit' && s.evidence_count > 0 && (
               <span className="text-ink-500">· {s.evidence_count}</span>
             )}
-            {s.status === 'unavailable' && (
-              <span className="text-ink-500">· unavailable</span>
-            )}
             {s.status === 'miss' && <span className="text-ink-500">· no match</span>}
-            {s.status === 'skipped' && <span className="text-ink-500">· skipped</span>}
-            {s.status === 'error' && <span className="text-ink-500">· upstream error</span>}
           </li>
         ))}
       </ul>
-      {issues.length > 0 && (
-        <details className="mt-2 text-[11px] text-ink-600" open>
-          <summary className="cursor-pointer select-none font-medium text-ink-700 hover:text-ink-900">
-            Why some systems didn&rsquo;t return results ({issues.length})
-          </summary>
-          <ul className="mt-1.5 space-y-1 border-t border-ink-100 pt-1.5">
-            {issues.map((s) => (
-              <li key={s.id} className="leading-snug">
-                <span className="font-medium text-ink-700">{s.name}:</span>{' '}
-                <span className="text-ink-600">{s.note}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-      {skippedSystems.length > 0 && (
-        <details className="mt-1.5 text-[11px] text-ink-500">
-          <summary className="cursor-pointer select-none hover:text-ink-700">
-            Why {skippedSystems.length} system{skippedSystems.length === 1 ? ' was' : 's were'} skipped
-          </summary>
-          <ul className="mt-1.5 space-y-1 border-t border-ink-100 pt-1.5">
-            {skippedSystems.map((s) => (
-              <li key={s.id} className="leading-snug">
-                <span className="font-medium text-ink-700">{s.name}:</span>{' '}
-                <span className="text-ink-600">{s.note}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
     </div>
   );
 }
@@ -944,12 +606,6 @@ function chipClass(status: string): string {
       return 'border-amber-200 bg-amber-50 text-ink';
     case 'miss':
       return 'border-ink-100 bg-paper text-ink-600';
-    case 'skipped':
-      return 'border-ink-100 bg-paper text-ink-500';
-    case 'unavailable':
-      return 'border-ink-100 bg-paper text-ink-500';
-    case 'error':
-      return 'border-danger-200 bg-danger-50/60 text-danger-700';
     default:
       return 'border-ink-100 bg-paper text-ink-600';
   }
@@ -961,73 +617,7 @@ function dotClass(status: string): string {
       return 'bg-amber-500';
     case 'miss':
       return 'bg-ink-300';
-    case 'skipped':
-      return 'bg-ink-200';
-    case 'unavailable':
-      return 'bg-ink-300';
-    case 'error':
-      return 'bg-danger-500';
     default:
-      return 'bg-ink-300';
-  }
-}
-
-/**
- * Higher-level banner that pulls one of a few shapes based on the overall
- * corroboration posture: matched a tracked event, found independent
- * coverage, or genuinely didn't find anything.
- */
-function CorroborationBanner({
-  corroboration,
-}: {
-  corroboration: VerifyResponse['corroboration'];
-}) {
-  const { matched_signal, matched_by, total_sources, systems } = corroboration;
-
-  if (matched_signal) {
-    return (
-      <div className="flex items-center gap-2 rounded-lg border border-ink-100 bg-canvas-50 px-3 py-2 text-xs text-ink-600">
-        <span className="shrink-0 text-amber-500" aria-hidden="true">●</span>
-        <span>
-          Related to a story we&rsquo;re tracking ({matched_signal.source_count} sources on file)
-        </span>
-        <a
-          href={`/signal/${matched_signal.id}`}
-          className="ml-auto shrink-0 font-medium text-amber-700 hover:text-amber-900"
-        >
-          View full story →
-        </a>
-      </div>
-    );
-  }
-
-  const hitSystems = systems.filter((s) => s.status === 'hit');
-  if (hitSystems.length === 0 && total_sources <= 1) {
-    return (
-      <div className="rounded-xl border border-ink-100 bg-canvas-50 p-3 text-xs text-ink-700">
-        <p className="font-semibold uppercase tracking-[0.18em] text-ink-500 text-[11px]">
-          No independent corroboration
-        </p>
-        <p className="mt-1 text-ink-600">
-          We queried every system above and none produced a match. Treat the score below as a
-          single-source reading and wait for corroboration before trusting the detail.
-        </p>
-      </div>
-    );
-  }
-
-  return null;
-}
-
-function bandDotClass(band: ConfidenceBand): string {
-  switch (band) {
-    case 'high':
-      return 'bg-brand-500';
-    case 'medium':
-      return 'bg-amber-500';
-    case 'contested':
-      return 'bg-danger-500';
-    case 'low':
       return 'bg-ink-300';
   }
 }

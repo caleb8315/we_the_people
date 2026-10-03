@@ -82,6 +82,97 @@ export interface EvidenceCaseFile {
   what_would_make_this_stronger: string[];
 }
 
+export type DirectAnswerKind =
+  | 'yes'
+  | 'no'
+  | 'partly'
+  | 'mixed'
+  | 'unclear'
+  | 'misleading'
+  | 'not_checkable';
+
+export interface DirectAnswer {
+  kind: DirectAnswerKind;
+  label: string;
+  explanation: string;
+}
+
+export function directAnswerForCaseFile(caseFile: EvidenceCaseFile): DirectAnswer {
+  const hasSupportedClaim = caseFile.claims.some(
+    (claim) => claim.verdict === 'supported' || claim.verdict === 'partly_supported',
+  );
+  const hasConflict = caseFile.claims.some(
+    (claim) => claim.contradiction_count > 0 || claim.verdict === 'contradicted',
+  );
+
+  switch (caseFile.overall_verdict) {
+    case 'supported':
+      return {
+        kind: 'yes',
+        label: 'Yes.',
+        explanation: 'The available evidence supports that this happened.',
+      };
+    case 'contradicted':
+      return {
+        kind: 'no',
+        label: 'No.',
+        explanation: 'The strongest available evidence contradicts this claim.',
+      };
+    case 'unsupported':
+      return {
+        kind: 'no',
+        label: 'No.',
+        explanation: 'The available evidence does not support this claim.',
+      };
+    case 'partly_supported':
+      return {
+        kind: 'partly',
+        label: 'Partly.',
+        explanation:
+          'The core claim has support, but at least one important detail does not fully check out.',
+      };
+    case 'misleading_framing':
+      return {
+        kind: 'misleading',
+        label: 'Misleading.',
+        explanation: 'The underlying event has support, but the claim presents it inaccurately.',
+      };
+    case 'unresolved':
+      if (hasSupportedClaim && hasConflict) {
+        return {
+          kind: 'mixed',
+          label: 'Sources disagree.',
+          explanation:
+            'The event may have happened, but reliable sources conflict on important details.',
+        };
+      }
+      return {
+        kind: 'unclear',
+        label: 'Not clear yet.',
+        explanation: 'There is not enough consistent evidence to answer yes or no.',
+      };
+    case 'context_only':
+      return {
+        kind: 'unclear',
+        label: 'Not clear yet.',
+        explanation: 'Sources discuss the topic, but they do not directly confirm this claim.',
+      };
+    case 'not_enough_evidence':
+      return {
+        kind: 'unclear',
+        label: 'Not clear yet.',
+        explanation: 'There is not enough direct evidence to answer yes or no.',
+      };
+    case 'not_fact_checkable':
+      return {
+        kind: 'not_checkable',
+        label: 'This is not a factual yes-or-no claim.',
+        explanation:
+          'The wording is too broad, subjective, or predictive to verify as a specific event.',
+      };
+  }
+}
+
 export interface BuildEvidenceCaseFileInput {
   title: string | null;
   text: string | null;

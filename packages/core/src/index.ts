@@ -31,3 +31,4 @@ export * from './confidence-breakdown';
 export * from './result-explanation';
 export * from './claim-decomposition';
 export * from './case-file';
+export * from './prompts';

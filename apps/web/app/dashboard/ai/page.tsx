@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation';
-import { resolveModel } from '@osint/core/ai-provider';
 import { getServerSupabase } from '@/lib/supabase-server';
 import { AiWorkspace } from '@/components/ai-workspace';
 import { StatTile } from '@/components/ui/stat-tile';
@@ -19,7 +18,7 @@ export default async function AiPage() {
   if (!profile?.onboarded_at) redirect('/onboarding');
 
   const today = new Date().toISOString().slice(0, 10);
-  const [{ data: usage }, { count: sessions }, { data: aiProfile }] = await Promise.all([
+  const [{ data: usage }, { count: sessions }] = await Promise.all([
     sb
       .from('user_daily_usage')
       .select('calls')
@@ -27,7 +26,6 @@ export default async function AiPage() {
       .eq('day', today)
       .eq('bucket', 'ai_chat'),
     sb.from('ai_sessions').select('id', { count: 'exact', head: true }).eq('user_id', auth.user.id),
-    sb.from('ai_profiles').select('model, temperature').eq('user_id', auth.user.id).maybeSingle(),
   ]);
 
   const chatsToday = (usage ?? []).reduce((sum, r) => sum + Number(r.calls ?? 0), 0);
@@ -43,19 +41,14 @@ export default async function AiPage() {
         </p>
       </header>
 
-      <section className="grid gap-3 sm:grid-cols-3">
+      <section className="grid gap-3 sm:grid-cols-2">
         <StatTile
           label="Chats today"
           value={`${chatsToday}/${chatCap}`}
-          hint={`${remaining} remaining in beta`}
+          hint={`${remaining} remaining today`}
           tone={remaining <= 2 ? 'warn' : 'accent'}
         />
         <StatTile label="Total sessions" value={sessions ?? 0} hint="Private to your account" />
-        <StatTile
-          label="Model"
-          value={resolveModel('gemini', aiProfile?.model ?? undefined)}
-          hint={`temp ${aiProfile?.temperature ?? 0.4}`}
-        />
       </section>
 
       <AiWorkspace />

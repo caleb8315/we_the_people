@@ -4,11 +4,12 @@ import {
   buildEvidenceCaseFile,
   claimEvidenceStanceLabel,
   decomposeClaims,
+  directAnswerForCaseFile,
   verdictLabel,
 } from '..';
 import { buildEvidenceCards } from '../evidence-cards';
 import { rankSources } from '../source-ranking';
-import type { EvidenceItem } from '../types';
+import type { EvidenceCaseFile, EvidenceItem } from '..';
 
 function ev(partial: Partial<EvidenceItem>): EvidenceItem {
   return {
@@ -90,5 +91,39 @@ describe('buildEvidenceCaseFile', () => {
     assert.ok(caseFile.claims.some((c) => c.support_count > 0));
     assert.match(verdictLabel(caseFile.overall_verdict), /Supported|Unresolved|evidence|Context/i);
     assert.equal(claimEvidenceStanceLabel('mentions_without_evidence'), 'Mentions only');
+  });
+});
+
+describe('directAnswerForCaseFile', () => {
+  function answer(overall_verdict: EvidenceCaseFile['overall_verdict']) {
+    return directAnswerForCaseFile({
+      id: 'case',
+      title: 'Claim',
+      input_text: 'Claim',
+      input_url: null,
+      overall_verdict,
+      overall_band: 'medium',
+      overall_summary: '',
+      claims: [],
+      what_we_can_say: [],
+      what_remains_uncertain: [],
+      what_would_make_this_stronger: [],
+    });
+  }
+
+  it('leads with direct yes, no, and partly labels', () => {
+    assert.deepEqual(answer('supported'), {
+      kind: 'yes',
+      label: 'Yes.',
+      explanation: 'The available evidence supports that this happened.',
+    });
+    assert.equal(answer('contradicted').label, 'No.');
+    assert.equal(answer('partly_supported').label, 'Partly.');
+  });
+
+  it('does not turn missing evidence into a false negative', () => {
+    const result = answer('not_enough_evidence');
+    assert.equal(result.kind, 'unclear');
+    assert.equal(result.label, 'Not clear yet.');
   });
 });
