@@ -187,14 +187,14 @@ function ExampleVerificationResult() {
       <h2 className="mt-1 text-lg font-semibold leading-snug text-ink sm:text-xl">
         Cruise ship hantavirus death reports
       </h2>
-      <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+      <div className="mt-3 rounded-2xl border border-danger-200 bg-danger-50/80 p-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500">
           Direct answer
         </p>
-        <p className="mt-2 font-display text-2xl font-semibold text-amber-800">Partly.</p>
+        <p className="mt-2 font-display text-2xl font-semibold text-danger-800">No.</p>
         <p className="mt-1 text-sm leading-relaxed text-ink-700">
-          The death and investigation happened, but the reported cause was not confirmed when
-          early headlines claimed it was.
+          A passenger did die and health officials investigated, but the cause early headlines
+          reported was never confirmed.
         </p>
       </div>
     </section>
@@ -347,6 +347,9 @@ function VerifyResult({ data, signedIn }: { data: VerifyResponse; signedIn: bool
         <p className="mt-2 max-w-2xl text-base leading-relaxed text-ink-700 sm:text-lg">
           {answer.explanation}
         </p>
+        {answer.detail && (
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-600">{answer.detail}</p>
+        )}
         <p className="mt-2 text-xs text-ink-500">
           Based on {summarizeMixNatural(reader.source_mix)}
         </p>
@@ -448,7 +451,6 @@ function directAnswerTone(
         label: 'text-danger-800',
         dot: 'bg-danger-500',
       };
-    case 'partly':
     case 'mixed':
       return {
         wrap: 'border-amber-200 bg-amber-50/80',
@@ -481,9 +483,10 @@ function fallbackDirectAnswer(band: ConfidenceBand): DirectAnswer {
       };
     case 'medium':
       return {
-        kind: 'partly',
-        label: 'Partly.',
-        explanation: 'The core claim has some support, but important details are still unsettled.',
+        kind: 'unclear',
+        label: 'Not confirmed.',
+        explanation:
+          'Credible outlets cover this topic, but none we found clearly report that this claim is true.',
       };
     case 'low':
       return {

@@ -34,6 +34,7 @@
     "./result-explanation": "./src/result-explanation.ts",
     "./claim-decomposition": "./src/claim-decomposition.ts",
     "./case-file": "./src/case-file.ts",
+    "./claim-judge": "./src/claim-judge.ts",
     "./prompts": "./src/prompts.ts"
   },
   "scripts": {
