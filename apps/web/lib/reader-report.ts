@@ -11,7 +11,6 @@
  *
  *     - What is this thing I submitted?
  *     - What does the evidence actually say?
- *     - What's still unclear or limited?
  *     - So what should I do with this?
  *
  * Build rules:
@@ -23,8 +22,7 @@
  *     that mean?", it doesn't belong here.
  */
 
-import type { ConfidenceBand, ConfidenceReport, SourceTraceEntry } from '@osint/core';
-import { isCredibleDomain } from '@osint/core';
+import type { ConfidenceBand, ConfidenceReport } from '@osint/core';
 
 export interface ReaderBullet {
   text: string;
@@ -40,15 +38,6 @@ export interface SourceMix {
   other: number;
 }
 
-export interface SourceTraceFriendly {
-  role_label: string;
-  domain: string;
-  outlet_label: string;
-  url: string;
-  title: string | null;
-  is_credible: boolean;
-}
-
 export interface ReaderReport {
   headline: string;
   kind_label: string;
@@ -59,26 +48,22 @@ export interface ReaderReport {
   band_summary: string;
 
   what_we_found: ReaderBullet[];
-  what_is_unclear: ReaderBullet[];
 
   bottom_line: string;
 
   source_mix: SourceMix;
-  source_trace_friendly: SourceTraceFriendly[];
 }
 
 export interface ReaderReportInput {
   confidence: ConfidenceReport;
   input: {
-    kind: 'url' | 'text' | 'image';
+    kind: 'url' | 'text';
     canonical_url: string | null;
     host: string | null;
     headline: string | null;
     preview_text: string | null;
     is_social: boolean;
     social_platform_label: string | null;
-    image_filename: string | null;
-    has_image_hash: boolean;
   };
   corroboration: {
     systems: Array<{
@@ -96,17 +81,11 @@ export interface ReaderReportInput {
       credible_source_count: number;
     } | null;
   };
-  /**
-   * Plain-language limits / warnings lifted from the provenance layer
-   * (image, link, social). Caller should pass them as-is — they are
-   * already user-safe strings from `assessImageProvenance` et al.
-   */
-  provenance_limits: string[];
 }
 
 /** Build a Reader Report from the engine's output + live-systems coverage. */
 export function buildReaderReport(input: ReaderReportInput): ReaderReport {
-  const { confidence, input: ctx, corroboration, provenance_limits } = input;
+  const { confidence, input: ctx, corroboration } = input;
 
   const headline = pickHeadline(ctx);
   const subject = storySubject(headline);
@@ -115,7 +94,6 @@ export function buildReaderReport(input: ReaderReportInput): ReaderReport {
 
   const source_mix = buildSourceMix(confidence, corroboration);
   const what_we_found = buildFindings(confidence, corroboration, source_mix, subject);
-  const what_is_unclear = buildUnclear(confidence, corroboration, provenance_limits, ctx);
   const bottom_line = buildBottomLine(confidence.band, source_mix, corroboration, subject);
 
   return {
@@ -128,12 +106,10 @@ export function buildReaderReport(input: ReaderReportInput): ReaderReport {
     band_summary: confidence.summary,
 
     what_we_found,
-    what_is_unclear,
 
     bottom_line,
 
     source_mix,
-    source_trace_friendly: friendlySourceTrace(confidence.source_trace),
   };
 }
 
@@ -150,15 +126,11 @@ function pickHeadline(ctx: ReaderReportInput['input']): string {
   if (ctx.kind === 'text' && ctx.preview_text) {
     return ctx.preview_text.slice(0, 140);
   }
-  if (ctx.kind === 'image') {
-    return ctx.image_filename ? `Image: ${ctx.image_filename}` : 'Image submission';
-  }
   if (ctx.host) return `Submission from ${ctx.host}`;
   return 'Verification result';
 }
 
 function pickKindLabel(ctx: ReaderReportInput['input']): string {
-  if (ctx.kind === 'image') return 'Image submission';
   if (ctx.kind === 'text') return 'Pasted claim';
   if (ctx.is_social && ctx.social_platform_label) {
     return `Social post on ${ctx.social_platform_label}`;
@@ -179,11 +151,6 @@ function pickOneLiner(
       return `This event is already on our radar — ${ms.source_count} sources are covering it. Here\u2019s what we know about how well it\u2019s backed up.`;
     }
     return `We\u2019re already tracking this event. Here\u2019s how the reporting holds up across independent sources.`;
-  }
-  if (ctx.kind === 'image') {
-    return ctx.host
-      ? `We looked into this image from ${prettyOutletName(ctx.host)}. Without the article or post it came from, there\u2019s limited context to verify \u2014 sharing that link next time gives us much more to work with.`
-      : 'We looked into this image, but without the post or article it came from, there\u2019s limited context. Sharing the original link next time gives us much more to work with.';
   }
   if (ctx.kind === 'text') {
     return 'We searched for this claim across news outlets, social feeds, and sensor networks. Without a source link, we\u2019re matching on the wording alone.';
@@ -330,74 +297,9 @@ function buildFindings(
   if (out.length === 0) {
     out.push({
       tone: 'info',
-      text: 'We couldn\u2019t find any corroborating coverage anywhere. This could mean it\u2019s too new to have spread, it\u2019s very niche, or the claim doesn\u2019t match anything we can verify. Treat it as unconfirmed for now.',
+      text: 'No independent coverage matched this submission. The available evidence is too thin to treat it as established yet.',
     });
   }
-  return out.slice(0, 5);
-}
-
-function buildUnclear(
-  confidence: ConfidenceReport,
-  corroboration: ReaderReportInput['corroboration'],
-  provenance_limits: string[],
-  ctx: ReaderReportInput['input'],
-): ReaderBullet[] {
-  const out: ReaderBullet[] = [];
-  const systemsById = new Map(corroboration.systems.map((s) => [s.id, s] as const));
-
-  if (ctx.kind === 'image') {
-    out.push({
-      tone: 'warn',
-      text: 'This is an image-only submission. Without the original post or article for context, our ability to verify is very limited. Next time, share the full link if you can.',
-    });
-  }
-  if (ctx.kind === 'text') {
-    out.push({
-      tone: 'warn',
-      text: 'There\u2019s no source link attached, so we can only match on the wording. Including a URL to the original source would let us check credibility directly.',
-    });
-  }
-  if (ctx.is_social && !corroboration.matched_signal) {
-    out.push({
-      tone: 'warn',
-      text: 'This is from social media, which isn\u2019t the same as professional reporting. We looked for news outlets independently covering the same event but haven\u2019t found a match yet.',
-    });
-  }
-
-  const web = systemsById.get('web');
-  if (web && web.status === 'unavailable') {
-    out.push({
-      tone: 'info',
-      text: 'Our broad web search capability is temporarily offline. We still checked news archives, social feeds, and sensors, but may have missed some coverage.',
-    });
-  }
-
-  const sensors = systemsById.get('sensors');
-  if (sensors && sensors.status === 'miss') {
-    out.push({
-      tone: 'info',
-      text: 'Open sensor networks (earthquakes, fires, severe weather) don\u2019t show anything matching this event. If this were a physical disaster, sensors would usually detect it.',
-    });
-  }
-
-  const saidNoSource = out.some((o) => /no source link|no source/i.test(o.text));
-  for (const l of provenance_limits) {
-    if (!l) continue;
-    if (out.some((o) => o.text === l)) continue;
-    if (saidNoSource && /no source attribution|source attribution|wording alone|claim shape/i.test(l)) continue;
-    out.push({ tone: 'warn', text: l });
-  }
-
-  for (const b of confidence.explanation_bullets) {
-    if (/sources? (is|are) reporting|rated outlets?|independent sources are reporting|Only one source is reporting/i.test(b)) continue;
-    if (/disagree/i.test(b)) continue;
-    if (/sensor networks/i.test(b)) continue;
-    if (/picked up/i.test(b)) continue;
-    if (saidNoSource && /no source attribution|source attribution|wording alone|claim shape/i.test(b)) continue;
-    if (out.some((o) => o.text === b)) continue;
-    out.push({ tone: 'warn', text: b });
-  }
-
   return out.slice(0, 5);
 }
 
@@ -428,36 +330,12 @@ function buildBottomLine(
       return 'This appears to be a developing story. The general shape looks plausible, but no single claim has enough independent backing yet to be confident about. Keep watching for updates.';
     case 'low':
       if (mix.total === 0) {
-        return 'We couldn\u2019t find any independent reporting on this anywhere. It could be too new to have spread, very niche, or inaccurate. Treat it as unverified and check back later.';
+        return 'No independent reporting matched this submission. The evidence is currently too thin to treat it as established.';
       }
       if (mix.total === 1) {
         return 'Only one source is reporting this so far. That\u2019s not enough to judge reliability. Check who published it, look at their track record, and wait for other outlets to pick it up before trusting the details.';
       }
       return `A few sources mention this, but none are rated outlets yet. Read each one carefully and form your own judgement — don’t treat this as confirmed.`;
-  }
-}
-
-function friendlySourceTrace(trace: SourceTraceEntry[]): SourceTraceFriendly[] {
-  return trace.map((t) => ({
-    role_label: friendlyRole(t.role),
-    domain: t.domain,
-    outlet_label: prettyOutletName(t.domain),
-    url: t.url,
-    title: t.title,
-    is_credible: t.is_credible || isCredibleDomain(t.domain),
-  }));
-}
-
-function friendlyRole(role: SourceTraceEntry['role']): string {
-  switch (role) {
-    case 'primary':
-      return 'Main report';
-    case 'corroborating':
-      return 'Backs this up';
-    case 'conflicting':
-      return 'Disagrees';
-    case 'sensor':
-      return 'Sensor network';
   }
 }
 

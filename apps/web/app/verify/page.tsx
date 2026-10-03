@@ -1,6 +1,5 @@
 import { VerifyClient } from './verify-client';
 import { getServerSupabase } from '@/lib/supabase-server';
-import { PlayerStatus } from '@/components/player-status';
 
 export const metadata = { title: 'Verify a claim · Crosscheck' };
 export const dynamic = 'force-dynamic';
@@ -17,10 +16,10 @@ export default async function VerifyPage() {
 
   return (
     <div className="space-y-6 sm:space-y-7">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <header>
         <div>
           <p className="font-display text-[11px] font-semibold uppercase tracking-[0.22em] text-flare">
-            Daily mission · +25 XP
+            Evidence check
           </p>
           <h1 className="mt-2 max-w-2xl font-display text-[34px] font-semibold leading-[1.1] tracking-tight text-ink sm:text-[44px]">
             Is this trustworthy?
@@ -29,9 +28,6 @@ export default async function VerifyPage() {
             Paste a URL, headline, or rumor. Get a clear call — looks solid, still forming, thin so
             far, or sources clash — with both sides when they disagree.
           </p>
-        </div>
-        <div className="w-full max-w-sm lg:shrink-0">
-          <PlayerStatus compact />
         </div>
       </header>
       <VerifyClient signedIn={signedIn} />

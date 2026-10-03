@@ -6,7 +6,7 @@ import { Segmented } from './ui/segmented';
 const TOPICS = ['war', 'economy', 'climate', 'health', 'civil', 'cyber', 'disaster', 'tech', 'finance', 'other'] as const;
 type Topic = (typeof TOPICS)[number];
 
-type FeedMode = 'personalized' | 'global' | 'hybrid';
+type FeedMode = 'personalized' | 'global';
 type BriefingFreq = 'daily' | 'weekly' | 'both' | 'off';
 type AlertIntensity = 'critical_only' | 'important_and_up' | 'all';
 
@@ -93,7 +93,6 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
           options={[
             { label: 'Personalized', value: 'personalized' },
             { label: 'Global', value: 'global' },
-            { label: 'Hybrid', value: 'hybrid' },
           ]}
         />
       </Section>

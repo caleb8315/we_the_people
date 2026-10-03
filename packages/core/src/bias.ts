@@ -38,8 +38,6 @@ export interface BiasReport {
   signals: BiasSignal[];
   /** Always non-empty — at minimum "no bias signals detected". */
   summary: string;
-  /** Stable disclaimer the UI is required to render. */
-  disclaimer: string;
 }
 
 /**
@@ -143,9 +141,6 @@ const EMOTIONAL_PATTERNS: ReadonlyArray<RegExp> = [
 ];
 
 const ALL_CAPS_RX = /\b[A-Z]{4,}\b/g;
-
-const DISCLAIMER =
-  'Bias signals describe how the text is written — loaded words, framing, tone — separate from whether the claim itself checks out.';
 
 function intensityFromHits(hits: number, perHit: number, cap: number): number {
   return Math.min(cap, hits * perHit);
@@ -312,7 +307,6 @@ export function detectBias(text: string | null | undefined): BiasReport {
         { type: 'emotional_tone', intensity: 0, examples: [], description: 'Not enough text to evaluate.' },
       ],
       summary: 'Not enough text supplied to detect bias markers reliably.',
-      disclaimer: DISCLAIMER,
     };
     return empty;
   }
@@ -337,7 +331,6 @@ export function detectBias(text: string | null | undefined): BiasReport {
     band,
     signals,
     summary: buildSummary(signals, band),
-    disclaimer: DISCLAIMER,
   };
 }
 
@@ -356,7 +349,6 @@ export interface CorpusBiasReport {
   /** True when the average exceeds the moderate threshold. */
   has_signal: boolean;
   summary: string;
-  disclaimer: string;
 }
 
 export function detectCorpusBias(texts: Array<string | null | undefined>): CorpusBiasReport {
@@ -376,7 +368,6 @@ export function detectCorpusBias(texts: Array<string | null | undefined>): Corpu
       },
       has_signal: false,
       summary: 'No evidence text supplied to evaluate corpus bias.',
-      disclaimer: DISCLAIMER,
     };
   }
   const totals: Record<BiasSignalType, number> = {
@@ -414,9 +405,5 @@ export function detectCorpusBias(texts: Array<string | null | undefined>): Corpu
     per_signal: per,
     has_signal: hasSignal,
     summary,
-    disclaimer: DISCLAIMER,
   };
 }
-
-/** Stable disclaimer string for the UI. Always render. */
-export const BIAS_DISCLAIMER = DISCLAIMER;

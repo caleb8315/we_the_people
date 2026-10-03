@@ -75,9 +75,8 @@ export async function POST(req: Request) {
   if (!chatLimit.ok) {
     return NextResponse.json(
       {
-        error: 'beta_daily_limit',
-        message:
-          'You hit your daily AI chat limit (10) for this beta. This keeps quality high and costs stable while we iterate. Please come back tomorrow.',
+        error: 'daily_limit',
+        message: `Daily chat limit reached (${chatLimit.used}/${chatLimit.limit}). Resets at midnight UTC.`,
         used: chatLimit.used,
         limit: chatLimit.limit,
       },
@@ -347,7 +346,7 @@ async function generateAssistantReply(input: {
   });
 
   if (result.text) return result.text;
-  return 'AI provider unavailable right now. Your message was saved to your private session; retry in a few minutes.';
+  return 'AI is temporarily unavailable. Your message is saved — try again shortly.';
 }
 
 function buildGroundingContext(input: {

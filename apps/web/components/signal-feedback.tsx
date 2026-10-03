@@ -9,7 +9,7 @@ import { useState, useTransition } from 'react';
  * for unauthenticated readers.
  */
 
-type Kind = 'useful' | 'wrong' | 'noise' | 'helpful_context';
+type Kind = 'useful' | 'wrong' | 'helpful_context';
 
 const BUTTONS: Array<{ kind: Kind; label: string; short: string }> = [
   { kind: 'useful', label: 'Helpful', short: 'Helpful' },
@@ -17,10 +17,12 @@ const BUTTONS: Array<{ kind: Kind; label: string; short: string }> = [
   { kind: 'wrong', label: 'Inaccurate', short: 'Wrong' },
 ];
 
-export function SignalFeedbackButtons({ signalId }: { signalId: string }) {
+export function SignalFeedbackButtons({ signalId, signedIn }: { signalId: string; signedIn: boolean }) {
   const [picked, setPicked] = useState<Kind | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  if (!signedIn) return null;
 
   if (picked) {
     return (

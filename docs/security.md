@@ -26,12 +26,12 @@ Explicitly out of scope for v1 (but tracked):
 - All user-facing tables have `enable row level security`.
 - Policies restrict `profiles`, `preferences`, `feedback` to the owning `auth.uid()`.
 - `signals`, `evidence`, `briefings` are public-read but filter out `quarantined` / `blocked` rows via a view (`signals_public`).
-- `usage_ledger`, `engine_runs`, `beta_allowlist` are service-role only (default-deny).
+- `usage_ledger` and `engine_runs` are service-role only (default-deny).
 
 ### Auth
 
-- Email/password auth for the current beta, backed by Supabase Auth.
-- Allowlist gate: only emails matching `BETA_ALLOWLIST` (env) or `beta_allowlist` (DB) can sign up or sign in. Unapproved users are directed to the access-request flow.
+- Open email/password auth backed by Supabase Auth.
+- Account-owned data remains isolated with RLS even though signup is open.
 - Session cookie refreshed in middleware on every request.
 
 ### API

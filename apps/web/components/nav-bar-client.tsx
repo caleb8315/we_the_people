@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { SignOutButton } from './signout-button';
-import { PlayerStatus } from './player-status';
 
 /**
  * People-first nav — brand mark + live progress chip + desktop links.
@@ -17,7 +16,6 @@ export function NavBarClient({
   displayName: string | null;
 }) {
   const pathname = usePathname();
-  const hideCompactProgress = pathname === '/';
 
   const links = [
     { href: '/feed', label: 'Feed' },
@@ -79,11 +77,6 @@ export function NavBarClient({
         </nav>
 
         <div className="ml-auto flex items-center gap-1.5 md:ml-0 md:gap-2">
-          {!hideCompactProgress && (
-            <div className="hidden w-52 lg:block">
-              <PlayerStatus compact />
-            </div>
-          )}
           {signedIn ? (
             <>
               <Link

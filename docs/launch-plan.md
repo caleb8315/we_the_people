@@ -1,5 +1,8 @@
 # Launch Plan — Private Beta to 200 Users
 
+> Historical rollout plan. Account creation is now open; the allowlist and
+> access-request tables were removed by migration `004_drop_access_request_flow.sql`.
+
 A staged rollout with clear exit criteria at each cohort. Each cohort only opens if the previous one met its gates.
 
 ## Cohort 1 — 20 users (Week 1)
@@ -7,7 +10,7 @@ A staged rollout with clear exit criteria at each cohort. Each cohort only opens
 **Goal:** prove reliability with a tight group of sympathetic testers.
 
 - Audience: journalists, analysts, OSINT-community peers you know directly.
-- Entry: founder invites only (add emails to `public.beta_allowlist`).
+- Entry: direct founder outreach with the standard account link.
 - Communication: a single Slack/Discord channel or group chat.
 
 Gates to open cohort 2:
@@ -21,7 +24,7 @@ Gates to open cohort 2:
 **Goal:** validate the product-market signal with a wider audience.
 
 - Audience: referrals from cohort 1 + niche geopolitics / crisis-mapping communities.
-- Entry: invite-only, form-based request reviewed manually.
+- Entry: referrals from cohort 1 and targeted outreach.
 - Communication: weekly email changelog to all beta users.
 
 Gates to open cohort 3:

@@ -50,15 +50,15 @@ export default async function LandingPage() {
               Know what&apos;s real before you share it.
             </h1>
             <p className="animate-rise-in-late mt-4 max-w-xl text-base text-white/75 sm:text-lg">
-              Paste a claim. Earn XP. See what looks trustworthy, what clashes, and what&apos;s still thin —
-              built for regular people, not gatekeepers.
+              Paste a claim and get a clear, source-backed answer: what holds up, what clashes,
+              and which details still need stronger evidence.
             </p>
             <div className="animate-rise-in-late mt-8 flex flex-wrap items-center gap-3">
               <Link
                 href="/verify"
                 className="rounded-2xl bg-flare px-6 py-3 text-sm font-semibold text-white shadow-[0_12px_28px_-10px_rgba(228,87,46,0.7)] transition hover:bg-flare-600"
               >
-                Verify a claim · +25 XP
+                Verify a claim
               </Link>
               <Link
                 href="/feed"
@@ -97,8 +97,8 @@ export default async function LandingPage() {
           />
           <Step
             n="03"
-            title="Level up"
-            body="Daily missions, streaks, and ranks from Newcomer to Guardian. Stay sharp without doomscrolling."
+            title="Inspect the evidence"
+            body="Open the sources behind the answer, compare conflicts, and see exactly what moved the result."
           />
         </ol>
       </section>
@@ -107,11 +107,12 @@ export default async function LandingPage() {
       <section>
         <div className="mb-6 max-w-2xl">
           <p className="font-display text-[11px] font-semibold uppercase tracking-[0.22em] text-flare">
-            In the wild
+            Illustrative examples
           </p>
           <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
             What Crosscheck actually says
           </h2>
+          <p className="mt-2 text-sm text-ink-500">Examples only — not live verification results.</p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <VerdictDemo
@@ -127,40 +128,6 @@ export default async function LandingPage() {
             body="USGS and regional sensors disagree on magnitude. Both readings are shown with citations — don't round it off yet."
           />
         </div>
-      </section>
-
-      {/* Ranks teaser */}
-      <section className="overflow-hidden rounded-[32px] border border-ink-100 bg-ink-900 px-5 py-8 text-white sm:px-8 sm:py-10">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-xl">
-            <p className="font-display text-[11px] font-semibold uppercase tracking-[0.22em] text-signal-300">
-              Progress
-            </p>
-            <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight sm:text-3xl">
-              Climb from Newcomer to Guardian
-            </h2>
-            <p className="mt-2 text-sm text-white/70">
-              Verify claims, scout stories, inspect clashes. XP and streaks keep you honest — not addicted.
-            </p>
-          </div>
-          <Link
-            href="/login?next=/dashboard"
-            className="inline-flex rounded-2xl bg-signal px-5 py-3 text-sm font-semibold text-white hover:bg-signal-600"
-          >
-            Start free · keep your streak
-          </Link>
-        </div>
-        <ul className="mt-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {['Newcomer', 'Citizen', 'Watchdog', 'Truth Hunter', 'Sentinel', 'Guardian'].map((rank, i) => (
-            <li
-              key={rank}
-              className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-center"
-            >
-              <p className="text-[10px] uppercase tracking-wider text-white/45">Rank {i + 1}</p>
-              <p className="mt-1 font-display text-sm font-semibold">{rank}</p>
-            </li>
-          ))}
-        </ul>
       </section>
 
       {/* Topics */}
@@ -234,7 +201,8 @@ export default async function LandingPage() {
                 Create your account. Keep your progress.
               </h2>
               <p className="mt-2 max-w-xl text-sm text-ink-500">
-                Personalized feed, missions, and AI-grounded verifications. Secure by default — not locked behind invite walls.
+                Save verification cases, personalize your feed, and ask the analyst follow-up
+                questions grounded in the evidence you just checked.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">

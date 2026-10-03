@@ -14,28 +14,6 @@ const SavedViewBody = z.object({
   filters: z.record(z.unknown()).optional(),
 });
 
-export async function GET(req: Request) {
-  const rl = limit(getClientKey(req, 'saved-views-get'), 60, 60_000);
-  if (!rl.ok) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
-
-  const sb = getServerSupabase();
-  const { data: auth } = await sb.auth.getUser();
-  if (!auth.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-
-  const url = new URL(req.url);
-  const context = url.searchParams.get('context');
-  let q = sb
-    .from('user_saved_views')
-    .select('id, name, context, view_mode, filters, updated_at')
-    .eq('user_id', auth.user.id)
-    .order('updated_at', { ascending: false })
-    .limit(20);
-  if (context === 'feed' || context === 'intel') q = q.eq('context', context);
-  const { data, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ views: data ?? [] });
-}
-
 export async function POST(req: Request) {
   const rl = limit(getClientKey(req, 'saved-views-post'), 20, 60_000);
   if (!rl.ok) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
@@ -87,7 +65,7 @@ export async function POST(req: Request) {
 
   await logProductEvent(sb, {
     userId: auth.user.id,
-    eventName: 'saved_view_applied',
+    eventName: 'saved_view_created',
     eventProps: {
       action: 'created',
       context: parsed.data.context,

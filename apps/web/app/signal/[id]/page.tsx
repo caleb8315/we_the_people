@@ -14,7 +14,7 @@ import {
   type TrustExplanation,
   type VerificationStatus,
 } from '@osint/core';
-import { getAdminSupabase } from '@/lib/supabase-server';
+import { getAdminSupabase, getServerSupabase } from '@/lib/supabase-server';
 import { Badge } from '@/components/ui/badge';
 import { SeverityMeter } from '@/components/ui/severity-meter';
 import { Disclosure } from '@/components/ui/disclosure';
@@ -25,7 +25,6 @@ import {
 import { SignalFeedbackButtons } from '@/components/signal-feedback';
 import { DevelopStoryButton } from '@/components/develop-story';
 import { SignalShareButton } from '@/components/signal-share-button';
-import { AwardProgress } from '@/components/award-progress';
 import { prettyOutletName } from '@/lib/reader-report';
 
 export const revalidate = 30;
@@ -34,6 +33,7 @@ type PageProps = { params: { id: string } };
 
 export default async function SignalPage({ params }: PageProps) {
   const sb = getAdminSupabase();
+  const session = getServerSupabase();
 
   const [{ data: signal }, { data: enrichmentRow }, { data: evidence }, { data: contradictions }, { data: feedbackRows }] =
     await Promise.all([
@@ -56,7 +56,7 @@ export default async function SignalPage({ params }: PageProps) {
   // We don't enforce auth here — anonymous readers can still trigger the
   // live enrichment (it's per-IP rate limited). But only authenticated
   // users can bypass the per-signal cooldown with force=true.
-  const { data: auth } = await sb.auth.getUser();
+  const { data: auth } = await session.auth.getUser();
   const canForce = Boolean(auth?.user?.id);
 
   const contradictionsCount = (contradictions ?? []).length;
@@ -135,7 +135,6 @@ export default async function SignalPage({ params }: PageProps) {
   const humanVerdict = trustExplanation.reader_summary || trustExplanation.summary || bottomLine;
   return (
     <article className="space-y-4 sm:space-y-5">
-      <AwardProgress action="open_signal" disputed={contradictionsCount > 0} />
       {/* Reader-first header: what happened → what we think about it →
           the technical chrome. The event title is the hero because it's
           the thing you're here to read; the verdict sits right below it
@@ -213,7 +212,7 @@ export default async function SignalPage({ params }: PageProps) {
         )}
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <SignalFeedbackButtons signalId={signal.id} />
+          <SignalFeedbackButtons signalId={signal.id} signedIn={canForce} />
           <SignalShareButton title={signal.title} verdict={humanVerdict} />
           <LearnMoreLinks title={signal.title} topic={signal.topic} />
         </div>

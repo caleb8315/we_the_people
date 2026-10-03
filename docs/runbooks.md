@@ -16,12 +16,11 @@ Operational playbooks for the beta. Keep these up to date as the system evolves.
 - Gemini: https://aistudio.google.com/apikey → revoke old, create new → update `GEMINI_API_KEY`.
 - Groq: https://console.groq.com → revoke old, create new → update `GROQ_API_KEY`.
 
-## 3. Beta cohort onboarding
+## 3. Account onboarding
 
-1. Add entries to `public.beta_allowlist` (one row per email, tagged with cohort).
-2. Send outreach from your founder email with a link to `/login`.
-3. Monitor the `auth.users` table for sign-ups; confirm invitees can create an
-   email/password account after approval.
+1. Send users to `/login` to create an email/password account.
+2. Monitor `auth.users` for sign-ups and confirm onboarding completes.
+3. Review account and rate-limit metrics before widening outreach.
 
 ## 4. Ingestion is failing
 
