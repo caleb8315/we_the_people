@@ -1,7 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { outletProfile, ownershipLabel } from '@osint/core';
-import { fetchJson, stripTags, truncate } from '../http';
+import { fetchJson, gdeltRequest, stripTags, truncate } from '../http';
 import { parseDateLoose, recordStat, sourceBrief, type ToolContext } from './context';
 
 const WIKIDATA_UA = { 'user-agent': 'Crosscheck-Investigator/1.0 (https://crosscheck.news; hello@crosscheck.news)' };
@@ -121,7 +121,7 @@ export function referenceTools(ctx: ToolContext) {
         if (url) {
           const cdx = await fetchJson<string[][]>(
             `https://web.archive.org/cdx/search/cdx?url=${encodeURIComponent(url)}&output=json&limit=1&fl=timestamp,original,statuscode`,
-            { timeoutMs: 15_000, signal: ctx.signal },
+            { timeoutMs: 30_000, signal: ctx.signal },
           );
           const row = cdx?.[1];
           out.archive_first_capture = row
@@ -139,10 +139,17 @@ export function referenceTools(ctx: ToolContext) {
           u.searchParams.set('maxrecords', '12');
           u.searchParams.set('sort', 'dateasc');
           u.searchParams.set('timespan', '3months');
-          const body = await fetchJson<{ articles?: Array<{ url: string; title?: string; seendate?: string; sourcecountry?: string; language?: string }> }>(
-            u.toString(),
-            { timeoutMs: 25_000, signal: ctx.signal },
-          );
+          const res = await gdeltRequest(u.toString(), ctx.signal);
+          let body: { articles?: Array<{ url: string; title?: string; seendate?: string; sourcecountry?: string; language?: string }> } | null = null;
+          if (res.ok) {
+            try {
+              body = JSON.parse(res.text);
+            } catch {
+              body = null;
+            }
+          } else {
+            out.gdelt_error = res.reason;
+          }
           const earliest = (body?.articles ?? []).map((a) => {
             const entry = ctx.ledger.add({
               url: a.url,

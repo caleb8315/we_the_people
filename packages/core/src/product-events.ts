@@ -16,4 +16,5 @@ export type ProductEventName =
   | 'verify_submitted'
   | 'verify_result_viewed'
   | 'signal_feedback_sent'
-  | 'signal_developed';
+  | 'signal_developed'
+  | 'investigation_completed';

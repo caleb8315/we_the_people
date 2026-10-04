@@ -2,8 +2,9 @@
 const nextConfig = {
   experimental: {
     externalDir: true,
+    serverComponentsExternalPackages: ['linkedom', '@mozilla/readability'],
   },
-  transpilePackages: ['@osint/core'],
+  transpilePackages: ['@osint/core', '@osint/investigator'],
   async headers() {
     return [
       {

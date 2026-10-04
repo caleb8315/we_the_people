@@ -1,6 +1,6 @@
 import { tool } from 'ai';
 import { z } from 'zod';
-import { decodeEntities, fetchJson, fetchText, httpFetch, truncate } from '../http';
+import { decodeEntities, fetchJson, fetchText, gdeltRequest, httpFetch, truncate } from '../http';
 import {
   countryName,
   languageName,
@@ -179,10 +179,10 @@ export function newsTools(ctx: ToolContext) {
         if (end_date) u.searchParams.set('enddatetime', `${end_date.replace(/-/g, '')}235959`);
         if (!start_date && !end_date) u.searchParams.set('timespan', '3months');
 
-        const res = await fetchText(u.toString(), { timeoutMs: 25_000, signal: ctx.signal });
-        if (!res) {
+        const res = await gdeltRequest(u.toString(), ctx.signal);
+        if (!res.ok) {
           recordStat(ctx, 'gdelt_search', 0);
-          return { error: 'GDELT did not respond (its free API is often slow); try again or use another tool.' };
+          return { error: res.reason };
         }
         let body: { articles?: GdeltArticle[] } | null = null;
         try {

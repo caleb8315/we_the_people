@@ -95,3 +95,23 @@ export function decodeEntities(s: string): string {
 export function stripTags(s: string): string {
   return decodeEntities(s).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
+
+/**
+ * GDELT's free API answers 429 with a plain-text notice when its per-IP
+ * limit is hit (shared cloud IPs hit it often). Back off and retry.
+ */
+export async function gdeltRequest(url: string, signal?: AbortSignal): Promise<{ ok: true; text: string } | { ok: false; reason: string }> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const res = await httpFetch(url, { timeoutMs: 25_000, signal });
+    if (!res) return { ok: false, reason: 'GDELT did not respond (its free API is often slow).' };
+    const text = await res.text().catch(() => '');
+    if (res.status === 429 || text.startsWith('Please limit requests')) {
+      if (signal?.aborted) break;
+      await new Promise((r) => setTimeout(r, 6_000 * (attempt + 1)));
+      continue;
+    }
+    if (!res.ok) return { ok: false, reason: `GDELT returned HTTP ${res.status}.` };
+    return { ok: true, text };
+  }
+  return { ok: false, reason: 'GDELT is rate-limiting this server right now; use google_news_search or web_search instead.' };
+}
