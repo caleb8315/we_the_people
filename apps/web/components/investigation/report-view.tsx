@@ -95,7 +95,7 @@ export function ReportView({ report }: { report: InvestigationReport }) {
                     return (
                       <li key={j} className="flex gap-3 rounded-xl bg-canvas-50 p-3">
                         <span
-                          className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                          className={`mt-0.5 h-fit shrink-0 self-start rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                             q.stance === 'supports' ? 'bg-brand-100 text-brand-700' : q.stance === 'refutes' ? 'bg-danger-100 text-danger-700' : 'bg-canvas-200 text-ink-600'
                           }`}
                         >
@@ -351,7 +351,7 @@ function PhysicalCard({ check }: { check: PhysicalCheck }) {
         <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${resultStyle[check.result]}`}>{resultLabel[check.result]}</span>
       </div>
       {check.imagery.length > 0 && (
-        <div className={`mt-3 grid gap-2 ${check.imagery.length > 1 ? 'sm:grid-cols-2' : ''}`}>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {check.imagery.map((img) => (
             <figure key={img.url} className="overflow-hidden rounded-xl border border-ink-100 bg-ink-900">
               <a href={img.url} target="_blank" rel="noopener noreferrer">

@@ -36,7 +36,7 @@ export function extractArticle(html: string, url: string): ReadResult | null {
       document.querySelector('time[datetime]')?.getAttribute('datetime') ??
       null;
     const article = new Readability(document as unknown as Document, { charThreshold: 300 }).parse();
-    const text = (article?.textContent ?? '').replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n\n').trim();
+    const text = article?.content ? htmlToText(article.content) : (article?.textContent ?? '').trim();
     if (!text) return null;
     return {
       url,
@@ -50,6 +50,46 @@ export function extractArticle(html: string, url: string): ReadResult | null {
   } catch {
     return null;
   }
+}
+
+const BLOCK_TAGS = new Set(['P', 'DIV', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'TR', 'TABLE', 'SECTION', 'ARTICLE', 'BLOCKQUOTE', 'FIGCAPTION', 'CAPTION', 'DD', 'DT', 'UL', 'OL', 'PRE']);
+
+interface MiniNode {
+  nodeType: number;
+  textContent: string | null;
+  tagName?: string;
+  childNodes: ArrayLike<MiniNode>;
+  getAttribute?: (name: string) => string | null;
+}
+
+/** Block-aware HTML → text: keeps paragraph and table-cell boundaries that textContent loses. */
+export function htmlToText(html: string): string {
+  const { document } = parseHTML(`<!doctype html><html><body>${html}</body></html>`);
+  let out = '';
+  const walk = (n: MiniNode) => {
+    if (n.nodeType === 3) {
+      out += n.textContent ?? '';
+      return;
+    }
+    if (n.nodeType !== 1) return;
+    const tag = n.tagName ?? '';
+    if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') return;
+    if (tag === 'SUP' && /reference/.test(n.getAttribute?.('class') ?? '')) return;
+    if (tag === 'BR') {
+      out += '\n';
+      return;
+    }
+    for (const c of Array.from(n.childNodes)) walk(c);
+    if (tag === 'TD' || tag === 'TH') out += ' · ';
+    else if (BLOCK_TAGS.has(tag)) out += '\n';
+  };
+  walk(document.body as unknown as MiniNode);
+  return out
+    .replace(/[ \t\u00a0]+/g, ' ')
+    .replace(/ ?· ?\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 export async function readUrl(url: string, env: Record<string, string | undefined>, signal?: AbortSignal): Promise<ReadResult | null> {

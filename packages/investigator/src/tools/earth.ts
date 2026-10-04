@@ -88,15 +88,17 @@ async function bestSentinelScene(
   });
   const features = body?.features ?? [];
   if (!features.length) return null;
-  // Prefer low cloud cover; break ties toward the requested end of the window.
-  return [...features].sort((a, b) => {
-    const ca = a.properties['eo:cloud_cover'] ?? 100;
-    const cb = b.properties['eo:cloud_cover'] ?? 100;
-    if (Math.abs(ca - cb) > 10) return ca - cb;
+  const cloud = (f: StacFeature) => f.properties['eo:cloud_cover'] ?? 100;
+  const byTime = (a: StacFeature, b: StacFeature) => {
     const ta = Date.parse(a.properties.datetime);
     const tb = Date.parse(b.properties.datetime);
     return pick === 'latest' ? tb - ta : ta - tb;
-  })[0]!;
+  };
+  // Tile-level cloud cover understates local cloud, so insist on clear
+  // scenes when any exist and take the one closest to the event.
+  const clear = features.filter((f) => cloud(f) <= 10).sort(byTime);
+  if (clear.length) return clear[0]!;
+  return [...features].sort((a, b) => cloud(a) - cloud(b) || byTime(a, b))[0]!;
 }
 
 function sentinelCropUrl(itemId: string, bbox: [number, number, number, number], size = 768): string {

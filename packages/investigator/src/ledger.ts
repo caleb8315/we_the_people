@@ -70,11 +70,12 @@ export class SourceLedger {
 
     const domain = (input.domain?.toLowerCase().replace(/^www\./, '') || extractDomain(input.url)) || 'unknown';
     const profile = outletProfile(domain);
+    const wikiLang = domain.match(/^([a-z-]+)\.(?:m\.)?wikipedia\.org$/)?.[1];
     const entry: LedgerEntry = {
       id: `S${this.entries.length + 1}`,
       url: input.url,
       title: input.title ?? null,
-      outlet: input.outlet?.trim() || profile?.name || domain,
+      outlet: wikiLang ? `Wikipedia (${wikiLang})` : input.outlet?.trim() || profile?.name || domain,
       domain,
       country: input.country ?? profile?.country ?? null,
       language: input.language ?? null,
