@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@osint/core": "*",
+    "@osint/investigator": "*",
     "@supabase/ssr": "^0.5.1",
     "@supabase/supabase-js": "^2.49.1",
     "leaflet": "^1.9.4",
@@ -31,5 +32,8 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=22.0.0"
   }
 }

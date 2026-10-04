@@ -8,6 +8,7 @@ import {
   type AtomicClaim,
   type ClaimKind,
 } from './claim-decomposition';
+import { classifyRebuttal } from './debunk-signals';
 
 export type ClaimEvidenceStance =
   | 'directly_supports'
@@ -319,7 +320,17 @@ function mapEvidenceToClaim(input: {
   let stanceConfidence = 35;
   let explanation = 'Mentions related terms, but the available snippet does not clearly support or contradict this claim.';
 
-  if (input.conflicted || input.card?.stance === 'disputes') {
+  const rebuttal = overlap >= 0.06 ? classifyRebuttal(input.evidence, claim.text) : null;
+
+  if (rebuttal === 'debunks') {
+    stance = 'contradicts';
+    stanceConfidence = 78;
+    explanation = 'This source reads as a fact-check or rebuttal of the claim, not a confirmation of it.';
+  } else if (rebuttal === 'fact_check_context') {
+    stance = 'context_only';
+    stanceConfidence = 50;
+    explanation = 'Fact-check about this topic; the snippet does not show its rating, so open it before relying on it.';
+  } else if (input.conflicted || input.card?.stance === 'disputes') {
     stance = 'contradicts';
     stanceConfidence = 75;
     explanation = 'This source is involved in a detected disagreement with another source.';

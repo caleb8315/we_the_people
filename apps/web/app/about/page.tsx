@@ -13,8 +13,12 @@ export default function AboutPage() {
       <section>
         <h2>What Crosscheck does</h2>
         <p>
-          Crosscheck reads public reporting and open sensor networks — seismic (USGS), satellite
-          (NASA EONET), weather (NOAA), market, and cyber feeds — and clusters them by event.
+          Crosscheck investigates claims in any language: it searches the media of every
+          country involved in their own languages, reads the key sources in full, checks
+          sensor and satellite data for the claimed place and time (USGS seismic records,
+          NASA FIRMS fire detections, NASA EONET and GDACS hazard catalogs, ERA5 weather,
+          and Sentinel-2 / VIIRS before-and-after imagery), and traces where the story
+          started. It also clusters public reporting and sensor feeds into an event feed.
           For each event it shows three things:
         </p>
         <ul>

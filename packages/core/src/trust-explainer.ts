@@ -241,7 +241,7 @@ function buildWhy(input: TrustExplanationInput): string[] {
 
   if (input.physical_evidence) {
     if (input.physical_evidence.status === 'confirmed') {
-      out.push('Public sensor networks (earthquakes, weather, satellite hotspots) recorded a matching event.');
+      out.push('Public sensor networks (earthquakes, weather, NASA natural-event tracking) recorded a matching event.');
     } else if (input.physical_evidence.status === 'partial') {
       out.push('Public sensor networks partially confirm something is happening, but the picture is incomplete.');
     } else if (input.physical_evidence.status === 'none_detected') {
@@ -401,7 +401,7 @@ function buildHeadlineChips(input: TrustExplanationInput): TrustHeadlineChip[] {
       label: 'Sensor-confirmed',
       tone: 'sensor',
       href: '#physical-evidence',
-      hint: 'Public sensor networks (USGS earthquakes, NASA satellites, NOAA weather) recorded a matching event.',
+      hint: 'Public sensor networks (USGS earthquakes, NASA natural-event tracking, NOAA weather) recorded a matching event.',
     });
   } else if (input.physical_evidence?.status === 'partial') {
     chips.push({
@@ -505,7 +505,7 @@ function buildWhatsUnclear(input: TrustExplanationInput): string[] {
     out.push('Whether additional newsrooms pick this up. Coverage from only one or two sources often shifts in the first hours.');
   }
   if (input.physical_evidence?.status === 'partial' || input.physical_evidence?.status === 'none_detected') {
-    out.push('Whether sensor coverage improves (next satellite pass, additional readings, weather updates).');
+    out.push('Whether sensor coverage improves (additional readings, event-catalog updates, weather updates).');
   }
   if (out.length === 0) {
     out.push('Whether new reporting changes the basic shape of the event.');

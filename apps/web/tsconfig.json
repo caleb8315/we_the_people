@@ -18,7 +18,9 @@
     "paths": {
       "@/*": ["./*"],
       "@osint/core": ["../../packages/core/src/index.ts"],
-      "@osint/core/*": ["../../packages/core/src/*"]
+      "@osint/core/*": ["../../packages/core/src/*"],
+      "@osint/investigator": ["../../packages/investigator/src/index.ts"],
+      "@osint/investigator/*": ["../../packages/investigator/src/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

@@ -8,6 +8,8 @@
  * independent readers treat them as reliable enough to cross-check.
  */
 
+import { isStateControlledDomain } from './outlet-profiles';
+
 export const CREDIBLE_DOMAINS: ReadonlySet<string> = new Set([
   // Wire services
   'reuters.com',
@@ -45,7 +47,6 @@ export const CREDIBLE_DOMAINS: ReadonlySet<string> = new Set([
   'arabnews.com',
   'haaretz.com',
   'timesofisrael.com',
-  'trtworld.com',
   'allafrica.com',
   // Asia-Pacific
   'scmp.com',
@@ -157,6 +158,8 @@ export function isDomainMatch(candidate: string, trusted: string): boolean {
 export function isCredibleDomain(domain: string): boolean {
   if (!domain) return false;
   const normalized = domain.toLowerCase().replace(/^www\./, '');
+  // State-controlled outlets are a perspective, never independent corroboration.
+  if (isStateControlledDomain(normalized)) return false;
   if (dynamicCredibleDomains.has(normalized)) return true;
   for (const trusted of CREDIBLE_DOMAINS) {
     if (isDomainMatch(domain, trusted)) return true;

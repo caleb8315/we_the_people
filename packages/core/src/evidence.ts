@@ -114,11 +114,11 @@ export function assessPhysicalEvidence(input: PhysicalEvidenceInputs): PhysicalE
   }
   if (!satelliteMatch && (topic === 'disaster' || topic === 'war' || topic === 'climate')) {
     limitations.push(
-      'No satellite confirmation detected; public satellite revisit cadence can delay confirmation 1–12 hours.',
+      'No NASA natural-event (EONET) record found; its event catalog can lag real events by hours to days.',
     );
     if (/\b(cloud(?:y|s| cover)?|storm|overcast|fog|smoke)\b/.test(combinedText)) {
       limitations.push(
-        'Cloud / smoke cover may obscure optical satellite detection in this area.',
+        'This feed check does not inspect satellite imagery — use a deep investigation for imagery and fire-detection checks.',
       );
     }
   }

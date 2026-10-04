@@ -1,10 +1,21 @@
 # Crosscheck
 
-**See where reporting agrees, conflicts, and lacks evidence.**
+**Is it fake, is it a conspiracy theory, and what actually happened?**
 
-Crosscheck reads public reporting and open sensor networks — seismic (USGS),
-satellite (NASA EONET), weather (NOAA), market, and cyber feeds — clusters
-them by event, and shows three things for each:
+Paste any claim, headline, or link — in any language — and Crosscheck's
+**deep investigation engine** researches it like a newsroom would: it checks
+existing fact-checks, searches the media of every country involved *in their
+own languages* (including opposing sides), reads the key sources in full,
+pulls sensor and satellite data for the claimed place and time (USGS, NASA
+FIRMS, EONET, GDACS, ERA5 weather, Sentinel-2 and VIIRS before/after imagery),
+traces where the story started, and labels who owns each outlet. Every quote
+in the final report is verified word-for-word against its source. See
+[docs/investigation-engine.md](docs/investigation-engine.md).
+
+Alongside on-demand investigations, Crosscheck reads public reporting and open
+sensor networks — seismic (USGS), natural-event tracking (NASA EONET), weather
+(NOAA), market, and cyber feeds — clusters them by event, and shows three
+things for each:
 
 1. **Agreement** — how many independent credible sources describe the event
    the same way.
@@ -30,8 +41,12 @@ osint-platform/
 │   ├── web/              Next.js (Vercel) dashboard + API
 │   └── worker/           Node ingest + scoring worker (GitHub Actions)
 ├── packages/
-│   └── core/             Shared types, reliability scoring, contradiction
-│                         detection, claim normalization, evidence assessment
+│   ├── core/             Shared types, reliability scoring, contradiction
+│   │                     detection, claim normalization, evidence assessment,
+│   │                     outlet ownership profiles, rebuttal detection
+│   └── investigator/     Agentic investigation engine (AI SDK tool loop,
+│                         multilingual news, satellites/sensors, citation
+│                         verification, guardrails, evals)
 ├── supabase/
 │   └── migrations/       Database schema with RLS (013–016 roll out the
 │                         reliability / contradictions / label / evidence
@@ -49,6 +64,8 @@ osint-platform/
 - **Next.js 14** on Vercel Hobby (web + API)
 - **Supabase** Postgres + Auth + Storage (anon + service role)
 - **GitHub Actions** for cron ingestion, briefing, backfill
+- **Vercel AI SDK 7 + AI Gateway** for the investigation agent (Claude /
+  GPT / Gemini, tool calling, vision on satellite imagery)
 - **Gemini / Groq** for LLM enrichment (daily hard caps, strictly opt-in)
 - In-app notifications for user briefings and priority alerts
 
@@ -82,6 +99,9 @@ npm run backfill -- 48 --dry-run
 
 ## What Crosscheck does
 
+- **Deep investigation** on `/verify`: agentic, multilingual, sensor- and
+  satellite-backed verdicts with verified citations, every side's position,
+  origin tracing, and manipulation techniques (streams live progress)
 - Event feed with source citations, reliability labels, and confidence bands
 - Daily personal briefing (in-app notifications)
 - Priority alerts with user-configurable topics

@@ -32,3 +32,5 @@ export * from './result-explanation';
 export * from './claim-decomposition';
 export * from './case-file';
 export * from './prompts';
+export * from './outlet-profiles';
+export * from './debunk-signals';

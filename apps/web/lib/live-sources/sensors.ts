@@ -68,9 +68,26 @@ export async function searchSensors(q: SourceQuery): Promise<SourceResult> {
   if (networks.has('swpc')) jobs.push(querySwpc());
 
   const settled = await Promise.allSettled(jobs);
-  const hits: SensorHit[] = [];
+  const feedHits: SensorHit[] = [];
   for (const s of settled) {
-    if (s.status === 'fulfilled') hits.push(...s.value);
+    if (s.status === 'fulfilled') feedHits.push(...s.value);
+  }
+
+  // A recent quake in Japan says nothing about a claimed quake in Paris:
+  // only events whose location text shares a place name with the claim count.
+  const placeTokens = claimPlaceTokens(searchText);
+  const hits = feedHits.filter((h) => matchesPlace(h, placeTokens));
+
+  if (placeTokens.size === 0) {
+    return {
+      id: 'sensors',
+      name: 'Sensor networks',
+      status: 'miss',
+      hits: 0,
+      note: 'The claim does not name a place we could match against sensor events, so sensor data was not used.',
+      evidence: [],
+      physical_evidence: null,
+    };
   }
 
   if (hits.length === 0) {
@@ -79,14 +96,14 @@ export async function searchSensors(q: SourceQuery): Promise<SourceResult> {
       name: 'Sensor networks',
       status: 'miss',
       hits: 0,
-      note: `Queried ${[...networks].join(', ').toUpperCase()}; no recent matching events.`,
+      note: `Queried ${[...networks].join(', ').toUpperCase()}; no recent events near the place named in the claim.`,
       evidence: [],
       physical_evidence: {
         status: 'none_detected',
         sources: [...networks].map(networkDomain),
         confidence: 0,
         limitations: [
-          'Sensor networks returned no matching events within the current window.',
+          'Only the last few days of sensor data were checked, and only by place name.',
         ],
       },
     };
@@ -117,6 +134,35 @@ export async function searchSensors(q: SourceQuery): Promise<SourceResult> {
       limitations: [],
     },
   };
+}
+
+const NON_PLACE_WORDS = new Set([
+  'earthquake', 'quake', 'magnitude', 'seismic', 'aftershock', 'tremor', 'wildfire', 'fire', 'fires',
+  'forest', 'volcano', 'volcanic', 'eruption', 'hurricane', 'typhoon', 'cyclone', 'tropical', 'storm',
+  'tornado', 'blizzard', 'flood', 'flooding', 'warning', 'watch', 'alert', 'advisory', 'severe',
+  'weather', 'event', 'events', 'near', 'north', 'south', 'east', 'west', 'region', 'island',
+  'islands', 'massive', 'major', 'strong', 'deadly', 'hits', 'struck', 'strikes', 'today',
+  'issued', 'until', 'county', 'area', 'space', 'solar', 'geomagnetic', 'flare', 'with', 'from',
+  'this', 'that', 'there', 'their', 'after', 'over',
+]);
+
+function claimPlaceTokens(text: string): Set<string> {
+  const out = new Set<string>();
+  // Capitalised words (any script with case) plus long tokens in caseless scripts.
+  for (const m of text.matchAll(/\p{Lu}[\p{L}\p{M}'-]{2,}|[\p{Script=Han}\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Devanagari}\p{Script=Thai}]{2,}/gu)) {
+    const token = m[0].toLowerCase();
+    if (!NON_PLACE_WORDS.has(token)) out.add(token);
+  }
+  return out;
+}
+
+function matchesPlace(hit: SensorHit, placeTokens: Set<string>): boolean {
+  if (placeTokens.size === 0) return false;
+  const haystack = `${hit.title} ${hit.excerpt ?? ''}`.toLowerCase();
+  for (const t of placeTokens) {
+    if (haystack.includes(t)) return true;
+  }
+  return false;
 }
 
 function detectTopics(text: string): PhysicalTopic[] {

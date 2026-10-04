@@ -1,7 +1,8 @@
-import { VerifyClient } from './verify-client';
+import { investigatorConfigured } from '@osint/investigator';
+import { VerifyWorkspace } from './verify-workspace';
 import { getServerSupabase } from '@/lib/supabase-server';
 
-export const metadata = { title: 'Verify a claim · Crosscheck' };
+export const metadata = { title: 'Investigate a claim · Crosscheck' };
 export const dynamic = 'force-dynamic';
 
 export default async function VerifyPage() {
@@ -19,18 +20,20 @@ export default async function VerifyPage() {
       <header>
         <div>
           <p className="font-display text-[11px] font-semibold uppercase tracking-[0.22em] text-flare">
-            Evidence check
+            Investigate
           </p>
-          <h1 className="mt-2 max-w-2xl font-display text-[34px] font-semibold leading-[1.1] tracking-tight text-ink sm:text-[44px]">
-            Is this trustworthy?
+          <h1 className="mt-2 max-w-3xl font-display text-[34px] font-semibold leading-[1.1] tracking-tight text-ink sm:text-[44px]">
+            Is it real, is it spin, and what actually happened?
           </h1>
           <p className="mt-3 max-w-2xl text-sm text-ink-500 sm:text-base">
-            Paste a URL, headline, or rumor. Get a direct answer — yes, no, partly, or sources
-            disagree — followed by the evidence behind it.
+            Paste a claim, headline, or link in any language. Crosscheck investigates it the way a
+            newsroom would — every side&apos;s media in their own language, the full articles,
+            satellite and sensor data, and where the story started — then shows you the evidence
+            behind its answer.
           </p>
         </div>
       </header>
-      <VerifyClient signedIn={signedIn} />
+      <VerifyWorkspace signedIn={signedIn} deepAvailable={investigatorConfigured()} />
     </div>
   );
 }
