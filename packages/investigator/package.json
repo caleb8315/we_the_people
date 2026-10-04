@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test src/__tests__/*.test.ts",
     "investigate": "tsx src/cli.ts",
-    "eval": "tsx evals/run.ts"
+    "eval": "tsx evals/run.ts",
+    "smoke": "tsx evals/smoke-tools.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

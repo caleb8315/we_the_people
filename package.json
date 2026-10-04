@@ -23,7 +23,7 @@
     "watchdog": "npm run watchdog --workspace apps/worker"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "devDependencies": {
     "typescript": "^5.7.3",
