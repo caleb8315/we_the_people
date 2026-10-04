@@ -310,6 +310,7 @@ export async function POST(req: Request) {
     evidence: mergedEvidence,
     ranked,
     contradictions: corroboration.contradictions,
+    claim_text: `${searchedTitle ?? title ?? ''} ${body.text ?? ''}`.trim() || null,
   });
   const cardsSummary = summarizeEvidenceCards(evidenceCards);
 

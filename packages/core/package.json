@@ -34,7 +34,9 @@
     "./result-explanation": "./src/result-explanation.ts",
     "./claim-decomposition": "./src/claim-decomposition.ts",
     "./case-file": "./src/case-file.ts",
-    "./prompts": "./src/prompts.ts"
+    "./prompts": "./src/prompts.ts",
+    "./outlet-profiles": "./src/outlet-profiles.ts",
+    "./debunk-signals": "./src/debunk-signals.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

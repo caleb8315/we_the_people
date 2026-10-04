@@ -28,6 +28,7 @@ import type { EvidenceItem } from './types';
 import type { DetectedContradiction } from './contradictions';
 import type { RankedSource } from './source-ranking';
 import { normalizeCause } from './normalize';
+import { classifyRebuttal } from './debunk-signals';
 
 export type EvidenceStance = 'supports' | 'disputes' | 'neutral' | 'context';
 
@@ -62,6 +63,8 @@ export interface BuildEvidenceCardsInput {
   evidence: EvidenceItem[];
   ranked: RankedSource[];
   contradictions: DetectedContradiction[];
+  /** The claim being checked. When present, rebuttals of it are marked 'disputes'. */
+  claim_text?: string | null;
 }
 
 const REFERENCE_DOMAINS = ['wikipedia.org', 'britannica.com'];
@@ -133,7 +136,23 @@ function deriveStance(
   ranked: RankedSource | undefined,
   contradictionUrls: Set<string>,
   dominantCause: string | null,
+  claimText: string | null,
 ): { stance: EvidenceStance; explanation: string } {
+  if (claimText) {
+    const rebuttal = classifyRebuttal(e, claimText);
+    if (rebuttal === 'debunks') {
+      return {
+        stance: 'disputes',
+        explanation: 'Reads as a fact-check or rebuttal of the claim rather than a confirmation.',
+      };
+    }
+    if (rebuttal === 'fact_check_context') {
+      return {
+        stance: 'context',
+        explanation: 'Fact-check about this topic — open it to see the rating.',
+      };
+    }
+  }
   if (contradictionUrls.has(e.url)) {
     return {
       stance: 'disputes',
@@ -241,7 +260,13 @@ export function buildEvidenceCards(input: BuildEvidenceCardsInput): EvidenceCard
     if (!key || seen.has(key)) return;
     seen.add(key);
     const r = rankedMap.get(key);
-    const { stance, explanation } = deriveStance(e, r, conflictedUrls, dominantCause);
+    const { stance, explanation } = deriveStance(
+      e,
+      r,
+      conflictedUrls,
+      dominantCause,
+      input.claim_text ?? null,
+    );
     cards.push({
       id: urlId(e.url, idx),
       url: e.url,

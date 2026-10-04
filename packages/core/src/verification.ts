@@ -1,5 +1,7 @@
 import type { EvidenceItem, Signal, VerificationStatus } from './types';
 import { extractDomain, isCredibleDomain } from './domains';
+import { classifyRebuttal } from './debunk-signals';
+import { isFactCheckSource } from './outlet-profiles';
 
 /**
  * Reliability / corroboration scoring.
@@ -116,16 +118,21 @@ export function decideVerification(
   summary: string | null,
   evidence: EvidenceItem[],
 ): VerificationDecision {
+  const text = `${title}\n${summary ?? ''}`;
   const distinctDomains = new Set<string>();
   const credibleDomains = new Set<string>();
+  const rebuttingDomains = new Set<string>();
   for (const e of evidence) {
     if (!e.domain) continue;
+    if (classifyRebuttal(e, text) === 'debunks') {
+      rebuttingDomains.add(e.domain);
+      continue;
+    }
     distinctDomains.add(e.domain);
     if (isCredibleDomain(e.domain)) credibleDomains.add(e.domain);
   }
 
   const credible = credibleDomains.size;
-  const text = `${title}\n${summary ?? ''}`;
   const log: string[] = [];
 
   let status = computeStatus(distinctDomains.size, credible);
@@ -133,6 +140,17 @@ export function decideVerification(
     `initial=${status} sources=${distinctDomains.size} credible_domains=${credible} ` +
     `credible_list=[${[...credibleDomains].join(',')}]`,
   );
+
+  if (rebuttingDomains.size > 0) {
+    log.push(`rebuttals_excluded=[${[...rebuttingDomains].join(',')}]`);
+    const credibleRebuttal = [...rebuttingDomains].some(
+      (d) => isCredibleDomain(d) || isFactCheckSource(null, d),
+    );
+    if (credibleRebuttal && status === 'verified') {
+      log.push('override: credible rebuttal or fact-check present — not marking corroborated');
+      status = 'developing';
+    }
+  }
 
   if (isNonKineticContext(text) && status !== 'quarantined') {
     log.push('override: non-kinetic context (policy/legal language without kinetic evidence)');

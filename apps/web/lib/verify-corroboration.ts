@@ -119,12 +119,19 @@ export function extractKeywords(text: string): string[] {
     'last', 'long', 'great', 'high', 'people', 'state', 'says', 'report',
     'reports', 'reported', 'according', 'official', 'officials',
   ]);
+  // Unicode-aware: Arabic, Cyrillic, CJK, Devanagari etc. must survive
+  // tokenisation or non-English claims produce no search terms at all.
+  // Caseless/unspaced scripts (CJK, Thai) use a shorter minimum length.
   const tokens = text
     .toLowerCase()
     .replace(/['\u2018\u2019]/g, '')
-    .replace(/[^a-z0-9\s-]/g, ' ')
+    .replace(/[^\p{L}\p{M}\p{N}\s-]/gu, ' ')
     .split(/\s+/)
-    .filter((w) => w.length >= 4 && !stop.has(w) && !/^\d+$/.test(w));
+    .filter((w) => {
+      if (!w || stop.has(w) || /^\p{N}+$/u.test(w)) return false;
+      const minLength = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}]/u.test(w) ? 2 : 4;
+      return [...w].length >= minLength;
+    });
   const seen = new Set<string>();
   const out: string[] = [];
   for (const w of tokens) {
