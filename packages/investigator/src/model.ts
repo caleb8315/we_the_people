@@ -15,6 +15,8 @@ export interface ResolvedModels {
 
 type Env = Record<string, string | undefined>;
 
+const XAY_BASE_URL = 'https://api.xay.ai/v1';
+
 const GATEWAY_DEFAULT_MAIN = 'anthropic/claude-sonnet-5.5';
 const GATEWAY_DEFAULT_FAST = 'google/gemini-3.8-flash';
 
@@ -27,6 +29,22 @@ const GATEWAY_DEFAULT_FAST = 'google/gemini-3.8-flash';
 export function resolveModels(env: Env = process.env): ResolvedModels | null {
   const mainOverride = env.INVESTIGATOR_MODEL?.trim() || null;
   const fastOverride = env.INVESTIGATOR_FAST_MODEL?.trim() || null;
+
+  if (env.XAY_API_KEY) {
+    const xay = createOpenAI({
+      apiKey: env.XAY_API_KEY,
+      baseURL: XAY_BASE_URL,
+      name: 'xay',
+    });
+    const main = mainOverride ?? GATEWAY_DEFAULT_MAIN;
+    const fast = fastOverride ?? GATEWAY_DEFAULT_FAST;
+    return {
+      main: xay.chat(main),
+      fast: xay.chat(fast),
+      label: `${main} via XAY`,
+      gateway: null,
+    };
+  }
 
   if (env.AI_GATEWAY_API_KEY || env.VERCEL_OIDC_TOKEN) {
     const gateway = createGateway(env.AI_GATEWAY_API_KEY ? { apiKey: env.AI_GATEWAY_API_KEY } : {});
@@ -62,7 +80,8 @@ export function resolveModels(env: Env = process.env): ResolvedModels | null {
 
 export function investigatorConfigured(env: Env = process.env): boolean {
   return Boolean(
-    env.AI_GATEWAY_API_KEY ||
+    env.XAY_API_KEY ||
+      env.AI_GATEWAY_API_KEY ||
       env.VERCEL_OIDC_TOKEN ||
       env.ANTHROPIC_API_KEY ||
       env.OPENAI_API_KEY ||
