@@ -30,7 +30,7 @@ export function VerifyWorkspace({ signedIn, deepAvailable }: { signedIn: boolean
       </div>
       {mode === 'deep' && !deepAvailable && (
         <p className="rounded-2xl border border-warn-200 bg-warn-50 px-4 py-3 text-sm text-ink-700">
-          Deep investigation needs an AI key on the server (AI_GATEWAY_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY or GEMINI_API_KEY). Quick check works without one.
+          Deep investigation needs an AI key on the server (XAY_API_KEY, AI_GATEWAY_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY or GEMINI_API_KEY). Quick check works without one.
         </p>
       )}
       {mode === 'deep' ? <InvestigateClient signedIn={signedIn} /> : <VerifyClient signedIn={signedIn} />}

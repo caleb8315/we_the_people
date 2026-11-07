@@ -46,7 +46,7 @@ export interface InvestigationOptions {
 
 export class InvestigatorNotConfiguredError extends Error {
   constructor() {
-    super('No AI model is configured. Set AI_GATEWAY_API_KEY (recommended), ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY.');
+    super('No AI model is configured. Set XAY_API_KEY (recommended), AI_GATEWAY_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY.');
   }
 }
 

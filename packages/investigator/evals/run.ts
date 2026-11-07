@@ -37,7 +37,7 @@ const concurrency = Number(arg('concurrency') ?? 2);
 const selected = cases.filter((c) => !only || c.id === only).slice(0, limitN);
 
 if (!resolveModels()) {
-  console.error('No model configured. Set AI_GATEWAY_API_KEY (or ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY).');
+  console.error('No model configured. Set XAY_API_KEY (or AI_GATEWAY_API_KEY / ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY).');
   process.exit(1);
 }
 
